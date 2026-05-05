@@ -1,0 +1,3 @@
+-- All stored procedures have been moved to Database\Master\02_MasterDB_StoredProcedures.sql
+-- They are dynamic cross-database SPs that accept @DatabaseName as the first parameter.
+-- This file is intentionally empty.

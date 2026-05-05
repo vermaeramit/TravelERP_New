@@ -1,0 +1,15 @@
+D:\Projects\travel_crm\TravelERP.Core\bin\Debug\net8.0\TravelERP.Core.deps.json
+D:\Projects\travel_crm\TravelERP.Core\bin\Debug\net8.0\TravelERP.Core.dll
+D:\Projects\travel_crm\TravelERP.Core\bin\Debug\net8.0\TravelERP.Core.pdb
+D:\Projects\travel_crm\TravelERP.Core\bin\Debug\net8.0\TravelERP.Shared.dll
+D:\Projects\travel_crm\TravelERP.Core\bin\Debug\net8.0\TravelERP.Shared.pdb
+D:\Projects\travel_crm\TravelERP.Core\obj\Debug\net8.0\TravelERP.Core.csproj.AssemblyReference.cache
+D:\Projects\travel_crm\TravelERP.Core\obj\Debug\net8.0\TravelERP.Core.GeneratedMSBuildEditorConfig.editorconfig
+D:\Projects\travel_crm\TravelERP.Core\obj\Debug\net8.0\TravelERP.Core.AssemblyInfoInputs.cache
+D:\Projects\travel_crm\TravelERP.Core\obj\Debug\net8.0\TravelERP.Core.AssemblyInfo.cs
+D:\Projects\travel_crm\TravelERP.Core\obj\Debug\net8.0\TravelERP.Core.csproj.CoreCompileInputs.cache
+D:\Projects\travel_crm\TravelERP.Core\obj\Debug\net8.0\TravelER.C8EDA5AB.Up2Date
+D:\Projects\travel_crm\TravelERP.Core\obj\Debug\net8.0\TravelERP.Core.dll
+D:\Projects\travel_crm\TravelERP.Core\obj\Debug\net8.0\refint\TravelERP.Core.dll
+D:\Projects\travel_crm\TravelERP.Core\obj\Debug\net8.0\TravelERP.Core.pdb
+D:\Projects\travel_crm\TravelERP.Core\obj\Debug\net8.0\ref\TravelERP.Core.dll

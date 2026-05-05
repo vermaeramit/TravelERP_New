@@ -1,0 +1,46 @@
+@model IEnumerable<TravelERP.Core.Entities.Tenant.Customer>
+@{
+    ViewData["Title"] = "Customers";
+}
+<div class="card shadow-sm">
+    <div class="card-header bg-transparent border-0 section-header">
+        <h5><i class="bi bi-people-fill text-primary me-2"></i>Customer Directory</h5>
+        <a href="/Customers/Create" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg me-1"></i>Add Customer
+        </a>
+    </div>
+    <div class="card-body">
+        <table class="table table-hover dt-table">
+            <thead>
+                <tr>
+                    <th>Code</th><th>Name</th><th>Mobile</th><th>Destination</th>
+                    <th>Travel Date</th><th>Lead Source</th><th>Assigned To</th><th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var c in Model)
+                {
+                    <tr>
+                        <td><span class="badge bg-light text-dark border">@c.CustomerCode</span></td>
+                        <td><a href="/Customers/Details/@c.Id" class="fw-semibold text-decoration-none">@c.Name</a></td>
+                        <td>@c.Mobile</td>
+                        <td>@(c.Destination ?? "—")</td>
+                        <td>@(c.TravelingDate.HasValue ? c.TravelingDate.Value.ToString("dd MMM yyyy") : "—")</td>
+                        <td>@(c.LeadSource ?? "—")</td>
+                        <td>@(c.AssignedTo ?? "—")</td>
+                        <td>
+                            <a href="/Customers/Details/@c.Id" class="btn btn-sm btn-outline-info" title="View"><i class="bi bi-eye"></i></a>
+                            <a href="/Customers/Edit/@c.Id" class="btn btn-sm btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></a>
+                            <form method="post" action="/Customers/Delete/@c.Id" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-outline-danger btn-confirm-delete" title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

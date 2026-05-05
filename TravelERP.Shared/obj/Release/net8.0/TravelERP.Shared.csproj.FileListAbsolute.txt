@@ -1,0 +1,11 @@
+D:\Projects\travel_crm\TravelERP.Shared\bin\Release\net8.0\TravelERP.Shared.deps.json
+D:\Projects\travel_crm\TravelERP.Shared\bin\Release\net8.0\TravelERP.Shared.dll
+D:\Projects\travel_crm\TravelERP.Shared\bin\Release\net8.0\TravelERP.Shared.pdb
+D:\Projects\travel_crm\TravelERP.Shared\obj\Release\net8.0\TravelERP.Shared.GeneratedMSBuildEditorConfig.editorconfig
+D:\Projects\travel_crm\TravelERP.Shared\obj\Release\net8.0\TravelERP.Shared.AssemblyInfoInputs.cache
+D:\Projects\travel_crm\TravelERP.Shared\obj\Release\net8.0\TravelERP.Shared.AssemblyInfo.cs
+D:\Projects\travel_crm\TravelERP.Shared\obj\Release\net8.0\TravelERP.Shared.csproj.CoreCompileInputs.cache
+D:\Projects\travel_crm\TravelERP.Shared\obj\Release\net8.0\TravelERP.Shared.dll
+D:\Projects\travel_crm\TravelERP.Shared\obj\Release\net8.0\refint\TravelERP.Shared.dll
+D:\Projects\travel_crm\TravelERP.Shared\obj\Release\net8.0\TravelERP.Shared.pdb
+D:\Projects\travel_crm\TravelERP.Shared\obj\Release\net8.0\ref\TravelERP.Shared.dll

@@ -1,0 +1,216 @@
+/* ===== TravelERP Custom Styles ===== */
+
+:root {
+    --erp-primary: #0d6efd;
+    --erp-sidebar-bg: #1e2433;
+    --erp-sidebar-width: 260px;
+}
+
+/* ── Sidebar shell ── */
+.app-sidebar {
+    background-color: var(--erp-sidebar-bg) !important;
+}
+.app-sidebar .sidebar-wrapper {
+    background-color: var(--erp-sidebar-bg) !important;
+}
+
+/* Sidebar brand */
+.sidebar-brand {
+    padding: 1rem 1.2rem;
+    background-color: #161b27 !important;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+/* ── Section headers (MAIN / OPERATIONS / FINANCE …) ── */
+.app-sidebar .nav-header {
+    color: #6c8ebf !important;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    padding: 1rem 1rem 0.35rem;
+    text-transform: uppercase;
+}
+
+/* ── Nav links ── */
+.app-sidebar .nav-sidebar .nav-link {
+    color: #c4cde0 !important;
+    border-radius: 6px;
+    margin: 1px 8px;
+    padding: 0.52rem 0.85rem;
+    transition: background 0.15s, color 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+.app-sidebar .nav-sidebar .nav-link .nav-icon {
+    color: #7b92b8 !important;
+    font-size: 1rem;
+    width: 1.25rem;
+    text-align: center;
+    flex-shrink: 0;
+    transition: color 0.15s;
+}
+.app-sidebar .nav-sidebar .nav-link p {
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.2;
+}
+
+/* ── Hover ── */
+.app-sidebar .nav-sidebar .nav-link:hover {
+    background-color: rgba(99,135,210,0.15) !important;
+    color: #ffffff !important;
+}
+.app-sidebar .nav-sidebar .nav-link:hover .nav-icon {
+    color: #6387d2 !important;
+}
+
+/* ── Active ── */
+.app-sidebar .nav-sidebar .nav-link.active {
+    background-color: #0d6efd !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 10px rgba(13,110,253,0.35);
+}
+.app-sidebar .nav-sidebar .nav-link.active .nav-icon {
+    color: #ffffff !important;
+}
+
+/* ── Treeview sub-items ── */
+.app-sidebar .nav-treeview .nav-link {
+    padding-left: 2.6rem !important;
+    font-size: 0.83rem !important;
+    color: #9aaec8 !important;
+}
+.app-sidebar .nav-treeview .nav-link:hover {
+    color: #ffffff !important;
+    background-color: rgba(99,135,210,0.12) !important;
+}
+.app-sidebar .nav-treeview .nav-link.active {
+    background-color: rgba(13,110,253,0.75) !important;
+    color: #ffffff !important;
+}
+
+/* ── Treeview arrow ── */
+.app-sidebar .nav-arrow {
+    margin-left: auto;
+    font-size: 0.7rem;
+    opacity: 0.6;
+    transition: transform 0.2s;
+}
+.app-sidebar .nav-item.menu-open > .nav-link .nav-arrow {
+    transform: rotate(90deg);
+    opacity: 1;
+}
+
+/* Stat cards */
+.stat-card {
+    border: none;
+    border-radius: 12px;
+    transition: transform 0.2s, box-shadow 0.2s;
+    overflow: hidden;
+}
+.stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.12) !important;
+}
+.stat-card .stat-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+.stat-card .stat-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    line-height: 1;
+}
+.stat-card .stat-label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* DataTables */
+.dataTables_wrapper .dataTables_length select,
+.dataTables_wrapper .dataTables_filter input {
+    border-radius: 8px;
+    border: 1px solid var(--bs-border-color);
+    padding: 4px 10px;
+}
+table.dataTable thead th {
+    white-space: nowrap;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+/* Badges */
+.status-badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* Form card */
+.form-card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+
+/* Section header */
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+}
+.section-header h5 {
+    margin: 0;
+    font-weight: 600;
+}
+
+/* Timeline */
+.timeline-item {
+    padding-left: 1.5rem;
+    border-left: 2px solid var(--bs-border-color);
+    position: relative;
+    padding-bottom: 1rem;
+}
+.timeline-item::before {
+    content: '';
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--erp-primary);
+    position: absolute;
+    left: -6px;
+    top: 4px;
+}
+
+/* Dark mode overrides */
+[data-bs-theme="dark"] .app-sidebar {
+    background-color: #1a1d23 !important;
+}
+[data-bs-theme="dark"] .stat-card {
+    background-color: #2c2f36;
+}
+
+/* Loading spinner */
+.page-loading {
+    position: fixed; inset: 0;
+    background: rgba(255,255,255,0.8);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9999;
+}
+
+/* Print styles */
+@media print {
+    .app-sidebar, .app-header, .app-footer, .btn, .no-print { display: none !important; }
+    .app-main { margin: 0 !important; }
+}

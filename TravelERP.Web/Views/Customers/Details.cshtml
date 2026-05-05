@@ -1,0 +1,110 @@
+@model TravelERP.Core.Entities.Tenant.Customer
+@{
+    ViewData["Title"] = Model.Name;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div></div>
+    <div class="d-flex gap-2">
+        <a href="/Customers/Edit/@Model.Id" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-pencil me-1"></i>Edit
+        </a>
+        <a href="/Customers" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i>Back
+        </a>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-xl-8">
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-transparent border-0">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-person-fill text-primary me-2"></i>Customer Details</h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-2">
+                    @{
+                        void DetailRow(string label, string? value) {
+                            <div class="col-md-6 mb-2">
+                                <div class="small text-muted">@label</div>
+                                <div class="fw-semibold">@(string.IsNullOrEmpty(value) ? "—" : value)</div>
+                            </div>
+                        }
+                    }
+                    @{ DetailRow("Customer Code", Model.CustomerCode); }
+                    @{ DetailRow("Name", Model.Name); }
+                    @{ DetailRow("Mobile", Model.Mobile); }
+                    @{ DetailRow("Email", Model.Email); }
+                    @{ DetailRow("Destination", Model.Destination); }
+                    @{ DetailRow("Traveling Date", Model.TravelingDate.HasValue ? Model.TravelingDate.Value.ToString("dd MMM yyyy") : null); }
+                    @{ DetailRow("Leaving From", Model.LeavingFrom); }
+                    @{ DetailRow("Travel City", Model.TravelCity); }
+                    @{ DetailRow("Hotel Recommended", Model.HotelRecommended); }
+                    @{ DetailRow("No. of Adults", Model.NoOfAdults?.ToString()); }
+                    @{ DetailRow("No. of Children", Model.NoOfChildren?.ToString()); }
+                    @{ DetailRow("No. of Days", Model.NoOfDays?.ToString()); }
+                    @{ DetailRow("Infant", Model.Infant); }
+                    @{ DetailRow("Lead Source", Model.LeadSource); }
+                    @{ DetailRow("Assigned To", Model.AssignedTo); }
+                </div>
+                @if (!string.IsNullOrEmpty(Model.Remark))
+                {
+                    <div class="mt-2">
+                        <div class="small text-muted">Remark</div>
+                        <div>@Model.Remark</div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(Model.PassportNumber) || Model.PassportExpiry.HasValue)
+        {
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-transparent border-0">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-passport text-warning me-2"></i>Passport Details</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <div class="small text-muted">Passport Number</div>
+                            <div class="fw-semibold">@(Model.PassportNumber ?? "—")</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="small text-muted">Passport Expiry</div>
+                            <div class="fw-semibold @(Model.PassportExpiry.HasValue && Model.PassportExpiry.Value < DateTime.Today.AddMonths(6) ? "text-danger" : "")">
+                                @(Model.PassportExpiry.HasValue ? Model.PassportExpiry.Value.ToString("dd MMM yyyy") : "—")
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="col-xl-4">
+        @if (!string.IsNullOrEmpty(Model.Notes))
+        {
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-transparent border-0">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-sticky-fill text-info me-2"></i>Notes</h6>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0 small" style="white-space:pre-wrap">@Model.Notes</p>
+                </div>
+            </div>
+        }
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-transparent border-0">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-clock-history text-secondary me-2"></i>Record Info</h6>
+            </div>
+            <div class="card-body small text-muted">
+                <div>Created: @Model.CreatedAt.ToString("dd MMM yyyy, hh:mm tt")</div>
+                @if (Model.UpdatedAt.HasValue)
+                {
+                    <div>Updated: @Model.UpdatedAt.Value.ToString("dd MMM yyyy, hh:mm tt")</div>
+                }
+            </div>
+        </div>
+    </div>
+</div>

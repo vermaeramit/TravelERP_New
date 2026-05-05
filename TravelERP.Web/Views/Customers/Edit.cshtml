@@ -1,0 +1,162 @@
+@model TravelERP.Core.Entities.Tenant.Customer
+@{
+    ViewData["Title"] = "Edit Customer";
+}
+<div class="row justify-content-center">
+    <div class="col-xl-10">
+        <form asp-action="Edit" asp-controller="Customers" method="post">
+            @Html.AntiForgeryToken()
+            <input asp-for="Id" type="hidden" />
+            <input asp-for="CustomerCode" type="hidden" />
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger small py-2"></div>
+
+            <div class="card form-card shadow-sm mb-3">
+                <div class="card-header border-0 bg-transparent d-flex align-items-center justify-content-between">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-person-fill text-primary me-2"></i>Customer Details</h6>
+                    <span class="badge bg-light text-dark border small">@Model.CustomerCode</span>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+
+                        <div class="col-12">
+                            <label asp-for="Name" class="form-label small fw-semibold">Name</label>
+                            <input asp-for="Name" class="form-control" />
+                            <span asp-validation-for="Name" class="text-danger small"></span>
+                        </div>
+                        <div class="col-12">
+                            <label asp-for="Mobile" class="form-label small fw-semibold">Mobile</label>
+                            <input asp-for="Mobile" class="form-control" />
+                            <span asp-validation-for="Mobile" class="text-danger small"></span>
+                        </div>
+                        <div class="col-12">
+                            <label asp-for="Email" class="form-label small fw-semibold">Email</label>
+                            <input asp-for="Email" class="form-control" />
+                        </div>
+                        <div class="col-12">
+                            <label asp-for="Destination" class="form-label small fw-semibold">Destination</label>
+                            <select asp-for="Destination" class="form-select">
+                                <option value="">Select Destination</option>
+                                <optgroup label="India">
+                                    <option>Goa</option><option>Kerala</option><option>Rajasthan</option>
+                                    <option>Himachal Pradesh</option><option>Uttarakhand</option>
+                                    <option>Andaman & Nicobar</option><option>Lakshadweep</option>
+                                    <option>Kashmir</option><option>Sikkim</option><option>Ladakh</option>
+                                    <option>Varanasi</option><option>Agra</option>
+                                </optgroup>
+                                <optgroup label="International">
+                                    <option>Dubai</option><option>Thailand</option><option>Singapore</option>
+                                    <option>Malaysia</option><option>Maldives</option><option>Sri Lanka</option>
+                                    <option>Nepal</option><option>Bhutan</option><option>Europe</option>
+                                    <option>USA</option><option>Australia</option><option>Canada</option>
+                                    <option>Bali (Indonesia)</option><option>Turkey</option>
+                                    <option>Egypt</option><option>South Africa</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label asp-for="TravelingDate" class="form-label small fw-semibold">Traveling Date</label>
+                            <input asp-for="TravelingDate" type="date" class="form-control" />
+                        </div>
+                        <div class="col-md-3">
+                            <label asp-for="LeavingFrom" class="form-label small fw-semibold">Leaving From</label>
+                            <select asp-for="LeavingFrom" class="form-select">
+                                <option value="">Select Leaving From</option>
+                                <option>Mumbai</option><option>Delhi</option><option>Bengaluru</option>
+                                <option>Chennai</option><option>Hyderabad</option><option>Kolkata</option>
+                                <option>Ahmedabad</option><option>Pune</option><option>Jaipur</option>
+                                <option>Surat</option><option>Lucknow</option><option>Nagpur</option>
+                                <option>Indore</option><option>Bhopal</option><option>Chandigarh</option>
+                                <option>Kochi</option><option>Coimbatore</option><option>Vadodara</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label asp-for="TravelCity" class="form-label small fw-semibold">Travel City</label>
+                            <input asp-for="TravelCity" class="form-control" />
+                        </div>
+                        <div class="col-md-3">
+                            <label asp-for="HotelRecommended" class="form-label small fw-semibold">Hotel Recommended</label>
+                            <input asp-for="HotelRecommended" class="form-control" />
+                        </div>
+                        <div class="col-md-2">
+                            <label asp-for="NoOfAdults" class="form-label small fw-semibold">No. of Adults</label>
+                            <select asp-for="NoOfAdults" class="form-select">
+                                <option value="">Adults</option>
+                                @for (int i = 1; i <= 20; i++) { <option value="@i">@i</option> }
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label asp-for="NoOfChildren" class="form-label small fw-semibold">No. of Childs</label>
+                            <select asp-for="NoOfChildren" class="form-select">
+                                <option value="">Childs</option>
+                                @for (int i = 0; i <= 10; i++) { <option value="@i">@i</option> }
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label asp-for="NoOfDays" class="form-label small fw-semibold">No. of Days</label>
+                            <select asp-for="NoOfDays" class="form-select">
+                                <option value="">Days</option>
+                                @for (int i = 1; i <= 60; i++) { <option value="@i">@i</option> }
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label asp-for="AssignedTo" class="form-label small fw-semibold">Assigned To</label>
+                            <input asp-for="AssignedTo" class="form-control" />
+                        </div>
+                        <div class="col-md-3">
+                            <label asp-for="LeadSource" class="form-label small fw-semibold">Lead Source</label>
+                            <select asp-for="LeadSource" class="form-select">
+                                <option value="">Select Source</option>
+                                <option>From Website</option><option>Walk-in</option>
+                                <option>Phone Inquiry</option><option>WhatsApp</option>
+                                <option>Referral</option><option>Social Media</option>
+                                <option>Agent</option><option>Email</option><option>Other</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label asp-for="Infant" class="form-label small fw-semibold">Infant</label>
+                            <input asp-for="Infant" class="form-control" />
+                        </div>
+                        <div class="col-md-8">
+                            <label asp-for="Remark" class="form-label small fw-semibold">Remark</label>
+                            <input asp-for="Remark" class="form-control" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card form-card shadow-sm mb-3">
+                <div class="card-header border-0 bg-transparent">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-passport text-warning me-2"></i>Passport Details</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label asp-for="PassportNumber" class="form-label small fw-semibold">Passport Number</label>
+                            <input asp-for="PassportNumber" class="form-control" />
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="PassportExpiry" class="form-label small fw-semibold">Passport Expiry</label>
+                            <input asp-for="PassportExpiry" type="date" class="form-control" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card form-card shadow-sm mb-3">
+                <div class="card-body">
+                    <label asp-for="Notes" class="form-label small fw-semibold">Notes</label>
+                    <textarea asp-for="Notes" class="form-control" rows="3"></textarea>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 justify-content-end">
+                <a href="/Customers/Details/@Model.Id" class="btn btn-outline-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary px-4">
+                    <i class="bi bi-check-lg me-1"></i>Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

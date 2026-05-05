@@ -1,0 +1,134 @@
+@{
+    Layout = "_LayoutPlans";
+    ViewData["Title"] = "Pricing Plans";
+}
+
+<div class="plans-hero text-center mb-5">
+    <div class="badge-pill mb-3">Simple, transparent pricing</div>
+    <h1 class="plans-title">Choose the plan that fits<br>your travel business</h1>
+    <p class="plans-subtitle">Start free for 30 days — no credit card required. Cancel anytime.</p>
+
+    <div class="billing-toggle mt-4">
+        <span class="toggle-label" id="lblMonthly">Monthly</span>
+        <label class="toggle-switch">
+            <input type="checkbox" id="billingToggle" onchange="switchBilling(this)">
+            <span class="slider"></span>
+        </label>
+        <span class="toggle-label" id="lblYearly">Yearly <span class="save-badge">Save 20%</span></span>
+    </div>
+</div>
+
+<div class="plans-grid">
+
+    <!-- Starter -->
+    <div class="plan-card">
+        <div class="plan-header">
+            <div class="plan-icon" style="background:#eff6ff;color:#3b82f6"><i class="bi bi-rocket-takeoff"></i></div>
+            <h3 class="plan-name">Starter</h3>
+            <p class="plan-tagline">Perfect for small agencies getting started</p>
+        </div>
+        <div class="plan-price">
+            <span class="currency">₹</span>
+            <span class="amount" data-monthly="2,499" data-yearly="1,999">2,499</span>
+            <span class="period">/month</span>
+        </div>
+        <div class="plan-billing-note" data-monthly="Billed monthly" data-yearly="Billed ₹23,988/year">Billed monthly</div>
+        <ul class="plan-features">
+            <li><i class="bi bi-check-circle-fill"></i> Up to <strong>3 staff accounts</strong></li>
+            <li><i class="bi bi-check-circle-fill"></i> <strong>500 bookings</strong>/month</li>
+            <li><i class="bi bi-check-circle-fill"></i> Customer & supplier management</li>
+            <li><i class="bi bi-check-circle-fill"></i> Invoice generation</li>
+            <li><i class="bi bi-check-circle-fill"></i> Basic reports</li>
+            <li><i class="bi bi-check-circle-fill"></i> Email support</li>
+            <li class="disabled"><i class="bi bi-x-circle"></i> Visa tracking</li>
+            <li class="disabled"><i class="bi bi-x-circle"></i> API access</li>
+            <li class="disabled"><i class="bi bi-x-circle"></i> White-label</li>
+        </ul>
+        <a href="/register" class="btn-plan btn-plan-outline">Start Free Trial</a>
+    </div>
+
+    <!-- Professional (highlighted) -->
+    <div class="plan-card plan-featured">
+        <div class="popular-badge">Most Popular</div>
+        <div class="plan-header">
+            <div class="plan-icon" style="background:rgba(255,255,255,0.15);color:#fff"><i class="bi bi-lightning-charge-fill"></i></div>
+            <h3 class="plan-name">Professional</h3>
+            <p class="plan-tagline">For growing agencies that need more power</p>
+        </div>
+        <div class="plan-price">
+            <span class="currency">₹</span>
+            <span class="amount" data-monthly="6,499" data-yearly="5,199">6,499</span>
+            <span class="period">/month</span>
+        </div>
+        <div class="plan-billing-note" data-monthly="Billed monthly" data-yearly="Billed ₹62,388/year">Billed monthly</div>
+        <ul class="plan-features">
+            <li><i class="bi bi-check-circle-fill"></i> Up to <strong>15 staff accounts</strong></li>
+            <li><i class="bi bi-check-circle-fill"></i> <strong>Unlimited bookings</strong></li>
+            <li><i class="bi bi-check-circle-fill"></i> Customer & supplier management</li>
+            <li><i class="bi bi-check-circle-fill"></i> Advanced invoicing & payments</li>
+            <li><i class="bi bi-check-circle-fill"></i> <strong>Visa & document tracking</strong></li>
+            <li><i class="bi bi-check-circle-fill"></i> Full analytics dashboard</li>
+            <li><i class="bi bi-check-circle-fill"></i> Priority email & chat support</li>
+            <li><i class="bi bi-check-circle-fill"></i> API access</li>
+            <li class="disabled"><i class="bi bi-x-circle"></i> White-label</li>
+        </ul>
+        <a href="/register" class="btn-plan btn-plan-primary">Start Free Trial</a>
+    </div>
+
+    <!-- Enterprise -->
+    <div class="plan-card">
+        <div class="plan-header">
+            <div class="plan-icon" style="background:#f0fdf4;color:#16a34a"><i class="bi bi-building-gear"></i></div>
+            <h3 class="plan-name">Enterprise</h3>
+            <p class="plan-tagline">For large agencies & travel groups</p>
+        </div>
+        <div class="plan-price">
+            <span class="currency">₹</span>
+            <span class="amount" data-monthly="16,499" data-yearly="13,199">16,499</span>
+            <span class="period">/month</span>
+        </div>
+        <div class="plan-billing-note" data-monthly="Billed monthly" data-yearly="Billed ₹1,58,388/year">Billed monthly</div>
+        <ul class="plan-features">
+            <li><i class="bi bi-check-circle-fill"></i> <strong>Unlimited</strong> staff accounts</li>
+            <li><i class="bi bi-check-circle-fill"></i> <strong>Unlimited bookings</strong></li>
+            <li><i class="bi bi-check-circle-fill"></i> Everything in Professional</li>
+            <li><i class="bi bi-check-circle-fill"></i> <strong>White-label</strong> branding</li>
+            <li><i class="bi bi-check-circle-fill"></i> Multi-branch management</li>
+            <li><i class="bi bi-check-circle-fill"></i> Custom integrations & API</li>
+            <li><i class="bi bi-check-circle-fill"></i> Dedicated account manager</li>
+            <li><i class="bi bi-check-circle-fill"></i> SLA-backed support</li>
+            <li><i class="bi bi-check-circle-fill"></i> On-premise option</li>
+        </ul>
+        <a href="mailto:sales@travelcrm.io" class="btn-plan btn-plan-outline">Contact Sales</a>
+    </div>
+
+</div>
+
+<!-- FAQ / trust strip -->
+<div class="trust-strip mt-5">
+    <div class="trust-item"><i class="bi bi-shield-check"></i> No credit card to start</div>
+    <div class="trust-item"><i class="bi bi-arrow-counterclockwise"></i> Cancel anytime</div>
+    <div class="trust-item"><i class="bi bi-lock"></i> Data stays yours</div>
+    <div class="trust-item"><i class="bi bi-headset"></i> 24/7 support on paid plans</div>
+</div>
+
+<div class="text-center mt-4" style="font-size:0.85rem;color:#64748b">
+    Already have an account? <a href="/login" class="fw-semibold text-decoration-none" style="color:#1a3a8f">Sign in</a>
+</div>
+
+@section Scripts {
+    <script>
+        let yearly = false;
+        function switchBilling(cb) {
+            yearly = cb.checked;
+            document.querySelectorAll('.amount').forEach(el => {
+                el.textContent = yearly ? el.dataset.yearly : el.dataset.monthly;
+            });
+            document.querySelectorAll('.plan-billing-note').forEach(el => {
+                el.textContent = yearly ? el.dataset.yearly : el.dataset.monthly;
+            });
+            document.getElementById('lblMonthly').style.fontWeight = yearly ? '400' : '700';
+            document.getElementById('lblYearly').style.fontWeight = yearly ? '700' : '400';
+        }
+    </script>
+}

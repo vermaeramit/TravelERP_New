@@ -1,0 +1,14 @@
+using TravelERP.Core.Entities.Master;
+
+namespace TravelERP.Core.Interfaces;
+
+public interface ICompanyRepository
+{
+    Task<Company?> GetByIdAsync(int id);
+    Task<Company?> GetBySlugAsync(string slug);
+    Task<IEnumerable<Company>> GetAllAsync();
+    Task<int> InsertAsync(Company company);
+    Task<bool> UpdateAsync(Company company);
+    Task<bool> ExistsAsync(string slug);
+    Task<string> GenerateDbNameAsync();
+}

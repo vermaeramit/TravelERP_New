@@ -1,0 +1,166 @@
+@model TravelERP.Shared.DTOs.RegisterCompanyDto
+@{
+    Layout = "_LayoutAuth";
+    ViewData["Title"] = "Register Company";
+}
+
+<div class="mb-4">
+    <h2 class="fw-800 mb-1" style="font-weight:800;font-size:1.75rem;color:#0f1f4b;letter-spacing:-0.5px">Create your account</h2>
+    <p class="text-muted mb-0" style="font-size:0.92rem">Start your 30-day free trial — no credit card needed</p>
+</div>
+
+<form asp-action="Register" asp-controller="Auth" method="post">
+    @Html.AntiForgeryToken()
+
+    <div asp-validation-summary="ModelOnly" class="alert alert-danger border-0 rounded-3 small py-2 mb-3"></div>
+
+    <!-- ── Company info ── -->
+    <div class="section-divider">Company Information</div>
+
+    <div class="mb-3">
+        <label asp-for="CompanyName" class="form-label">Company Name</label>
+        <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-building"></i></span>
+            <input asp-for="CompanyName" class="form-control" placeholder="Sunrise Travels Pvt Ltd"
+                   id="CompanyName" autocomplete="organization" />
+        </div>
+        <span asp-validation-for="CompanyName" class="text-danger" style="font-size:0.78rem"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Slug" class="form-label">
+            Company Code
+            <span class="fw-normal text-muted ms-1" style="font-size:0.78rem">— used to login</span>
+        </label>
+        <div class="input-group">
+            <span class="input-group-text" style="font-size:0.82rem;color:#94a3b8">code/</span>
+            <input asp-for="Slug" class="form-control" placeholder="sunrise-travels" id="Slug"
+                   spellcheck="false" autocomplete="off" />
+        </div>
+        <div class="form-text">Lowercase letters, numbers &amp; hyphens only · Cannot be changed later</div>
+        <span asp-validation-for="Slug" class="text-danger" style="font-size:0.78rem"></span>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-6">
+            <label asp-for="CompanyEmail" class="form-label">Company Email</label>
+            <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                <input asp-for="CompanyEmail" class="form-control" placeholder="info@company.com" />
+            </div>
+            <span asp-validation-for="CompanyEmail" class="text-danger" style="font-size:0.78rem"></span>
+        </div>
+        <div class="col-6">
+            <label asp-for="CompanyPhone" class="form-label">Phone</label>
+            <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-telephone"></i></span>
+                <input asp-for="CompanyPhone" class="form-control" placeholder="+1-555-0100" />
+            </div>
+            <span asp-validation-for="CompanyPhone" class="text-danger" style="font-size:0.78rem"></span>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-6">
+            <label asp-for="Country" class="form-label">Country</label>
+            <select asp-for="Country" class="form-select">
+                <option value="">Select country…</option>
+                <option>India</option><option>UAE</option><option>USA</option>
+                <option>UK</option><option>Saudi Arabia</option><option>Qatar</option>
+                <option>Kuwait</option><option>Singapore</option><option>Malaysia</option>
+                <option>Australia</option><option>Canada</option><option>Other</option>
+            </select>
+            <span asp-validation-for="Country" class="text-danger" style="font-size:0.78rem"></span>
+        </div>
+        <div class="col-6">
+            <label asp-for="LicenseNumber" class="form-label">
+                License No. <span class="fw-normal text-muted">(optional)</span>
+            </label>
+            <input asp-for="LicenseNumber" class="form-control" placeholder="IATA / Tourism license" />
+        </div>
+    </div>
+
+    <!-- ── Admin account ── -->
+    <div class="section-divider">Admin Account</div>
+
+    <div class="mb-3">
+        <label asp-for="AdminFullName" class="form-label">Your Full Name</label>
+        <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-person"></i></span>
+            <input asp-for="AdminFullName" class="form-control" placeholder="John Smith" autocomplete="name" />
+        </div>
+        <span asp-validation-for="AdminFullName" class="text-danger" style="font-size:0.78rem"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="AdminEmail" class="form-label">Admin Email</label>
+        <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+            <input asp-for="AdminEmail" class="form-control" placeholder="admin@company.com" autocomplete="email" />
+        </div>
+        <span asp-validation-for="AdminEmail" class="text-danger" style="font-size:0.78rem"></span>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-6">
+            <label asp-for="AdminPassword" class="form-label">Password</label>
+            <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                <input asp-for="AdminPassword" type="password" class="form-control"
+                       placeholder="Min 8 chars" id="pwd1" />
+                <button class="btn btn-outline-secondary" type="button" onclick="togglePwd('pwd1','ico1')" tabindex="-1">
+                    <i class="bi bi-eye" id="ico1"></i>
+                </button>
+            </div>
+            <span asp-validation-for="AdminPassword" class="text-danger" style="font-size:0.78rem"></span>
+        </div>
+        <div class="col-6">
+            <label asp-for="ConfirmPassword" class="form-label">Confirm Password</label>
+            <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-lock-fill"></i></span>
+                <input asp-for="ConfirmPassword" type="password" class="form-control"
+                       placeholder="Repeat password" id="pwd2" />
+                <button class="btn btn-outline-secondary" type="button" onclick="togglePwd('pwd2','ico2')" tabindex="-1">
+                    <i class="bi bi-eye" id="ico2"></i>
+                </button>
+            </div>
+            <span asp-validation-for="ConfirmPassword" class="text-danger" style="font-size:0.78rem"></span>
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-auth-primary w-100">
+        <i class="bi bi-rocket-takeoff me-2"></i>Create Account &amp; Start Free Trial
+    </button>
+</form>
+
+<div class="text-center mt-4" style="font-size:0.87rem;color:#64748b">
+    Already have an account?
+    <a href="/login" class="fw-semibold text-decoration-none" style="color:#1a3a8f">Sign in</a>
+    &nbsp;·&nbsp;
+    <a href="/plans" class="fw-semibold text-decoration-none" style="color:#1a3a8f">View plans</a>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        // Auto-generate slug from company name
+        document.getElementById('CompanyName').addEventListener('input', function () {
+            const slug = document.getElementById('Slug');
+            if (!slug.dataset.edited) {
+                slug.value = this.value.toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/^-|-$/g, '');
+            }
+        });
+        document.getElementById('Slug').addEventListener('input', function () {
+            this.dataset.edited = '1';
+        });
+
+        function togglePwd(inputId, iconId) {
+            const i = document.getElementById(inputId);
+            const icon = document.getElementById(iconId);
+            if (i.type === 'password') { i.type = 'text'; icon.className = 'bi bi-eye-slash'; }
+            else { i.type = 'password'; icon.className = 'bi bi-eye'; }
+        }
+    </script>
+}

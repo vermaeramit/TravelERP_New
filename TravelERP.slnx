@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="TravelERP.Core/TravelERP.Core.csproj" />
+  <Project Path="TravelERP.Infrastructure/TravelERP.Infrastructure.csproj" />
+  <Project Path="TravelERP.Shared/TravelERP.Shared.csproj" />
+  <Project Path="TravelERP.Web/TravelERP.Web.csproj" />
+</Solution>

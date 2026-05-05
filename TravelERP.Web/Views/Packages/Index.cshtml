@@ -1,0 +1,50 @@
+@model IEnumerable<TravelERP.Core.Entities.Tenant.TourPackage>
+@using TravelERP.Shared.Enums
+@{
+    ViewData["Title"] = "Tour Packages";
+}
+<div class="card shadow-sm">
+    <div class="card-header bg-transparent border-0 section-header">
+        <h5><i class="bi bi-map-fill text-primary me-2"></i>Tour Packages</h5>
+        <a href="/Packages/Create" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg me-1"></i>Add Package
+        </a>
+    </div>
+    <div class="card-body">
+        <table class="table table-hover dt-table">
+            <thead>
+                <tr>
+                    <th>Code</th><th>Package Name</th><th>Type</th><th>Destination</th>
+                    <th>Duration</th><th>Base Price</th><th>Status</th><th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in Model)
+                {
+                    <tr>
+                        <td><span class="badge bg-light text-dark border">@p.PackageCode</span></td>
+                        <td>
+                            <a href="/Packages/Details/@p.Id" class="fw-semibold text-decoration-none">@p.Name</a>
+                            @if (p.IsFeatured) { <span class="badge bg-warning text-dark ms-1"><i class="bi bi-star-fill"></i></span> }
+                        </td>
+                        <td>@p.Type</td>
+                        <td>@p.Destination</td>
+                        <td>@p.DurationDays D / @p.DurationNights N</td>
+                        <td class="fw-semibold">@p.BasePrice.ToString("N0")</td>
+                        <td>
+                            <span class="badge @(p.Status == PackageStatus.Active ? "bg-success" : "bg-secondary")">@p.Status</span>
+                        </td>
+                        <td>
+                            <a href="/Packages/Details/@p.Id" class="btn btn-sm btn-outline-info"><i class="bi bi-eye"></i></a>
+                            <a href="/Packages/Edit/@p.Id" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
+                            <form method="post" action="/Packages/Delete/@p.Id" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <button class="btn btn-sm btn-outline-danger btn-confirm-delete"><i class="bi bi-trash"></i></button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

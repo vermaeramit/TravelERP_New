@@ -1,0 +1,53 @@
+@model IEnumerable<TravelERP.Core.Entities.Tenant.VisaApplication>
+@using TravelERP.Shared.Enums
+@{
+    ViewData["Title"] = "Visa & Documents";
+}
+<div class="card shadow-sm">
+    <div class="card-header bg-transparent border-0 section-header">
+        <h5><i class="bi bi-passport text-primary me-2"></i>Visa Applications</h5>
+        <a href="/Visa/Create" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg me-1"></i>New Application
+        </a>
+    </div>
+    <div class="card-body">
+        <table class="table table-hover dt-table">
+            <thead>
+                <tr>
+                    <th>Appl. No</th><th>Customer</th><th>Country</th><th>Visa Type</th>
+                    <th>Applied On</th><th>Expiry</th><th>Status</th><th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var v in Model)
+                {
+                    <tr>
+                        <td><a href="/Visa/Details/@v.Id" class="fw-semibold text-decoration-none">@v.ApplicationNumber</a></td>
+                        <td>@v.CustomerId</td>
+                        <td>@v.Country</td>
+                        <td>@v.VisaType</td>
+                        <td>@(v.AppliedOn?.ToString("dd MMM yyyy") ?? "-")</td>
+                        <td class="@(v.ExpiryDate.HasValue && v.ExpiryDate < DateTime.Today ? "text-danger fw-semibold" : "")">
+                            @(v.ExpiryDate?.ToString("dd MMM yyyy") ?? "-")
+                        </td>
+                        <td><span class="badge @GetBadge(v.Status)">@v.Status</span></td>
+                        <td>
+                            <a href="/Visa/Details/@v.Id" class="btn btn-sm btn-outline-info"><i class="bi bi-eye"></i></a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@functions {
+    string GetBadge(VisaStatus s) => s switch {
+        VisaStatus.Approved   => "bg-success",
+        VisaStatus.Rejected   => "bg-danger",
+        VisaStatus.Processing => "bg-warning text-dark",
+        VisaStatus.Applied    => "bg-info",
+        VisaStatus.Expired    => "bg-secondary",
+        _                     => "bg-light text-dark"
+    };
+}

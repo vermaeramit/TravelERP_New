@@ -1,0 +1,17 @@
+D:\Projects\travel_crm\TravelERP.Infrastructure\bin\Debug\net8.0\TravelERP.Infrastructure.deps.json
+D:\Projects\travel_crm\TravelERP.Infrastructure\bin\Debug\net8.0\TravelERP.Infrastructure.dll
+D:\Projects\travel_crm\TravelERP.Infrastructure\bin\Debug\net8.0\TravelERP.Infrastructure.pdb
+D:\Projects\travel_crm\TravelERP.Infrastructure\bin\Debug\net8.0\TravelERP.Core.dll
+D:\Projects\travel_crm\TravelERP.Infrastructure\bin\Debug\net8.0\TravelERP.Shared.dll
+D:\Projects\travel_crm\TravelERP.Infrastructure\bin\Debug\net8.0\TravelERP.Core.pdb
+D:\Projects\travel_crm\TravelERP.Infrastructure\bin\Debug\net8.0\TravelERP.Shared.pdb
+D:\Projects\travel_crm\TravelERP.Infrastructure\obj\Debug\net8.0\TravelERP.Infrastructure.csproj.AssemblyReference.cache
+D:\Projects\travel_crm\TravelERP.Infrastructure\obj\Debug\net8.0\TravelERP.Infrastructure.GeneratedMSBuildEditorConfig.editorconfig
+D:\Projects\travel_crm\TravelERP.Infrastructure\obj\Debug\net8.0\TravelERP.Infrastructure.AssemblyInfoInputs.cache
+D:\Projects\travel_crm\TravelERP.Infrastructure\obj\Debug\net8.0\TravelERP.Infrastructure.AssemblyInfo.cs
+D:\Projects\travel_crm\TravelERP.Infrastructure\obj\Debug\net8.0\TravelERP.Infrastructure.csproj.CoreCompileInputs.cache
+D:\Projects\travel_crm\TravelERP.Infrastructure\obj\Debug\net8.0\TravelER.5CFA031D.Up2Date
+D:\Projects\travel_crm\TravelERP.Infrastructure\obj\Debug\net8.0\TravelERP.Infrastructure.dll
+D:\Projects\travel_crm\TravelERP.Infrastructure\obj\Debug\net8.0\refint\TravelERP.Infrastructure.dll
+D:\Projects\travel_crm\TravelERP.Infrastructure\obj\Debug\net8.0\TravelERP.Infrastructure.pdb
+D:\Projects\travel_crm\TravelERP.Infrastructure\obj\Debug\net8.0\ref\TravelERP.Infrastructure.dll
