@@ -17,113 +17,68 @@ public class EmployeeRepository : IEmployeeRepository
         _tenant = tenant;
     }
 
-    public async Task<Employee?> GetByIdAsync(int id)
-    {
-        using var conn = _factory.CreateMasterConnection();
-        return await conn.QuerySingleOrDefaultAsync<Employee>(
-            "sp_Employee_GetById", new { DatabaseName = _tenant.DatabaseName, Id = id },
-            commandType: CommandType.StoredProcedure);
-    }
-
-    public async Task<IEnumerable<Employee>> GetAllAsync(int? branchId = null)
+    public async Task<IEnumerable<Employee>> GetAllAsync()
     {
         using var conn = _factory.CreateMasterConnection();
         return await conn.QueryAsync<Employee>(
             "sp_Employee_GetAll",
-            new { DatabaseName = _tenant.DatabaseName, BranchId = branchId },
+            new { DatabaseName = _tenant.DatabaseName },
             commandType: CommandType.StoredProcedure);
     }
 
-    public async Task<IEnumerable<Employee>> GetByDepartmentAsync(string department)
+    public async Task<Employee?> GetByIdAsync(int id)
     {
         using var conn = _factory.CreateMasterConnection();
-        return await conn.QueryAsync<Employee>(
-            "sp_Employee_GetByDepartment",
-            new { DatabaseName = _tenant.DatabaseName, Department = department },
+        return await conn.QuerySingleOrDefaultAsync<Employee>(
+            "sp_Employee_GetById",
+            new { DatabaseName = _tenant.DatabaseName, Id = id },
             commandType: CommandType.StoredProcedure);
     }
 
-    public async Task<int> InsertAsync(Employee employee)
+    public async Task<int> InsertAsync(Employee e)
     {
         using var conn = _factory.CreateMasterConnection();
-        var p = new DynamicParameters(employee);
-        p.Add("DatabaseName", _tenant.DatabaseName);
+        var p = new DynamicParameters();
+        p.Add("DatabaseName",  _tenant.DatabaseName);
+        p.Add("UserId",        e.UserId);
+        p.Add("DesignationId", e.DesignationId);
+        p.Add("FirstName",     e.FirstName);
+        p.Add("LastName",      e.LastName);
+        p.Add("Email",         e.Email);
+        p.Add("Mobile",        e.Mobile);
+        p.Add("DateOfBirth",   e.DateOfBirth, DbType.Date);
+        p.Add("ImageUrl",      e.ImageUrl);
+        p.Add("ReplyEmail",    e.ReplyEmail);
+        p.Add("CreatedBy",     _tenant.UserId);
         p.Add("NewId", dbType: DbType.Int32, direction: ParameterDirection.Output);
         await conn.ExecuteAsync("sp_Employee_Insert", p, commandType: CommandType.StoredProcedure);
         return p.Get<int>("NewId");
     }
 
-    public async Task<bool> UpdateAsync(Employee employee)
+    public async Task UpdateAsync(Employee e)
     {
         using var conn = _factory.CreateMasterConnection();
-        var p = new DynamicParameters(employee);
-        p.Add("DatabaseName", _tenant.DatabaseName);
-        return await conn.ExecuteAsync(
-            "sp_Employee_Update", p, commandType: CommandType.StoredProcedure) > 0;
+        var p = new DynamicParameters();
+        p.Add("DatabaseName",  _tenant.DatabaseName);
+        p.Add("Id",            e.Id);
+        p.Add("DesignationId", e.DesignationId);
+        p.Add("FirstName",     e.FirstName);
+        p.Add("LastName",      e.LastName);
+        p.Add("Email",         e.Email);
+        p.Add("Mobile",        e.Mobile);
+        p.Add("DateOfBirth",   e.DateOfBirth, DbType.Date);
+        p.Add("ImageUrl",      e.ImageUrl);
+        p.Add("ReplyEmail",    e.ReplyEmail);
+        p.Add("UpdatedBy",     _tenant.UserId);
+        await conn.ExecuteAsync("sp_Employee_Update", p, commandType: CommandType.StoredProcedure);
     }
 
-    public async Task<bool> DeleteAsync(int id)
+    public async Task DeleteAsync(int id)
     {
         using var conn = _factory.CreateMasterConnection();
-        return await conn.ExecuteAsync(
-            "sp_Employee_Delete", new { DatabaseName = _tenant.DatabaseName, Id = id },
-            commandType: CommandType.StoredProcedure) > 0;
-    }
-
-    public async Task<string> GenerateEmployeeCodeAsync()
-    {
-        using var conn = _factory.CreateMasterConnection();
-        return await conn.ExecuteScalarAsync<string>(
-            "sp_Employee_GenerateCode", new { DatabaseName = _tenant.DatabaseName },
-            commandType: CommandType.StoredProcedure) ?? "EMP00001";
-    }
-
-    public async Task<int> GetTotalCountAsync()
-    {
-        using var conn = _factory.CreateMasterConnection();
-        return await conn.ExecuteScalarAsync<int>(
-            "sp_Employee_GetTotalCount", new { DatabaseName = _tenant.DatabaseName },
+        await conn.ExecuteAsync(
+            "sp_Employee_Delete",
+            new { DatabaseName = _tenant.DatabaseName, Id = id },
             commandType: CommandType.StoredProcedure);
-    }
-
-    public async Task<int> InsertLeaveRequestAsync(LeaveRequest leave)
-    {
-        using var conn = _factory.CreateMasterConnection();
-        var p = new DynamicParameters(leave);
-        p.Add("DatabaseName", _tenant.DatabaseName);
-        p.Add("NewId", dbType: DbType.Int32, direction: ParameterDirection.Output);
-        await conn.ExecuteAsync("sp_Leave_Insert", p, commandType: CommandType.StoredProcedure);
-        return p.Get<int>("NewId");
-    }
-
-    public async Task<IEnumerable<LeaveRequest>> GetLeavesByEmployeeAsync(int employeeId)
-    {
-        using var conn = _factory.CreateMasterConnection();
-        return await conn.QueryAsync<LeaveRequest>(
-            "sp_Leave_GetByEmployee",
-            new { DatabaseName = _tenant.DatabaseName, EmployeeId = employeeId },
-            commandType: CommandType.StoredProcedure);
-    }
-
-    public async Task<IEnumerable<LeaveRequest>> GetPendingLeavesAsync()
-    {
-        using var conn = _factory.CreateMasterConnection();
-        return await conn.QueryAsync<LeaveRequest>(
-            "sp_Leave_GetPending", new { DatabaseName = _tenant.DatabaseName },
-            commandType: CommandType.StoredProcedure);
-    }
-
-    public async Task<bool> UpdateLeaveStatusAsync(int leaveId, int status, int approvedById, string remarks)
-    {
-        using var conn = _factory.CreateMasterConnection();
-        return await conn.ExecuteAsync("sp_Leave_UpdateStatus",
-            new
-            {
-                DatabaseName = _tenant.DatabaseName,
-                Id = leaveId, Status = status,
-                ApprovedById = approvedById, ApproverRemarks = remarks,
-                ActionDate = DateTime.UtcNow
-            },
-            commandType: CommandType.StoredProcedure) > 0;
     }
 }

@@ -1,0 +1,81 @@
+@using TravelERP.Core.Entities.Tenant
+@model IEnumerable<ActivityTemplate>
+@inject TravelERP.Core.Interfaces.ITenantContext Tenant
+@{ ViewData["Title"] = "Activity Templates"; }
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <p class="text-muted mb-0 small">Predefined log snippets for fast follow-up entry. Pick one in the activity modal to auto-fill subject and notes.</p>
+    @if (Tenant.CanAdd(TravelERP.Core.Constants.AppModules.Masters))
+    {
+        <a href="/ActivityTemplates/Create" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Add Template
+        </a>
+    }
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        @if (!Model.Any())
+        {
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-chat-square-text fs-1 d-block mb-2 opacity-50"></i>
+                <p class="mb-0">No templates yet. Click <strong>Add Template</strong> to create one.</p>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3" style="width:60px">#</th>
+                            <th>Name</th>
+                            <th style="width:120px">Type</th>
+                            <th>Subject</th>
+                            <th style="width:160px" class="text-end pe-3">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var t in Model)
+                        {
+                            var (icon, color) = TravelERP.Core.Entities.Tenant.ActivityTypes.Style(t.ActivityType);
+                            <tr>
+                                <td class="ps-3 small text-muted">@t.DisplayOrder</td>
+                                <td class="fw-semibold">@t.Name</td>
+                                <td>
+                                    @if (t.ActivityType == "All")
+                                    {
+                                        <span class="badge bg-light text-dark border">All</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-@color-subtle text-@color">
+                                            <i class="bi @icon me-1"></i>@t.ActivityType
+                                        </span>
+                                    }
+                                </td>
+                                <td class="small text-muted">@(t.Subject ?? "—")</td>
+                                <td class="text-end pe-3">
+                                    @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.Masters))
+                                    {
+                                        <a href="/ActivityTemplates/Edit/@t.Id" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                    }
+                                    @if (Tenant.CanDelete(TravelERP.Core.Constants.AppModules.Masters))
+                                    {
+                                        <form asp-action="Delete" method="post" class="d-inline" onsubmit="return confirm('Deactivate this template?');">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@t.Id" />
+                                            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                        </form>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

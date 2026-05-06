@@ -1,0 +1,92 @@
+@model IEnumerable<TravelERP.Core.Entities.Tenant.BankAccount>
+@inject TravelERP.Core.Interfaces.ITenantContext Tenant
+@{ ViewData["Title"] = "Bank Accounts"; }
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <p class="text-muted mb-0 small">Bank accounts used for receiving customer payments. Mark one as default for invoices.</p>
+    @if (Tenant.CanAdd(TravelERP.Core.Constants.AppModules.Masters))
+    {
+        <a href="/BankAccounts/Create" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Add Bank Account
+        </a>
+    }
+</div>
+
+<div class="row g-3">
+    @if (!Model.Any())
+    {
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body text-center py-5 text-muted">
+                    <i class="bi bi-bank fs-1 d-block mb-2"></i>
+                    <p class="mb-0">No bank accounts yet. Click <strong>Add Bank Account</strong> to add one.</p>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        @foreach (var a in Model)
+        {
+            <div class="col-lg-6">
+                <div class="card shadow-sm h-100 @(a.IsDefault ? "border-primary border-2" : "")">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <h6 class="fw-bold mb-1"><i class="bi bi-bank text-primary me-2"></i>@a.BankName</h6>
+                                <span class="text-muted small">@(a.AccountType ?? "Account")</span>
+                            </div>
+                            <div class="d-flex gap-2">
+                                @if (a.IsDefault)
+                                {
+                                    <span class="badge bg-primary"><i class="bi bi-star-fill me-1"></i>Default</span>
+                                }
+                            </div>
+                        </div>
+
+                        <dl class="row mb-0 small">
+                            <dt class="col-sm-4 text-muted fw-normal">Holder</dt>
+                            <dd class="col-sm-8 fw-semibold">@a.HolderName</dd>
+
+                            <dt class="col-sm-4 text-muted fw-normal">A/c Number</dt>
+                            <dd class="col-sm-8 font-monospace">@a.MaskedAccount</dd>
+
+                            @if (!string.IsNullOrEmpty(a.IfscCode))
+                            {
+                                <dt class="col-sm-4 text-muted fw-normal">IFSC</dt>
+                                <dd class="col-sm-8 font-monospace">@a.IfscCode</dd>
+                            }
+                            @if (!string.IsNullOrEmpty(a.Branch))
+                            {
+                                <dt class="col-sm-4 text-muted fw-normal">Branch</dt>
+                                <dd class="col-sm-8">@a.Branch</dd>
+                            }
+                            @if (!string.IsNullOrEmpty(a.UpiId))
+                            {
+                                <dt class="col-sm-4 text-muted fw-normal">UPI</dt>
+                                <dd class="col-sm-8 font-monospace text-success">@a.UpiId</dd>
+                            }
+                        </dl>
+
+                        <div class="d-flex gap-2 justify-content-end mt-3">
+                            @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.Masters))
+                            {
+                                <a href="/BankAccounts/Edit/@a.Id" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-pencil me-1"></i>Edit
+                                </a>
+                            }
+                            @if (Tenant.CanDelete(TravelERP.Core.Constants.AppModules.Masters))
+                            {
+                                <form asp-action="Delete" method="post" class="d-inline" onsubmit="return confirm('Deactivate this account?');">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@a.Id" />
+                                    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                </form>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>

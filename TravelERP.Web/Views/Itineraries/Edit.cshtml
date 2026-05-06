@@ -1,0 +1,86 @@
+@model TravelERP.Core.Entities.Tenant.Itinerary
+@{
+    ViewData["Title"] = $"Edit — {Model.Title}";
+    var destinations = ViewBag.Destinations as IEnumerable<TravelERP.Core.Entities.Tenant.Destination> ?? [];
+}
+
+@section Styles {
+    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet" />
+    <style>
+        .quill-host { background: #fff; border-radius: 0 0 .375rem .375rem; }
+        .quill-host .ql-toolbar { border-radius: .375rem .375rem 0 0; }
+        .quill-host .ql-container { min-height: 320px; font-size: .9rem; }
+    </style>
+}
+
+<form asp-action="Edit" method="post" id="itineraryForm">
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="Id" />
+
+    <div class="card shadow-sm mb-3">
+        <div class="card-header bg-transparent border-0">
+            <h6 class="mb-0 fw-bold"><i class="bi bi-list-ul text-primary me-2"></i>Itinerary Details</h6>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-12">
+                    <label asp-for="DestinationId" class="form-label small fw-semibold">Destination <span class="text-danger">*</span></label>
+                    <select asp-for="DestinationId" class="form-select dest-select">
+                        <option value="">Select Destination</option>
+                        @foreach (var d in destinations)
+                        {
+                            <option value="@d.Id" selected="@(d.Id == Model.DestinationId)">@d.Name</option>
+                        }
+                    </select>
+                    <span asp-validation-for="DestinationId" class="text-danger small"></span>
+                </div>
+                <div class="col-md-12">
+                    <label asp-for="Title" class="form-label small fw-semibold">Itinerary Title <span class="text-danger">*</span></label>
+                    <input asp-for="Title" class="form-control" />
+                    <span asp-validation-for="Title" class="text-danger small"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-3">
+        <div class="card-header bg-transparent border-0">
+            <h6 class="mb-0 fw-bold"><i class="bi bi-text-paragraph text-primary me-2"></i>Itinerary Description</h6>
+        </div>
+        <div class="card-body p-3">
+            <input type="hidden" asp-for="Description" id="Description" />
+            <div class="quill-host"><div id="descEditor"></div></div>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 justify-content-end">
+        <a href="/Itineraries" class="btn btn-outline-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary px-4">
+            <i class="bi bi-check-lg me-1"></i>Update Itinerary
+        </button>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+    <script>
+        $('.dest-select').select2({ theme: 'bootstrap-5', width: '100%' });
+
+        const toolbar = [
+            [{ header: [false, 1, 2, 3] }],
+            ['bold', 'italic', 'underline'],
+            [{ list: 'ordered' }, { list: 'bullet' }],
+            [{ indent: '-1' }, { indent: '+1' }],
+            ['link', 'clean']
+        ];
+        const descQuill = new Quill('#descEditor', { theme: 'snow', modules: { toolbar } });
+
+        const initial = document.getElementById('Description').value;
+        if (initial) descQuill.clipboard.dangerouslyPasteHTML(initial);
+
+        document.getElementById('itineraryForm').addEventListener('submit', () => {
+            document.getElementById('Description').value = descQuill.root.innerHTML;
+        });
+    </script>
+}

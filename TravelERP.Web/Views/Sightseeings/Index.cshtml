@@ -1,0 +1,81 @@
+@model IEnumerable<TravelERP.Core.Entities.Tenant.Sightseeing>
+@inject TravelERP.Core.Interfaces.ITenantContext Tenant
+@{ ViewData["Title"] = "Sightseeing"; }
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <p class="text-muted mb-0 small">Manage sightseeing spots grouped by destination.</p>
+    @if (Tenant.CanAdd(TravelERP.Core.Constants.AppModules.Masters))
+    {
+        <a href="/Sightseeings/Create" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Add Sightseeing
+        </a>
+    }
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        @if (!Model.Any())
+        {
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-camera fs-1 d-block mb-2"></i>
+                <p class="mb-0">No sightseeing spots yet.</p>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width:90px"></th>
+                            <th>Sightseeing Name</th>
+                            <th>Destination</th>
+                            <th style="width:160px" class="text-end pe-3">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var s in Model)
+                        {
+                            <tr>
+                                <td class="ps-3">
+                                    @if (!string.IsNullOrEmpty(s.ImageUrl))
+                                    {
+                                        <img src="@s.ImageUrl" class="rounded" style="width:64px;height:48px;object-fit:cover" />
+                                    }
+                                    else
+                                    {
+                                        <div class="rounded bg-light d-flex align-items-center justify-content-center text-muted"
+                                             style="width:64px;height:48px">
+                                            <i class="bi bi-camera"></i>
+                                        </div>
+                                    }
+                                </td>
+                                <td class="fw-semibold">@s.Name</td>
+                                <td><span class="badge bg-light text-dark">@s.DestinationName</span></td>
+                                <td class="text-end pe-3">
+                                    @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.Masters))
+                                    {
+                                        <a href="/Sightseeings/Edit/@s.Id" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                    }
+                                    @if (Tenant.CanDelete(TravelERP.Core.Constants.AppModules.Masters))
+                                    {
+                                        <form asp-action="Delete" method="post" class="d-inline"
+                                              onsubmit="return confirm('Deactivate this sightseeing?');">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@s.Id" />
+                                            <button class="btn btn-sm btn-outline-danger">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

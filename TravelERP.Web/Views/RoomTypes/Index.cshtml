@@ -1,0 +1,116 @@
+@model IEnumerable<TravelERP.Core.Entities.Tenant.RoomType>
+@inject TravelERP.Core.Interfaces.ITenantContext Tenant
+@{ ViewData["Title"] = "Room Types"; }
+
+<div class="row g-3">
+    <div class="col-lg-5">
+        @if (Tenant.CanAdd(TravelERP.Core.Constants.AppModules.Masters))
+        {
+            <div class="card shadow-sm">
+                <div class="card-header bg-transparent border-0">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-plus-circle text-primary me-2"></i>Add Room Type</h6>
+                </div>
+                <div class="card-body">
+                    <form asp-action="Create" method="post" class="d-flex gap-2">
+                        @Html.AntiForgeryToken()
+                        <input type="text" name="name" class="form-control" placeholder="e.g. Deluxe, Suite, Twin" required autofocus />
+                        <button type="submit" class="btn btn-primary px-4">
+                            <i class="bi bi-check-lg"></i>
+                        </button>
+                    </form>
+                    <p class="text-muted small mb-0 mt-2">
+                        Quick-add a new room type. It'll appear in the list on the right.
+                    </p>
+                </div>
+            </div>
+        }
+    </div>
+    <div class="col-lg-7">
+        <div class="card shadow-sm">
+            <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-door-closed text-primary me-2"></i>Room Types</h6>
+                <span class="badge bg-light text-dark">@Model.Count()</span>
+            </div>
+            <div class="card-body p-0">
+                @if (!Model.Any())
+                {
+                    <div class="text-center py-5 text-muted">
+                        <i class="bi bi-door-closed fs-1 d-block mb-2"></i>
+                        <p class="mb-0">No room types yet.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Name</th>
+                                    <th style="width:200px" class="text-end pe-3">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var r in Model)
+                                {
+                                    <tr id="row-@r.Id">
+                                        <td class="fw-semibold ps-3">
+                                            <span class="rt-name">@r.Name</span>
+                                            @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.Masters))
+                                            {
+                                                <form asp-action="Update" method="post" class="d-none rt-edit-form gap-2">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@r.Id" />
+                                                    <input type="text" name="name" value="@r.Name" class="form-control form-control-sm" required />
+                                                    <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check"></i></button>
+                                                    <button type="button" class="btn btn-sm btn-outline-secondary rt-cancel"><i class="bi bi-x"></i></button>
+                                                </form>
+                                            }
+                                        </td>
+                                        <td class="text-end pe-3">
+                                            @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.Masters))
+                                            {
+                                                <button type="button" class="btn btn-sm btn-outline-primary rt-edit">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                            }
+                                            @if (Tenant.CanDelete(TravelERP.Core.Constants.AppModules.Masters))
+                                            {
+                                                <form asp-action="Delete" method="post" class="d-inline"
+                                                      onsubmit="return confirm('Deactivate this room type?');">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@r.Id" />
+                                                    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                                </form>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.querySelectorAll('.rt-edit').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const row = btn.closest('tr');
+                row.querySelector('.rt-name').classList.add('d-none');
+                row.querySelector('.rt-edit-form').classList.remove('d-none');
+                row.querySelector('.rt-edit-form').classList.add('d-flex');
+            });
+        });
+        document.querySelectorAll('.rt-cancel').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const row = btn.closest('tr');
+                row.querySelector('.rt-name').classList.remove('d-none');
+                row.querySelector('.rt-edit-form').classList.add('d-none');
+                row.querySelector('.rt-edit-form').classList.remove('d-flex');
+            });
+        });
+    </script>
+}

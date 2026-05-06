@@ -1,0 +1,118 @@
+@model IEnumerable<TravelERP.Core.Entities.Tenant.MealPlan>
+@inject TravelERP.Core.Interfaces.ITenantContext Tenant
+@{ ViewData["Title"] = "Meal Plans"; }
+
+<div class="row g-3">
+    <div class="col-lg-5">
+        @if (Tenant.CanAdd(TravelERP.Core.Constants.AppModules.Masters))
+        {
+            <div class="card shadow-sm">
+                <div class="card-header bg-transparent border-0">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-plus-circle text-primary me-2"></i>Add Meal Plan</h6>
+                </div>
+                <div class="card-body">
+                    <form asp-action="Create" method="post" class="row g-2">
+                        @Html.AntiForgeryToken()
+                        <div class="col-4">
+                            <input type="text" name="code" class="form-control text-uppercase" placeholder="Code" maxlength="10" required />
+                        </div>
+                        <div class="col-8">
+                            <input type="text" name="name" class="form-control" placeholder="Name" required />
+                        </div>
+                        <div class="col-12 d-grid">
+                            <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Add Meal Plan</button>
+                        </div>
+                    </form>
+                    <p class="text-muted small mb-0 mt-2">
+                        Common codes: <strong>EP</strong> (room only), <strong>CP</strong> (breakfast),
+                        <strong>MAP</strong> (breakfast + 1 meal), <strong>AP</strong> (3 meals), <strong>AI</strong> (all-inclusive).
+                    </p>
+                </div>
+            </div>
+        }
+    </div>
+    <div class="col-lg-7">
+        <div class="card shadow-sm">
+            <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-egg-fried text-primary me-2"></i>Meal Plans</h6>
+                <span class="badge bg-light text-dark">@Model.Count()</span>
+            </div>
+            <div class="card-body p-0">
+                @if (!Model.Any())
+                {
+                    <div class="text-center py-5 text-muted">
+                        <i class="bi bi-egg-fried fs-1 d-block mb-2"></i>
+                        <p class="mb-0">No meal plans yet.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr><th style="width:90px">Code</th><th>Name</th><th style="width:200px" class="text-end pe-3">Actions</th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var r in Model)
+                                {
+                                    <tr>
+                                        <td class="ps-3">
+                                            <span class="row-code badge bg-primary-subtle text-primary fw-bold">@r.Code</span>
+                                        </td>
+                                        <td class="fw-semibold">
+                                            <span class="row-name">@r.Name</span>
+                                            @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.Masters))
+                                            {
+                                                <form asp-action="Update" method="post" class="d-none row-edit-form gap-2 align-items-center">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@r.Id" />
+                                                    <input type="text" name="code" value="@r.Code" class="form-control form-control-sm text-uppercase" required style="max-width:90px" />
+                                                    <input type="text" name="name" value="@r.Name" class="form-control form-control-sm" required />
+                                                    <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check"></i></button>
+                                                    <button type="button" class="btn btn-sm btn-outline-secondary row-cancel"><i class="bi bi-x"></i></button>
+                                                </form>
+                                            }
+                                        </td>
+                                        <td class="text-end pe-3">
+                                            @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.Masters))
+                                            {
+                                                <button type="button" class="btn btn-sm btn-outline-primary row-edit"><i class="bi bi-pencil"></i></button>
+                                            }
+                                            @if (Tenant.CanDelete(TravelERP.Core.Constants.AppModules.Masters))
+                                            {
+                                                <form asp-action="Delete" method="post" class="d-inline" onsubmit="return confirm('Deactivate?');">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@r.Id" />
+                                                    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                                </form>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.querySelectorAll('.row-edit').forEach(b => b.addEventListener('click', () => {
+            const r = b.closest('tr');
+            r.querySelector('.row-code').classList.add('d-none');
+            r.querySelector('.row-name').classList.add('d-none');
+            const f = r.querySelector('.row-edit-form');
+            f.classList.remove('d-none'); f.classList.add('d-flex');
+        }));
+        document.querySelectorAll('.row-cancel').forEach(b => b.addEventListener('click', () => {
+            const r = b.closest('tr');
+            r.querySelector('.row-code').classList.remove('d-none');
+            r.querySelector('.row-name').classList.remove('d-none');
+            const f = r.querySelector('.row-edit-form');
+            f.classList.add('d-none'); f.classList.remove('d-flex');
+        }));
+    </script>
+}

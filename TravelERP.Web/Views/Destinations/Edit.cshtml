@@ -1,0 +1,266 @@
+@model TravelERP.Core.Entities.Tenant.Destination
+@{ ViewData["Title"] = $"Edit — {Model.Name}"; }
+
+@section Styles {
+    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet" />
+    <style>
+        .quill-host { background: #fff; border-radius: 0 0 .375rem .375rem; }
+        .quill-host .ql-toolbar { border-radius: .375rem .375rem 0 0; }
+        .quill-host .ql-container { min-height: 160px; font-size: .9rem; }
+        .review-row { border: 1px solid var(--bs-border-color); border-radius: .5rem; padding: 1rem; }
+        .review-row + .review-row { margin-top: 1rem; }
+        .img-preview { width: 100%; max-width: 200px; aspect-ratio: 16/9; object-fit: cover;
+                       border-radius: .375rem; border: 1px solid var(--bs-border-color); }
+        .img-placeholder { width: 100%; max-width: 200px; aspect-ratio: 16/9;
+                           border: 2px dashed var(--bs-border-color); border-radius: .375rem;
+                           display: flex; align-items: center; justify-content: center;
+                           color: var(--bs-secondary-color); }
+    </style>
+}
+
+<form asp-action="Edit" method="post" enctype="multipart/form-data" id="destForm">
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="Id" />
+
+    <!-- DESTINATION DETAILS -->
+    <div class="card shadow-sm mb-3">
+        <div class="card-header bg-transparent border-0">
+            <h6 class="mb-0 fw-bold"><i class="bi bi-geo-alt-fill text-primary me-2"></i>Destination Details</h6>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-8">
+                    <label asp-for="Name" class="form-label small fw-semibold">Destination Name <span class="text-danger">*</span></label>
+                    <input asp-for="Name" class="form-control" />
+                    <span asp-validation-for="Name" class="text-danger small"></span>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small fw-semibold">Hero Image <span class="text-muted">(1366×768)</span></label>
+                    <input type="file" name="heroImage" accept="image/*" class="form-control hero-input" />
+                    <div class="mt-2">
+                        @if (!string.IsNullOrEmpty(Model.ImageUrl))
+                        {
+                            <div class="img-placeholder hero-placeholder d-none">
+                                <i class="bi bi-image fs-3"></i>
+                            </div>
+                            <img class="img-preview hero-preview" src="@Model.ImageUrl" />
+                        }
+                        else
+                        {
+                            <div class="img-placeholder hero-placeholder">
+                                <i class="bi bi-image fs-3"></i>
+                            </div>
+                            <img class="img-preview hero-preview d-none" />
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TERMS -->
+    <div class="row g-3 mb-3">
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-transparent border-0">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-file-text text-primary me-2"></i>Package Terms &amp; Conditions</h6>
+                </div>
+                <div class="card-body p-3">
+                    <input type="hidden" asp-for="PackageTerms" id="PackageTerms" />
+                    <div class="quill-host"><div id="packageEditor"></div></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-transparent border-0">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-receipt text-primary me-2"></i>Invoice Terms &amp; Conditions</h6>
+                </div>
+                <div class="card-body p-3">
+                    <input type="hidden" asp-for="InvoiceTerms" id="InvoiceTerms" />
+                    <div class="quill-host"><div id="invoiceEditor"></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- REVIEWS -->
+    <div class="card shadow-sm mb-3">
+        <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center">
+            <h6 class="mb-0 fw-bold"><i class="bi bi-star-fill text-warning me-2"></i>Traveler Reviews</h6>
+            <button type="button" class="btn btn-sm btn-outline-primary" id="addReview">
+                <i class="bi bi-plus-lg me-1"></i>Add Review
+            </button>
+        </div>
+        <div class="card-body" id="reviewsContainer">
+            @if (!Model.Reviews.Any())
+            {
+                <p class="text-muted small mb-0 empty-msg">No reviews added yet. Click <strong>Add Review</strong> to add traveler feedback.</p>
+            }
+            else
+            {
+                <p class="text-muted small mb-0 empty-msg d-none">No reviews added yet.</p>
+                @for (int i = 0; i < Model.Reviews.Count; i++)
+                {
+                    var r = Model.Reviews[i];
+                    <div class="review-row">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="fw-semibold small text-muted review-num">Review @(i + 1)</span>
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-review">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold">Traveler Name</label>
+                                <input type="text" name="reviewNames" value="@r.TravelerName" class="form-control" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold">Image</label>
+                                <input type="file" name="reviewImages" accept="image/*" class="form-control review-img-input" />
+                                <input type="hidden" name="reviewExistingImages" value="@r.ImageUrl" />
+                            </div>
+                            <div class="col-md-4">
+                                @if (!string.IsNullOrEmpty(r.ImageUrl))
+                                {
+                                    <div class="img-placeholder review-img-placeholder mt-md-4 d-none">
+                                        <i class="bi bi-person-circle fs-3"></i>
+                                    </div>
+                                    <img class="img-preview review-img-preview mt-md-4" src="@r.ImageUrl" />
+                                }
+                                else
+                                {
+                                    <div class="img-placeholder review-img-placeholder mt-md-4">
+                                        <i class="bi bi-person-circle fs-3"></i>
+                                    </div>
+                                    <img class="img-preview review-img-preview d-none mt-md-4" />
+                                }
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small fw-semibold">Review</label>
+                                <textarea name="reviewTexts" class="form-control" rows="2">@r.ReviewText</textarea>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+
+    <!-- ACTIONS -->
+    <div class="d-flex gap-2 justify-content-end">
+        <a href="/Destinations" class="btn btn-outline-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary px-4">
+            <i class="bi bi-check-lg me-1"></i>Update Destination
+        </button>
+    </div>
+</form>
+
+<!-- Review row template -->
+<template id="reviewTemplate">
+    <div class="review-row">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="fw-semibold small text-muted review-num">Review</span>
+            <button type="button" class="btn btn-sm btn-outline-danger remove-review">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label small fw-semibold">Traveler Name</label>
+                <input type="text" name="reviewNames" class="form-control" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small fw-semibold">Image</label>
+                <input type="file" name="reviewImages" accept="image/*" class="form-control review-img-input" />
+                <input type="hidden" name="reviewExistingImages" value="" />
+            </div>
+            <div class="col-md-4">
+                <div class="img-placeholder review-img-placeholder mt-md-4">
+                    <i class="bi bi-person-circle fs-3"></i>
+                </div>
+                <img class="img-preview review-img-preview d-none mt-md-4" />
+            </div>
+            <div class="col-12">
+                <label class="form-label small fw-semibold">Review</label>
+                <textarea name="reviewTexts" class="form-control" rows="2"></textarea>
+            </div>
+        </div>
+    </div>
+</template>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+    <script>
+        const toolbar = [
+            [{ header: [false, 1, 2, 3] }],
+            ['bold', 'italic', 'underline'],
+            [{ list: 'ordered' }, { list: 'bullet' }],
+            [{ indent: '-1' }, { indent: '+1' }],
+            ['link', 'clean']
+        ];
+
+        const pkgQuill = new Quill('#packageEditor', { theme: 'snow', modules: { toolbar } });
+        const invQuill = new Quill('#invoiceEditor', { theme: 'snow', modules: { toolbar } });
+
+        // Pre-populate Quill from hidden fields
+        const pkgInitial = document.getElementById('PackageTerms').value;
+        const invInitial = document.getElementById('InvoiceTerms').value;
+        if (pkgInitial) pkgQuill.clipboard.dangerouslyPasteHTML(pkgInitial);
+        if (invInitial) invQuill.clipboard.dangerouslyPasteHTML(invInitial);
+
+        function bindPreview(input, preview, placeholder) {
+            input.addEventListener('change', e => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                preview.src = URL.createObjectURL(f);
+                preview.classList.remove('d-none');
+                if (placeholder) placeholder.classList.add('d-none');
+            });
+        }
+
+        const heroInput = document.querySelector('.hero-input');
+        const heroPreview = document.querySelector('.hero-preview');
+        const heroPlaceholder = document.querySelector('.hero-placeholder');
+        bindPreview(heroInput, heroPreview, heroPlaceholder);
+
+        const container = document.getElementById('reviewsContainer');
+        const tmpl = document.getElementById('reviewTemplate');
+        const addBtn = document.getElementById('addReview');
+        const emptyMsg = container.querySelector('.empty-msg');
+
+        function renumber() {
+            container.querySelectorAll('.review-row').forEach((row, i) => {
+                row.querySelector('.review-num').textContent = `Review ${i + 1}`;
+            });
+            if (emptyMsg) emptyMsg.classList.toggle('d-none', container.querySelectorAll('.review-row').length > 0);
+        }
+
+        function wireRow(node) {
+            const fileInput = node.querySelector('.review-img-input');
+            const preview = node.querySelector('.review-img-preview');
+            const placeholder = node.querySelector('.review-img-placeholder');
+            bindPreview(fileInput, preview, placeholder);
+            node.querySelector('.remove-review').addEventListener('click', () => {
+                node.remove();
+                renumber();
+            });
+        }
+
+        // Wire existing rows
+        container.querySelectorAll('.review-row').forEach(wireRow);
+
+        addBtn.addEventListener('click', () => {
+            const node = tmpl.content.firstElementChild.cloneNode(true);
+            container.appendChild(node);
+            wireRow(node);
+            renumber();
+        });
+
+        document.getElementById('destForm').addEventListener('submit', () => {
+            document.getElementById('PackageTerms').value = pkgQuill.root.innerHTML;
+            document.getElementById('InvoiceTerms').value = invQuill.root.innerHTML;
+        });
+    </script>
+}

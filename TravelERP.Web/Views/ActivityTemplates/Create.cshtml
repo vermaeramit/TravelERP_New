@@ -1,0 +1,56 @@
+@using TravelERP.Core.Entities.Tenant
+@model ActivityTemplate
+@{
+    ViewData["Title"] = "Add Activity Template";
+    var types = ViewBag.Types as string[] ?? [];
+}
+
+<form asp-action="Create" method="post">
+    @Html.AntiForgeryToken()
+    <div class="card shadow-sm mb-3">
+        <div class="card-header bg-transparent border-0">
+            <h6 class="mb-0 fw-bold"><i class="bi bi-chat-square-text text-primary me-2"></i>Template Details</h6>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label asp-for="Name" class="form-label small fw-semibold">Template Name <span class="text-danger">*</span></label>
+                    <input asp-for="Name" class="form-control" placeholder="e.g. Customer not picking up" autofocus />
+                    <span asp-validation-for="Name" class="text-danger small"></span>
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="ActivityType" class="form-label small fw-semibold">Applies To</label>
+                    <select asp-for="ActivityType" class="form-select">
+                        @foreach (var t in types)
+                        {
+                            <option value="@t">@t</option>
+                        }
+                    </select>
+                    <small class="text-muted">Choose <strong>All</strong> to show in every activity type.</small>
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="DisplayOrder" class="form-label small fw-semibold">Display Order</label>
+                    <input asp-for="DisplayOrder" type="number" min="0" class="form-control" />
+                </div>
+                <div class="col-md-12">
+                    <label asp-for="Subject" class="form-label small fw-semibold">Subject</label>
+                    <input asp-for="Subject" class="form-control" placeholder="Auto-filled when template is picked" />
+                </div>
+                <div class="col-md-12">
+                    <label asp-for="Notes" class="form-label small fw-semibold">Notes</label>
+                    <textarea asp-for="Notes" class="form-control" rows="4"
+                              placeholder="The note that will be auto-filled. The user can still edit before logging."></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 justify-content-end">
+        <a href="/ActivityTemplates" class="btn btn-outline-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary px-4">
+            <i class="bi bi-check-lg me-1"></i>Save Template
+        </button>
+    </div>
+</form>
+
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

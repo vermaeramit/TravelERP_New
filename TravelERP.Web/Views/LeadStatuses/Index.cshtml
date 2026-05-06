@@ -1,0 +1,207 @@
+@model IEnumerable<TravelERP.Core.Entities.Tenant.LeadStatus>
+@inject TravelERP.Core.Interfaces.ITenantContext Tenant
+@{
+    ViewData["Title"] = "Lead Statuses";
+    var colors = ViewBag.Colors as string[] ?? [];
+}
+
+@section Styles {
+    <style>
+        .color-option { padding: 4px 12px; border-radius: 6px; cursor: pointer;
+                        border: 2px solid transparent; font-size: .75rem; font-weight: 600; }
+        .color-option.selected { border-color: var(--bs-dark); }
+    </style>
+}
+
+<div class="row g-3">
+    <div class="col-lg-5">
+        @if (Tenant.CanAdd(TravelERP.Core.Constants.AppModules.Masters))
+        {
+            <div class="card shadow-sm">
+                <div class="card-header bg-transparent border-0">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-plus-circle text-primary me-2"></i>Add Lead Status</h6>
+                </div>
+                <div class="card-body">
+                    <form asp-action="Create" method="post">
+                        @Html.AntiForgeryToken()
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Status Name</label>
+                            <input type="text" name="name" class="form-control" placeholder="e.g. Hot, Warm, Cold" required />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Color</label>
+                            <input type="hidden" name="color" id="newColor" value="primary" />
+                            <div class="d-flex flex-wrap gap-2">
+                                @foreach (var c in colors)
+                                {
+                                    <span class="color-option bg-@c text-white new-color-pick @(c == "primary" ? "selected" : "")"
+                                          data-color="@c">@c</span>
+                                }
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Display Order</label>
+                            <input type="number" name="displayOrder" class="form-control" value="0" min="0" />
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input type="checkbox" name="isDefault" value="true" class="form-check-input" id="newDefault" role="switch" />
+                            <label for="newDefault" class="form-check-label small">
+                                <i class="bi bi-star me-1"></i>Default for new leads
+                            </label>
+                        </div>
+                        <div class="form-check form-switch mb-3">
+                            <input type="checkbox" name="isClosed" value="true" class="form-check-input" id="newClosed" role="switch" />
+                            <label for="newClosed" class="form-check-label small">
+                                <i class="bi bi-flag me-1"></i>Closed status (Converted/Lost)
+                            </label>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100"><i class="bi bi-check-lg me-1"></i>Add Status</button>
+                    </form>
+                </div>
+            </div>
+        }
+    </div>
+    <div class="col-lg-7">
+        <div class="card shadow-sm">
+            <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-flag text-primary me-2"></i>Pipeline Statuses</h6>
+                <span class="badge bg-light text-dark">@Model.Count()</span>
+            </div>
+            <div class="card-body p-0">
+                @if (!Model.Any())
+                {
+                    <div class="text-center py-5 text-muted">
+                        <i class="bi bi-flag fs-1 d-block mb-2"></i>
+                        <p class="mb-0">No statuses yet.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width:60px">#</th>
+                                    <th>Status</th>
+                                    <th style="width:100px">Flags</th>
+                                    <th style="width:160px" class="text-end pe-3">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var s in Model)
+                                {
+                                    <tr>
+                                        <td class="ps-3 small text-muted">@s.DisplayOrder</td>
+                                        <td>
+                                            <span class="row-display badge bg-@s.Color fs-6">@s.Name</span>
+                                            @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.Masters))
+                                            {
+                                                <form asp-action="Update" method="post" class="d-none row-edit-form">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@s.Id" />
+                                                    <div class="row g-2 align-items-center">
+                                                        <div class="col-12">
+                                                            <input type="text" name="name" value="@s.Name" class="form-control form-control-sm" required />
+                                                        </div>
+                                                        <div class="col-12">
+                                                            <input type="hidden" name="color" value="@s.Color" class="edit-color" />
+                                                            <div class="d-flex flex-wrap gap-1">
+                                                                @foreach (var c in colors)
+                                                                {
+                                                                    <span class="color-option bg-@c text-white edit-color-pick @(c == s.Color ? "selected" : "")"
+                                                                          data-color="@c">@c</span>
+                                                                }
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-6">
+                                                            <input type="number" name="displayOrder" value="@s.DisplayOrder" class="form-control form-control-sm" min="0" />
+                                                        </div>
+                                                        <div class="col-3">
+                                                            <div class="form-check form-switch">
+                                                                <input type="checkbox" name="isDefault" value="true" class="form-check-input" @(s.IsDefault ? "checked" : "") />
+                                                                <label class="form-check-label small">Default</label>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-3">
+                                                            <div class="form-check form-switch">
+                                                                <input type="checkbox" name="isClosed" value="true" class="form-check-input" @(s.IsClosed ? "checked" : "") />
+                                                                <label class="form-check-label small">Closed</label>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-12 d-flex gap-2">
+                                                            <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check"></i> Save</button>
+                                                            <button type="button" class="btn btn-sm btn-outline-secondary row-cancel"><i class="bi bi-x"></i> Cancel</button>
+                                                        </div>
+                                                    </div>
+                                                </form>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (s.IsDefault)
+                                            {
+                                                <span class="badge bg-light text-primary border" title="Default"><i class="bi bi-star-fill"></i></span>
+                                            }
+                                            @if (s.IsClosed)
+                                            {
+                                                <span class="badge bg-light text-secondary border" title="Closed"><i class="bi bi-flag-fill"></i></span>
+                                            }
+                                        </td>
+                                        <td class="text-end pe-3">
+                                            @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.Masters))
+                                            {
+                                                <button type="button" class="btn btn-sm btn-outline-primary row-edit"><i class="bi bi-pencil"></i></button>
+                                            }
+                                            @if (Tenant.CanDelete(TravelERP.Core.Constants.AppModules.Masters))
+                                            {
+                                                <form asp-action="Delete" method="post" class="d-inline" onsubmit="return confirm('Deactivate this status?');">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@s.Id" />
+                                                    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                                </form>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // New form color picker
+        document.querySelectorAll('.new-color-pick').forEach(el => {
+            el.addEventListener('click', () => {
+                document.querySelectorAll('.new-color-pick').forEach(o => o.classList.remove('selected'));
+                el.classList.add('selected');
+                document.getElementById('newColor').value = el.dataset.color;
+            });
+        });
+
+        // Edit row pickers (per row)
+        document.querySelectorAll('.row-edit-form').forEach(form => {
+            form.querySelectorAll('.edit-color-pick').forEach(el => {
+                el.addEventListener('click', () => {
+                    form.querySelectorAll('.edit-color-pick').forEach(o => o.classList.remove('selected'));
+                    el.classList.add('selected');
+                    form.querySelector('.edit-color').value = el.dataset.color;
+                });
+            });
+        });
+
+        document.querySelectorAll('.row-edit').forEach(b => b.addEventListener('click', () => {
+            const r = b.closest('tr');
+            r.querySelector('.row-display').classList.add('d-none');
+            r.querySelector('.row-edit-form').classList.remove('d-none');
+        }));
+        document.querySelectorAll('.row-cancel').forEach(b => b.addEventListener('click', () => {
+            const r = b.closest('tr');
+            r.querySelector('.row-display').classList.remove('d-none');
+            r.querySelector('.row-edit-form').classList.add('d-none');
+        }));
+    </script>
+}
