@@ -1,0 +1,85 @@
+@model TravelERP.Core.Entities.Master.Company
+@{ ViewData["Title"] = "Number Series"; }
+
+<form asp-action="NumberSeries" method="post" class="row g-3">
+    @Html.AntiForgeryToken()
+
+    <div class="col-lg-8">
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-transparent border-0">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-hash text-primary me-2"></i>Number Series Prefixes</h6>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small">
+                    Configure the prefixes used in auto-generated lead and package numbers.
+                    Format: <code>{Prefix}-{Year}-{Sequence}</code> — e.g.
+                    <code class="text-primary">@(Model?.LeadPrefix ?? "LD")-@DateTime.UtcNow.Year-0001</code>.
+                </p>
+                <p class="text-muted small mb-3">
+                    <strong>Note:</strong> changes apply only to <em>new</em> records.
+                    Existing lead and package numbers will keep their original prefix.
+                </p>
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Lead Prefix <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <input type="text" name="leadPrefix" maxlength="20"
+                                   value="@(Model?.LeadPrefix ?? "LD")"
+                                   class="form-control text-uppercase font-monospace fw-bold"
+                                   pattern="[A-Z0-9]{1,20}" required />
+                            <span class="input-group-text font-monospace">-@DateTime.UtcNow.Year-0001</span>
+                        </div>
+                        <small class="text-muted">Letters/numbers only, max 20 chars. e.g. LD, LEAD, TRP, INQ</small>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Package Prefix <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <input type="text" name="packagePrefix" maxlength="20"
+                                   value="@(Model?.PackagePrefix ?? "PKG")"
+                                   class="form-control text-uppercase font-monospace fw-bold"
+                                   pattern="[A-Z0-9]{1,20}" required />
+                            <span class="input-group-text font-monospace">-@DateTime.UtcNow.Year-0001</span>
+                        </div>
+                        <small class="text-muted">e.g. PKG, QT, QUOTE, ITN</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2 justify-content-end">
+            <a href="/Dashboard" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary px-4">
+                <i class="bi bi-check-lg me-1"></i>Save Series
+            </button>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card shadow-sm bg-light border-0">
+            <div class="card-body">
+                <h6 class="fw-bold mb-2"><i class="bi bi-info-circle text-primary me-2"></i>Live Preview</h6>
+                <div class="small mb-2">Next lead number:</div>
+                <div class="font-monospace fw-bold mb-3" id="previewLead">@(Model?.LeadPrefix ?? "LD")-@DateTime.UtcNow.Year-0001</div>
+                <div class="small mb-2">Next package number:</div>
+                <div class="font-monospace fw-bold" id="previewPkg">@(Model?.PackagePrefix ?? "PKG")-@DateTime.UtcNow.Year-0001</div>
+            </div>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+    <script>
+        const year = @DateTime.UtcNow.Year;
+        const leadIn = document.querySelector('input[name="leadPrefix"]');
+        const pkgIn  = document.querySelector('input[name="packagePrefix"]');
+        const leadPv = document.getElementById('previewLead');
+        const pkgPv  = document.getElementById('previewPkg');
+        function refresh() {
+            leadPv.textContent = `${(leadIn.value || 'LD').toUpperCase()}-${year}-0001`;
+            pkgPv.textContent  = `${(pkgIn.value  || 'PKG').toUpperCase()}-${year}-0001`;
+        }
+        leadIn.addEventListener('input', refresh);
+        pkgIn.addEventListener('input', refresh);
+    </script>
+}

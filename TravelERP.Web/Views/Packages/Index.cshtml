@@ -1,50 +1,139 @@
-@model IEnumerable<TravelERP.Core.Entities.Tenant.TourPackage>
-@using TravelERP.Shared.Enums
+@using TravelERP.Core.Common
+@model PagedResult<TravelERP.Core.Entities.Tenant.Package>
+@inject TravelERP.Core.Interfaces.ITenantContext Tenant
 @{
-    ViewData["Title"] = "Tour Packages";
+    ViewData["Title"] = "Packages";
+    var search = ViewBag.Search as string;
 }
-<div class="card shadow-sm">
-    <div class="card-header bg-transparent border-0 section-header">
-        <h5><i class="bi bi-map-fill text-primary me-2"></i>Tour Packages</h5>
-        <a href="/Packages/Create" class="btn btn-primary btn-sm">
-            <i class="bi bi-plus-lg me-1"></i>Add Package
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <p class="text-muted mb-0 small">Tour quotations with multiple price options.</p>
+    @if (Tenant.CanAdd(TravelERP.Core.Constants.AppModules.Packages))
+    {
+        <a href="/Packages/Create" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Create Package
         </a>
-    </div>
-    <div class="card-body">
-        <table class="table table-hover dt-table">
-            <thead>
-                <tr>
-                    <th>Code</th><th>Package Name</th><th>Type</th><th>Destination</th>
-                    <th>Duration</th><th>Base Price</th><th>Status</th><th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var p in Model)
-                {
-                    <tr>
-                        <td><span class="badge bg-light text-dark border">@p.PackageCode</span></td>
-                        <td>
-                            <a href="/Packages/Details/@p.Id" class="fw-semibold text-decoration-none">@p.Name</a>
-                            @if (p.IsFeatured) { <span class="badge bg-warning text-dark ms-1"><i class="bi bi-star-fill"></i></span> }
-                        </td>
-                        <td>@p.Type</td>
-                        <td>@p.Destination</td>
-                        <td>@p.DurationDays D / @p.DurationNights N</td>
-                        <td class="fw-semibold">@p.BasePrice.ToString("N0")</td>
-                        <td>
-                            <span class="badge @(p.Status == PackageStatus.Active ? "bg-success" : "bg-secondary")">@p.Status</span>
-                        </td>
-                        <td>
-                            <a href="/Packages/Details/@p.Id" class="btn btn-sm btn-outline-info"><i class="bi bi-eye"></i></a>
-                            <a href="/Packages/Edit/@p.Id" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
-                            <form method="post" action="/Packages/Delete/@p.Id" class="d-inline">
-                                @Html.AntiForgeryToken()
-                                <button class="btn btn-sm btn-outline-danger btn-confirm-delete"><i class="bi bi-trash"></i></button>
-                            </form>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
+    }
 </div>
+
+<form method="get" class="card shadow-sm mb-3">
+    <div class="card-body py-3 d-flex gap-2">
+        <input type="text" name="search" value="@search" class="form-control form-control-sm"
+               placeholder="Search by package #, title, customer name…" />
+        <button type="submit" class="btn btn-sm btn-primary px-3"><i class="bi bi-search"></i></button>
+        @if (!string.IsNullOrEmpty(search))
+        {
+            <a href="/Packages" class="btn btn-sm btn-outline-secondary">Clear</a>
+        }
+    </div>
+</form>
+
+@if (!Model.Items.Any())
+{
+    <div class="card shadow-sm">
+        <div class="card-body text-center py-5 text-muted">
+            <i class="bi bi-suitcase fs-1 d-block mb-2 opacity-50"></i>
+            <p class="mb-0">No packages yet. Click <strong>Create Package</strong> to start your first quote.</p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="row g-3">
+        @foreach (var p in Model.Items)
+        {
+            <div class="col-lg-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <a href="/Packages/Details/@p.Id" class="text-decoration-none">
+                                    <h6 class="fw-bold mb-1">@p.Title</h6>
+                                </a>
+                                <span class="font-monospace small text-muted">@p.PackageNumber</span>
+                            </div>
+                            <span class="badge bg-light text-dark border">
+                                <i class="bi bi-list-stars me-1"></i>@p.OptionCount options
+                            </span>
+                        </div>
+
+                        <dl class="row mb-0 small">
+                            <dt class="col-sm-4 text-muted fw-normal">Customer</dt>
+                            <dd class="col-sm-8 fw-semibold">@p.CustomerName</dd>
+
+                            <dt class="col-sm-4 text-muted fw-normal">Destination</dt>
+                            <dd class="col-sm-8">@(p.DestinationName ?? "—")</dd>
+
+                            @if (p.StartDate.HasValue)
+                            {
+                                <dt class="col-sm-4 text-muted fw-normal">Travel</dt>
+                                <dd class="col-sm-8">
+                                    @p.StartDate.Value.ToString("dd MMM yyyy")
+                                    @if (p.Days.HasValue) { <span class="text-muted">· @p.Days d</span> }
+                                </dd>
+                            }
+
+                            <dt class="col-sm-4 text-muted fw-normal">Pax</dt>
+                            <dd class="col-sm-8">@p.TotalPax (@p.Adults A, @p.Children C, @p.Infants I)</dd>
+
+                            @if (p.MinPrice.HasValue)
+                            {
+                                <dt class="col-sm-4 text-muted fw-normal">Price range</dt>
+                                <dd class="col-sm-8 fw-bold text-primary">
+                                    @if (p.MinPrice == p.MaxPrice)
+                                    {
+                                        @($"{p.Currency} {p.MinPrice:N0}")
+                                    }
+                                    else
+                                    {
+                                        @($"{p.Currency} {p.MinPrice:N0} – {p.MaxPrice:N0}")
+                                    }
+                                </dd>
+                            }
+                        </dl>
+
+                        <div class="d-flex gap-2 justify-content-end mt-3">
+                            <a href="/Packages/Details/@p.Id" class="btn btn-sm btn-outline-secondary">
+                                <i class="bi bi-eye me-1"></i>View
+                            </a>
+                            @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.Packages))
+                            {
+                                <a href="/Packages/Edit/@p.Id" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                            }
+                            @if (Tenant.CanDelete(TravelERP.Core.Constants.AppModules.Packages))
+                            {
+                                <form asp-action="Delete" method="post" class="d-inline" onsubmit="return confirm('Deactivate this package?');">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@p.Id" />
+                                    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                </form>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (Model.TotalPages > 1)
+    {
+        <nav class="mt-3">
+            <ul class="pagination pagination-sm justify-content-center mb-0">
+                <li class="page-item @(Model.HasPrevious ? "" : "disabled")">
+                    <a class="page-link" href="?search=@search&page=@(Model.Page - 1)"><i class="bi bi-chevron-left"></i></a>
+                </li>
+                @for (int p = 1; p <= Model.TotalPages; p++)
+                {
+                    <li class="page-item @(p == Model.Page ? "active" : "")">
+                        <a class="page-link" href="?search=@search&page=@p">@p</a>
+                    </li>
+                }
+                <li class="page-item @(Model.HasNext ? "" : "disabled")">
+                    <a class="page-link" href="?search=@search&page=@(Model.Page + 1)"><i class="bi bi-chevron-right"></i></a>
+                </li>
+            </ul>
+        </nav>
+    }
+}

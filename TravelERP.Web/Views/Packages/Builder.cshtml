@@ -1,0 +1,680 @@
+@using TravelERP.Core.Entities.Tenant
+@model Package
+@{
+    var isEdit = Model.Id > 0;
+    ViewData["Title"] ??= isEdit ? $"Edit — {Model.PackageNumber}" : "Create Package";
+    var destinations = ViewBag.Destinations as IEnumerable<Destination>     ?? [];
+    var hotels       = ViewBag.Hotels       as IEnumerable<Hotel>           ?? [];
+    var roomTypes    = ViewBag.RoomTypes    as IEnumerable<RoomType>        ?? [];
+    var mealPlans    = ViewBag.MealPlans    as IEnumerable<MealPlan>        ?? [];
+    var sightseeings = ViewBag.Sightseeings as IEnumerable<Sightseeing>     ?? [];
+}
+
+@section Styles {
+    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet" />
+    <style>
+        .pkg-tabs .nav-link { color: var(--bs-secondary-color); font-weight:600; padding: .65rem 1.1rem; }
+        .pkg-tabs .nav-link.active { color: var(--bs-primary); border-bottom: 2px solid var(--bs-primary); }
+        .quill-host { background:#fff; border-radius: 0 0 .375rem .375rem; }
+        .quill-host .ql-toolbar { border-radius: .375rem .375rem 0 0; }
+        .quill-host .ql-container { min-height: 140px; font-size: .9rem; }
+        .opt-tab {
+            border:1px solid var(--bs-border-color); background:#fff;
+            border-radius:.5rem .5rem 0 0; padding:.5rem 1rem; font-weight:600;
+            cursor:pointer; position:relative; bottom:-1px;
+        }
+        .opt-tab.active { background: var(--bs-primary-bg-subtle); border-color: var(--bs-primary);
+                          border-bottom-color: transparent; color: var(--bs-primary); }
+        .opt-pane { border:1px solid var(--bs-border-color); border-radius: 0 .5rem .5rem .5rem;
+                    padding: 1rem; background: #fff; }
+        .hotel-row { background:#f8f9fa; border:1px solid var(--bs-border-color);
+                     border-radius:.5rem; padding:.6rem; margin-bottom:.5rem; }
+    </style>
+}
+
+<form asp-action="@(isEdit ? "Edit" : "Create")" method="post" id="pkgForm">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="Id" value="@Model.Id" />
+    <input type="hidden" name="LeadId" value="@Model.LeadId" />
+
+    <!-- Header strip -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            @if (isEdit)
+            {
+                <span class="badge bg-light text-dark font-monospace fs-6 me-2">@Model.PackageNumber</span>
+            }
+            @if (Model.LeadId.HasValue)
+            {
+                <a href="/Leads/Details/@Model.LeadId" class="badge bg-info-subtle text-info text-decoration-none">
+                    <i class="bi bi-funnel me-1"></i>From Lead #@Model.LeadId
+                </a>
+            }
+        </div>
+        <div class="d-flex gap-2">
+            <a href="/Packages" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary px-4">
+                <i class="bi bi-check-lg me-1"></i>@(isEdit ? "Update" : "Save") Package
+            </button>
+        </div>
+    </div>
+
+    @if (!ViewData.ModelState.IsValid)
+    {
+        <div class="alert alert-danger">
+            <ul class="mb-0">
+                @foreach (var e in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                {
+                    <li>@e.ErrorMessage</li>
+                }
+            </ul>
+        </div>
+    }
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs pkg-tabs mb-3" role="tablist">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-info"   type="button">📋 Package Info</button></li>
+        <li class="nav-item"><button class="nav-link"        data-bs-toggle="tab" data-bs-target="#tab-options" type="button">💰 Options &amp; Pricing</button></li>
+        <li class="nav-item"><button class="nav-link"        data-bs-toggle="tab" data-bs-target="#tab-itin"    type="button">📍 Day-wise Itinerary</button></li>
+        <li class="nav-item"><button class="nav-link"        data-bs-toggle="tab" data-bs-target="#tab-incl"    type="button">✏️ Inclusions / Exclusions</button></li>
+        <li class="nav-item"><button class="nav-link"        data-bs-toggle="tab" data-bs-target="#tab-flight"  type="button">✈️ Flight / Notes</button></li>
+    </ul>
+
+    <div class="tab-content">
+        <!-- ── PACKAGE INFO ── -->
+        <div class="tab-pane fade show active" id="tab-info">
+            <div class="card shadow-sm mb-3">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label small fw-semibold">Package Title <span class="text-danger">*</span></label>
+                            <input type="text" name="Title" value="@Model.Title" class="form-control" placeholder="e.g. 5N/6D Kerala Honeymoon Package" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Destination</label>
+                            <select name="DestinationId" class="form-select select2">
+                                <option value="">Select Destination</option>
+                                @foreach (var d in destinations)
+                                {
+                                    <option value="@d.Id" selected="@(d.Id == Model.DestinationId)">@d.Name</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Customer Name <span class="text-danger">*</span></label>
+                            <input type="text" name="CustomerName" value="@Model.CustomerName" class="form-control" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Mobile</label>
+                            <input type="text" name="CustomerMobile" value="@Model.CustomerMobile" class="form-control" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Email</label>
+                            <input type="email" name="CustomerEmail" value="@Model.CustomerEmail" class="form-control" />
+                        </div>
+
+                        <div class="col-md-2">
+                            <label class="form-label small fw-semibold">Adults</label>
+                            <input type="number" name="Adults" min="0" value="@Model.Adults" class="form-control" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small fw-semibold">Children</label>
+                            <input type="number" name="Children" min="0" value="@Model.Children" class="form-control" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small fw-semibold">Infants</label>
+                            <input type="number" name="Infants" min="0" value="@Model.Infants" class="form-control" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small fw-semibold">Days</label>
+                            <input type="number" name="Days" min="0" value="@Model.Days" class="form-control" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small fw-semibold">Nights</label>
+                            <input type="number" name="Nights" min="0" value="@Model.Nights" class="form-control" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small fw-semibold">Start Date</label>
+                            <input type="date" name="StartDate" value="@(Model.StartDate?.ToString("yyyy-MM-dd"))" class="form-control" />
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Price Mode</label>
+                            <select name="PriceMode" class="form-select">
+                                <option value="Total"  selected="@(Model.PriceMode == "Total")">Total Price</option>
+                                <option value="PerPax" selected="@(Model.PriceMode == "PerPax")">Per Pax</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Currency</label>
+                            <input type="text" name="Currency" value="@Model.Currency" class="form-control" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── OPTIONS & PRICING ── -->
+        <div class="tab-pane fade" id="tab-options">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <p class="text-muted small mb-0">
+                    Add multiple price options (Standard/Deluxe/Luxury). Hotels and price differ per option;
+                    the trip plan itself is shared.
+                </p>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="addOptionBtn">
+                    <i class="bi bi-plus-lg me-1"></i>Add Option
+                </button>
+            </div>
+
+            <div id="optTabs" class="d-flex flex-wrap gap-1 mb-0"></div>
+            <div id="optPanes"></div>
+        </div>
+
+        <!-- ── DAY-WISE ITINERARY ── -->
+        <div class="tab-pane fade" id="tab-itin">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <p class="text-muted small mb-0">
+                    Plan the day-by-day itinerary. Each day has a title, description, and which sightseeings are visited.
+                    Sightseeings are filtered by the package destination.
+                </p>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="addDayBtn">
+                    <i class="bi bi-plus-lg me-1"></i>Add Day
+                </button>
+            </div>
+            <div id="dayList"></div>
+        </div>
+
+        <!-- ── INCLUSIONS / EXCLUSIONS ── -->
+        <div class="tab-pane fade" id="tab-incl">
+            <div class="row g-3">
+                <div class="col-lg-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-transparent border-0">
+                            <h6 class="mb-0 fw-bold"><i class="bi bi-check-square text-success me-2"></i>Inclusions / Sightseeing</h6>
+                        </div>
+                        <div class="card-body p-3">
+                            <input type="hidden" name="Inclusions" id="InclusionsHidden" />
+                            <div class="quill-host"><div id="inclEditor"></div></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-transparent border-0">
+                            <h6 class="mb-0 fw-bold"><i class="bi bi-x-square text-danger me-2"></i>Exclusions</h6>
+                        </div>
+                        <div class="card-body p-3">
+                            <input type="hidden" name="Exclusions" id="ExclusionsHidden" />
+                            <div class="quill-host"><div id="exclEditor"></div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── FLIGHT / NOTES ── -->
+        <div class="tab-pane fade" id="tab-flight">
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-transparent border-0">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-airplane text-primary me-2"></i>Flight / Transport Details</h6>
+                </div>
+                <div class="card-body p-3">
+                    <input type="hidden" name="FlightDetails" id="FlightHidden" />
+                    <div class="quill-host"><div id="flightEditor"></div></div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-transparent border-0">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-sticky text-warning me-2"></i>Internal Notes</h6>
+                </div>
+                <div class="card-body">
+                    <textarea name="Notes" class="form-control" rows="3"
+                              placeholder="Notes for internal use — not shown to customer">@Model.Notes</textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+@* ─────────────────────────────────────────── *@
+@* Initial-state JSON (server → JS bootstrap)   *@
+@* ─────────────────────────────────────────── *@
+@{
+    var initialJson = System.Text.Json.JsonSerializer.Serialize(new
+    {
+        options = Model.Options.Select(o => new
+        {
+            name        = o.OptionName,
+            land        = o.LandPrice,
+            flight      = o.FlightPrice,
+            final       = o.FinalPrice,
+            recommended = o.IsRecommended,
+            notes       = o.Notes,
+            hotels      = o.Hotels.Select(h => new
+            {
+                nights     = h.Nights,
+                hotelId    = h.HotelId,
+                roomTypeId = h.RoomTypeId,
+                mealPlanId = h.MealPlanId,
+                otherText  = h.OtherText
+            })
+        }),
+        hotels    = hotels.Select(h => new { id = h.Id, name = h.Name, destinationId = h.DestinationId }),
+        roomTypes = roomTypes.Select(r => new { id = r.Id, name = r.Name }),
+        mealPlans = mealPlans.Select(m => new { id = m.Id, code = m.Code, name = m.Name }),
+        sightseeings = sightseeings.Select(s => new { id = s.Id, name = s.Name, destinationId = s.DestinationId }),
+        days = Model.ItineraryDays.OrderBy(d => d.DayNumber).Select(d => new
+        {
+            title          = d.Title,
+            description    = d.Description,
+            sightseeingIds = d.SightseeingIds
+        })
+    });
+    var inclusionsJson = System.Text.Json.JsonSerializer.Serialize(Model.Inclusions ?? "");
+    var exclusionsJson = System.Text.Json.JsonSerializer.Serialize(Model.Exclusions ?? "");
+    var flightJson     = System.Text.Json.JsonSerializer.Serialize(Model.FlightDetails ?? "");
+}
+
+<script id="pkgInitial" type="application/json">@Html.Raw(initialJson)</script>
+<script id="pkgIncl"    type="application/json">@Html.Raw(inclusionsJson)</script>
+<script id="pkgExcl"    type="application/json">@Html.Raw(exclusionsJson)</script>
+<script id="pkgFlight"  type="application/json">@Html.Raw(flightJson)</script>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+    <script>
+        $('.select2').select2({ theme: 'bootstrap-5', width: '100%' });
+
+        // ─── Quill editors ───
+        const toolbar = [
+            [{ header: [false, 1, 2, 3] }],
+            ['bold', 'italic', 'underline'],
+            [{ list: 'ordered' }, { list: 'bullet' }],
+            [{ indent: '-1' }, { indent: '+1' }],
+            ['link', 'clean']
+        ];
+        const inclQuill   = new Quill('#inclEditor',   { theme: 'snow', modules: { toolbar } });
+        const exclQuill   = new Quill('#exclEditor',   { theme: 'snow', modules: { toolbar } });
+        const flightQuill = new Quill('#flightEditor', { theme: 'snow', modules: { toolbar } });
+
+        const inclInit   = JSON.parse(document.getElementById('pkgIncl').textContent);
+        const exclInit   = JSON.parse(document.getElementById('pkgExcl').textContent);
+        const flightInit = JSON.parse(document.getElementById('pkgFlight').textContent);
+        if (inclInit)   inclQuill.clipboard.dangerouslyPasteHTML(inclInit);
+        if (exclInit)   exclQuill.clipboard.dangerouslyPasteHTML(exclInit);
+        if (flightInit) flightQuill.clipboard.dangerouslyPasteHTML(flightInit);
+
+        // ─── Initial bootstrap data ───
+        const initial      = JSON.parse(document.getElementById('pkgInitial').textContent);
+        const allHotels    = initial.hotels;
+        const roomTypes    = initial.roomTypes;
+        const mealPlans    = initial.mealPlans;
+        const allSights    = initial.sightseeings || [];
+        let   options      = (initial.options && initial.options.length)
+            ? initial.options.map(o => ({ ...o, hotels: (o.hotels || []).map(h => ({ ...h })) }))
+            : [{ name: 'Option 1', land: 0, flight: 0, final: 0, recommended: true, notes: null, hotels: [] }];
+        let activeOpt = 0;
+        let   days = (initial.days || []).map(d => ({
+            title: d.title || '',
+            description: d.description || '',
+            sightseeingIds: (d.sightseeingIds || []).map(Number)
+        }));
+        const dayQuills = [];   // index N = Quill for day N
+
+        const tabsEl  = document.getElementById('optTabs');
+        const panesEl = document.getElementById('optPanes');
+
+        // Helper: hotels filtered by current package destination
+        function destinationHotels() {
+            const destId = Number(document.querySelector('select[name="DestinationId"]').value || 0);
+            return destId ? allHotels.filter(h => h.destinationId === destId) : allHotels;
+        }
+
+        function selectOptions(items, selectedId, getId, getLabel) {
+            return ['<option value="">— Select —</option>']
+                .concat(items.map(i =>
+                    `<option value="${getId(i)}" ${Number(getId(i)) === Number(selectedId) ? 'selected' : ''}>${getLabel(i)}</option>`))
+                .join('');
+        }
+
+        function renderHotelRow(opt, h, idx) {
+            const hotelOpts = selectOptions(destinationHotels(), h.hotelId, x => x.id, x => x.name);
+            const rtOpts    = selectOptions(roomTypes,           h.roomTypeId, x => x.id, x => x.name);
+            const mpOpts    = selectOptions(mealPlans,           h.mealPlanId, x => x.id, x => `${x.code} — ${x.name}`);
+            return `
+                <div class="hotel-row" data-row="${idx}">
+                    <div class="row g-2">
+                        <div class="col-md-1">
+                            <label class="form-label small fw-semibold mb-1">Nights</label>
+                            <input type="number" min="1" value="${h.nights || 1}" class="form-control form-control-sm h-nights" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-semibold mb-1">Hotel</label>
+                            <select class="form-select form-select-sm h-hotel">${hotelOpts}</select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small fw-semibold mb-1">Room Type</label>
+                            <select class="form-select form-select-sm h-roomtype">${rtOpts}</select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small fw-semibold mb-1">Meal Plan</label>
+                            <select class="form-select form-select-sm h-mealplan">${mpOpts}</select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-semibold mb-1">Other / Notes</label>
+                            <input type="text" value="${h.otherText || ''}" class="form-control form-control-sm h-other" />
+                        </div>
+                        <div class="col-md-1 d-flex align-items-end">
+                            <button type="button" class="btn btn-sm btn-outline-danger w-100 h-remove" title="Remove">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        function readHotelsFromDom(paneEl) {
+            return Array.from(paneEl.querySelectorAll('.hotel-row')).map(r => ({
+                nights:     Number(r.querySelector('.h-nights').value)   || 1,
+                hotelId:    r.querySelector('.h-hotel').value    ? Number(r.querySelector('.h-hotel').value)    : null,
+                roomTypeId: r.querySelector('.h-roomtype').value ? Number(r.querySelector('.h-roomtype').value) : null,
+                mealPlanId: r.querySelector('.h-mealplan').value ? Number(r.querySelector('.h-mealplan').value) : null,
+                otherText:  r.querySelector('.h-other').value || ''
+            }));
+        }
+
+        function readPaneToOption(paneEl, opt) {
+            opt.name        = paneEl.querySelector('.opt-name').value;
+            opt.land        = Number(paneEl.querySelector('.opt-land').value)   || 0;
+            opt.flight      = Number(paneEl.querySelector('.opt-flight').value) || 0;
+            opt.final       = Number(paneEl.querySelector('.opt-final').value)  || 0;
+            opt.recommended = paneEl.querySelector('.opt-recommended').checked;
+            opt.notes       = paneEl.querySelector('.opt-notes').value || null;
+            opt.hotels      = readHotelsFromDom(paneEl);
+        }
+
+        function renderOption(opt, idx) {
+            const isActive = idx === activeOpt;
+            const hotelsHtml = (opt.hotels || []).map((h, i) => renderHotelRow(opt, h, i)).join('');
+            return `
+                <div class="opt-pane ${isActive ? '' : 'd-none'}" data-pane="${idx}">
+                    <div class="row g-2 align-items-end mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold mb-1">Option Name</label>
+                            <input type="text" class="form-control opt-name" value="${opt.name || ''}" placeholder="e.g. Option 1 — Standard" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small fw-semibold mb-1">Land Price</label>
+                            <input type="number" step="0.01" class="form-control opt-land"   value="${opt.land   || 0}" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small fw-semibold mb-1">Flight Price</label>
+                            <input type="number" step="0.01" class="form-control opt-flight" value="${opt.flight || 0}" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small fw-semibold mb-1">Final Price</label>
+                            <input type="number" step="0.01" class="form-control fw-bold opt-final" value="${opt.final || 0}" />
+                        </div>
+                        <div class="col-md-2 d-flex flex-column gap-1">
+                            <div class="form-check form-switch m-0">
+                                <input type="checkbox" class="form-check-input opt-recommended" ${opt.recommended ? 'checked' : ''} />
+                                <label class="form-check-label small">⭐ Recommended</label>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary opt-auto-final" title="Final = Land + Flight">
+                                <i class="bi bi-calculator me-1"></i>Auto-sum
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="fw-semibold small text-muted text-uppercase">Hotels</span>
+                        <button type="button" class="btn btn-sm btn-outline-primary opt-add-hotel">
+                            <i class="bi bi-plus-lg me-1"></i>Add Hotel Row
+                        </button>
+                    </div>
+                    <div class="hotels-list">${hotelsHtml || '<p class="text-muted small mb-2">No hotels added.</p>'}</div>
+
+                    <label class="form-label small fw-semibold mt-3 mb-1">Option Notes</label>
+                    <textarea class="form-control form-control-sm opt-notes" rows="2"
+                              placeholder="Optional note shown next to this option">${opt.notes || ''}</textarea>
+
+                    <div class="d-flex justify-content-end mt-3">
+                        ${options.length > 1
+                            ? `<button type="button" class="btn btn-sm btn-outline-danger opt-remove">
+                                   <i class="bi bi-trash me-1"></i>Delete this option
+                               </button>`
+                            : '' }
+                    </div>
+                </div>`;
+        }
+
+        function renderTabs() {
+            tabsEl.innerHTML = options.map((o, i) =>
+                `<div class="opt-tab ${i === activeOpt ? 'active' : ''}" data-tab="${i}">
+                    ${o.name || ('Option ' + (i + 1))}${o.recommended ? ' ⭐' : ''}
+                </div>`
+            ).join('');
+        }
+
+        function renderAll() {
+            renderTabs();
+            panesEl.innerHTML = options.map((o, i) => renderOption(o, i)).join('');
+            wirePaneEvents();
+        }
+
+        // Persist current pane state into options[] BEFORE switching/saving
+        function syncActivePane() {
+            const paneEl = panesEl.querySelector('.opt-pane:not(.d-none)');
+            if (paneEl) readPaneToOption(paneEl, options[activeOpt]);
+        }
+
+        function wirePaneEvents() {
+            // Tab switch
+            tabsEl.querySelectorAll('.opt-tab').forEach(t => {
+                t.addEventListener('click', () => {
+                    syncActivePane();
+                    activeOpt = Number(t.dataset.tab);
+                    renderAll();
+                });
+            });
+
+            const paneEl = panesEl.querySelector('.opt-pane:not(.d-none)');
+            if (!paneEl) return;
+
+            paneEl.querySelectorAll('.opt-add-hotel').forEach(b => b.addEventListener('click', () => {
+                syncActivePane();
+                options[activeOpt].hotels.push({ nights: 1 });
+                renderAll();
+            }));
+            paneEl.querySelectorAll('.h-remove').forEach(b => b.addEventListener('click', () => {
+                const row = b.closest('.hotel-row');
+                const idx = Number(row.dataset.row);
+                syncActivePane();
+                options[activeOpt].hotels.splice(idx, 1);
+                renderAll();
+            }));
+            paneEl.querySelectorAll('.opt-auto-final').forEach(b => b.addEventListener('click', () => {
+                const land   = Number(paneEl.querySelector('.opt-land').value)   || 0;
+                const flight = Number(paneEl.querySelector('.opt-flight').value) || 0;
+                paneEl.querySelector('.opt-final').value = (land + flight).toFixed(2);
+            }));
+            paneEl.querySelectorAll('.opt-remove').forEach(b => b.addEventListener('click', () => {
+                if (!confirm('Delete this option?')) return;
+                options.splice(activeOpt, 1);
+                activeOpt = Math.max(0, activeOpt - 1);
+                renderAll();
+            }));
+        }
+
+        document.getElementById('addOptionBtn').addEventListener('click', () => {
+            syncActivePane();
+            options.push({
+                name: 'Option ' + (options.length + 1),
+                land: 0, flight: 0, final: 0, recommended: false, notes: null, hotels: []
+            });
+            activeOpt = options.length - 1;
+            renderAll();
+        });
+
+        // Re-render hotel selects + day sightseeings when destination changes
+        document.querySelector('select[name="DestinationId"]').addEventListener('change', () => {
+            syncActivePane();
+            renderAll();
+            renderDays();
+        });
+
+        // ─── DAY-WISE ITINERARY ───
+        const dayListEl   = document.getElementById('dayList');
+        const addDayBtn   = document.getElementById('addDayBtn');
+        const dayToolbar  = [
+            ['bold', 'italic', 'underline'],
+            [{ list: 'ordered' }, { list: 'bullet' }],
+            ['link', 'clean']
+        ];
+
+        function destinationSightseeings() {
+            const destId = Number(document.querySelector('select[name="DestinationId"]').value || 0);
+            return destId ? allSights.filter(s => s.destinationId === destId) : allSights;
+        }
+
+        function renderDayCard(d, idx) {
+            const sights = destinationSightseeings();
+            const sightOpts = sights.map(s =>
+                `<option value="${s.id}" ${(d.sightseeingIds || []).includes(s.id) ? 'selected' : ''}>${s.name}</option>`
+            ).join('');
+            return `
+                <div class="card shadow-sm mb-3 day-card" data-day="${idx}">
+                    <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0 fw-bold">
+                            <span class="badge bg-primary me-2">Day ${idx + 1}</span>
+                            <input type="text" class="form-control form-control-sm d-inline-block d-title"
+                                   style="max-width: 400px;"
+                                   value="${(d.title || '').replace(/"/g, '&quot;')}"
+                                   placeholder="e.g. Cochin Arrival" />
+                        </h6>
+                        <button type="button" class="btn btn-sm btn-outline-danger d-remove">
+                            <i class="bi bi-trash"></i> Remove
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <label class="form-label small fw-semibold mb-1">Description</label>
+                        <div class="quill-host"><div class="d-desc"></div></div>
+
+                        <label class="form-label small fw-semibold mt-3 mb-1">
+                            <i class="bi bi-camera text-primary me-1"></i>Sightseeings visited on this day
+                        </label>
+                        <select multiple class="form-select d-sights" data-placeholder="Select sightseeings…">
+                            ${sightOpts}
+                        </select>
+                        ${sights.length === 0
+                            ? '<div class="form-text text-warning"><i class="bi bi-exclamation-triangle me-1"></i>No sightseeings for this destination — add some in the Sightseeings master.</div>'
+                            : ''}
+                    </div>
+                </div>`;
+        }
+
+        // Persist current DOM state into days[] array
+        function syncDaysFromDom() {
+            dayListEl.querySelectorAll('.day-card').forEach((card, i) => {
+                const idx = Number(card.dataset.day);
+                if (!days[idx]) return;
+                days[idx].title = card.querySelector('.d-title').value;
+                days[idx].description = dayQuills[idx] ? dayQuills[idx].root.innerHTML : days[idx].description;
+                const select = card.querySelector('.d-sights');
+                days[idx].sightseeingIds = Array.from(select.selectedOptions).map(o => Number(o.value));
+            });
+        }
+
+        function renderDays() {
+            // Sync current state before re-render
+            syncDaysFromDom();
+            dayQuills.length = 0;
+
+            if (days.length === 0) {
+                dayListEl.innerHTML = '<div class="text-muted small text-center py-4"><i class="bi bi-calendar-event fs-2 d-block opacity-50"></i><p class="mt-2 mb-0">No days yet. Click <strong>+ Add Day</strong> to start planning.</p></div>';
+                return;
+            }
+            dayListEl.innerHTML = days.map((d, i) => renderDayCard(d, i)).join('');
+
+            // Wire each card
+            dayListEl.querySelectorAll('.day-card').forEach((card) => {
+                const idx = Number(card.dataset.day);
+                // Quill
+                const q = new Quill(card.querySelector('.d-desc'), {
+                    theme: 'snow', modules: { toolbar: dayToolbar }
+                });
+                if (days[idx].description) q.clipboard.dangerouslyPasteHTML(days[idx].description);
+                dayQuills[idx] = q;
+
+                // Select2 multi-select
+                $(card.querySelector('.d-sights')).select2({
+                    theme: 'bootstrap-5', width: '100%',
+                    placeholder: 'Select sightseeings…'
+                });
+
+                // Remove button
+                card.querySelector('.d-remove').addEventListener('click', () => {
+                    if (!confirm('Remove Day ' + (idx + 1) + '?')) return;
+                    syncDaysFromDom();
+                    days.splice(idx, 1);
+                    renderDays();
+                });
+            });
+        }
+
+        addDayBtn.addEventListener('click', () => {
+            syncDaysFromDom();
+            days.push({ title: '', description: '', sightseeingIds: [] });
+            renderDays();
+        });
+
+        // ─── Submit: serialize options + days into hidden inputs ───
+        document.getElementById('pkgForm').addEventListener('submit', e => {
+            syncActivePane();
+            syncDaysFromDom();
+
+            // Quill → hidden inputs
+            document.getElementById('InclusionsHidden').value = inclQuill.root.innerHTML;
+            document.getElementById('ExclusionsHidden').value = exclQuill.root.innerHTML;
+            document.getElementById('FlightHidden').value     = flightQuill.root.innerHTML;
+
+            // Build the parallel-array hidden fields for options
+            const form = e.target;
+            form.querySelectorAll('input[data-dyn]').forEach(x => x.remove());
+
+            options.forEach((o) => {
+                const adds = [
+                    { name: 'OptionNames',     value: o.name || '' },
+                    { name: 'OptionLand',      value: o.land || 0 },
+                    { name: 'OptionFlight',    value: o.flight || 0 },
+                    { name: 'OptionFinal',     value: o.final || 0 },
+                    { name: 'OptionRecommend', value: o.recommended ? 'true' : 'false' },
+                    { name: 'OptionNotes',     value: o.notes || '' },
+                    { name: 'OptionHotelsJson', value: JSON.stringify(o.hotels || []) }
+                ];
+                adds.forEach(a => {
+                    const el = document.createElement('input');
+                    el.type = 'hidden';
+                    el.name = a.name;
+                    el.value = a.value;
+                    el.dataset.dyn = '1';
+                    form.appendChild(el);
+                });
+            });
+
+            // Itinerary days as a single JSON blob
+            const daysEl = document.createElement('input');
+            daysEl.type = 'hidden';
+            daysEl.name = 'ItineraryDaysJson';
+            daysEl.value = JSON.stringify(days);
+            daysEl.dataset.dyn = '1';
+            form.appendChild(daysEl);
+        });
+
+        renderAll();
+        renderDays();
+    </script>
+}

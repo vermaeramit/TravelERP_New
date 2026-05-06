@@ -1,0 +1,228 @@
+@using TravelERP.Core.Entities.Tenant
+@model Package
+@inject TravelERP.Core.Interfaces.ITenantContext Tenant
+@{ ViewData["Title"] = $"Package {Model.PackageNumber}"; }
+
+@section Styles {
+    <style>
+        .opt-card { border: 2px solid var(--bs-border-color); border-radius: .75rem;
+                    padding: 1rem; background: #fff; height: 100%; }
+        .opt-card.recommended { border-color: var(--bs-primary); background: rgba(13,110,253,.04); }
+        .opt-card .opt-name { font-size: 1rem; font-weight: 700; color: var(--bs-primary); }
+        .opt-card .price { font-size: 1.5rem; font-weight: 800; color: var(--bs-success); }
+        .opt-card .price-mode { font-size: .7rem; text-transform: uppercase;
+                                letter-spacing: .5px; color: var(--bs-secondary-color); }
+        .opt-hotel-row { padding: .5rem 0; border-bottom: 1px dashed var(--bs-border-color); }
+        .opt-hotel-row:last-child { border-bottom: 0; }
+        .info-row { padding: .4rem 0; border-bottom: 1px solid var(--bs-border-color); }
+        .info-row:last-child { border-bottom: 0; }
+        .info-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .5px;
+                      color: var(--bs-secondary-color); font-weight: 600; }
+    </style>
+}
+
+<!-- Header -->
+<div class="card shadow-sm mb-3">
+    <div class="card-body py-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div class="d-flex align-items-center flex-wrap gap-2">
+                <a href="/Packages" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+                <span class="badge bg-light text-dark font-monospace fs-6">@Model.PackageNumber</span>
+                <span class="fw-bold">@Model.Title</span>
+                @if (Model.LeadId.HasValue)
+                {
+                    <a href="/Leads/Details/@Model.LeadId" class="badge bg-info-subtle text-info text-decoration-none">
+                        <i class="bi bi-funnel me-1"></i>From Lead #@Model.LeadId
+                    </a>
+                }
+            </div>
+            <div class="d-flex gap-2">
+                @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.Packages))
+                {
+                    <a href="/Packages/Edit/@Model.Id" class="btn btn-sm btn-primary">
+                        <i class="bi bi-pencil me-1"></i>Edit
+                    </a>
+                }
+                @if (Tenant.CanDelete(TravelERP.Core.Constants.AppModules.Packages))
+                {
+                    <form asp-action="Delete" method="post" class="d-inline" onsubmit="return confirm('Deactivate this package?');">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@Model.Id" />
+                        <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                    </form>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <!-- LEFT: package summary -->
+    <div class="col-lg-4">
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-transparent border-0">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-info-circle text-primary me-2"></i>Package Summary</h6>
+            </div>
+            <div class="card-body">
+                <div class="info-row">
+                    <div class="info-label">Customer</div>
+                    <div class="fw-semibold">@Model.CustomerName</div>
+                    <div class="small text-muted">
+                        @if (!string.IsNullOrEmpty(Model.CustomerMobile)) { <span><i class="bi bi-telephone me-1"></i>@Model.CustomerMobile</span> }
+                        @if (!string.IsNullOrEmpty(Model.CustomerEmail)) { <span class="ms-2"><i class="bi bi-envelope me-1"></i>@Model.CustomerEmail</span> }
+                    </div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Destination</div>
+                    <div>@(Model.DestinationName ?? "—")</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Travel Date</div>
+                    <div>@(Model.StartDate?.ToString("dd MMM yyyy") ?? "—")</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Duration</div>
+                    <div>@(Model.Days ?? 0) days / @(Model.Nights ?? 0) nights</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Pax</div>
+                    <div>@Model.TotalPax (A:@Model.Adults · C:@Model.Children · I:@Model.Infants)</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Price Mode</div>
+                    <div>@(Model.PriceMode == "PerPax" ? "Per Pax" : "Total Price") · @Model.Currency</div>
+                </div>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Model.FlightDetails))
+        {
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-transparent border-0">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-airplane text-primary me-2"></i>Flight / Transport</h6>
+                </div>
+                <div class="card-body small">@Html.Raw(Model.FlightDetails)</div>
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Model.Inclusions))
+        {
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-transparent border-0">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-check-square text-success me-2"></i>Inclusions</h6>
+                </div>
+                <div class="card-body small">@Html.Raw(Model.Inclusions)</div>
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Model.Exclusions))
+        {
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-transparent border-0">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-x-square text-danger me-2"></i>Exclusions</h6>
+                </div>
+                <div class="card-body small">@Html.Raw(Model.Exclusions)</div>
+            </div>
+        }
+    </div>
+
+    <!-- RIGHT: side-by-side options -->
+    <div class="col-lg-8">
+        <h6 class="fw-bold mb-3 text-muted text-uppercase small">
+            <i class="bi bi-list-stars me-1"></i>@Model.Options.Count Price Option@(Model.Options.Count == 1 ? "" : "s")
+        </h6>
+
+        <div class="row g-3">
+            @foreach (var o in Model.Options)
+            {
+                <div class="col-md-@(Model.Options.Count >= 3 ? 4 : 6)">
+                    <div class="opt-card @(o.IsRecommended ? "recommended" : "")">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div class="opt-name">@o.OptionName</div>
+                            @if (o.IsRecommended)
+                            {
+                                <span class="badge bg-primary"><i class="bi bi-star-fill me-1"></i>Recommended</span>
+                            }
+                        </div>
+
+                        <div class="mb-2">
+                            <div class="price-mode">@(Model.PriceMode == "PerPax" ? "Per Pax" : "Total")</div>
+                            <div class="price">@Model.Currency @o.FinalPrice.ToString("N0")</div>
+                            <div class="small text-muted">
+                                Land: @Model.Currency @o.LandPrice.ToString("N0")
+                                · Flight: @Model.Currency @o.FlightPrice.ToString("N0")
+                            </div>
+                        </div>
+
+                        @if (o.Hotels.Any())
+                        {
+                            <div class="info-label mt-3 mb-1">Hotels</div>
+                            @foreach (var h in o.Hotels)
+                            {
+                                <div class="opt-hotel-row small">
+                                    <div class="d-flex justify-content-between">
+                                        <strong>@(h.HotelName ?? "—")</strong>
+                                        <span class="text-muted">@h.Nights N</span>
+                                    </div>
+                                    <div class="text-muted">
+                                        @(h.RoomTypeName ?? "—")
+                                        @if (!string.IsNullOrEmpty(h.MealPlanCode))
+                                        {
+                                            <span class="ms-1 badge bg-light text-dark border">@h.MealPlanCode</span>
+                                        }
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(h.OtherText))
+                                    {
+                                        <div class="text-muted fst-italic">@h.OtherText</div>
+                                    }
+                                </div>
+                            }
+                        }
+
+                        @if (!string.IsNullOrWhiteSpace(o.Notes))
+                        {
+                            <div class="info-label mt-3 mb-1">Notes</div>
+                            <div class="small">@o.Notes</div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+
+        @if (Model.ItineraryDays.Any())
+        {
+            <h6 class="fw-bold mt-4 mb-3 text-muted text-uppercase small">
+                <i class="bi bi-calendar2-week me-1"></i>Day-wise Itinerary
+            </h6>
+            <div class="day-timeline">
+                @foreach (var day in Model.ItineraryDays.OrderBy(d => d.DayNumber))
+                {
+                    <div class="card shadow-sm mb-3 day-card-detail">
+                        <div class="card-header bg-transparent border-0 d-flex align-items-center">
+                            <span class="badge bg-primary me-2">Day @day.DayNumber</span>
+                            <h6 class="fw-bold mb-0">@day.Title</h6>
+                        </div>
+                        <div class="card-body">
+                            @if (!string.IsNullOrWhiteSpace(day.Description))
+                            {
+                                <div class="small mb-2">@Html.Raw(day.Description)</div>
+                            }
+                            @if (day.SightseeingNames.Any())
+                            {
+                                <div class="info-label mb-1"><i class="bi bi-camera me-1"></i>Sightseeings</div>
+                                <div class="d-flex flex-wrap gap-1">
+                                    @foreach (var s in day.SightseeingNames)
+                                    {
+                                        <span class="badge bg-light text-dark border">
+                                            <i class="bi bi-geo-alt me-1"></i>@s
+                                        </span>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>

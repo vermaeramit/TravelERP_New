@@ -56,4 +56,37 @@ public class CompanyController : Controller
         ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Setup", null), ("Branches", null) };
         return View();
     }
+
+    [HttpGet("NumberSeries")]
+    public async Task<IActionResult> NumberSeries()
+    {
+        if (!_tenant.IsSuperAdmin) return Forbid();
+        ViewData["Title"] = "Number Series";
+        var company = await _companies.GetByIdAsync(_tenant.CompanyId);
+        return View(company);
+    }
+
+    [HttpPost("NumberSeries"), ValidateAntiForgeryToken]
+    public async Task<IActionResult> NumberSeries(string leadPrefix, string packagePrefix)
+    {
+        if (!_tenant.IsSuperAdmin) return Forbid();
+
+        leadPrefix    = (leadPrefix    ?? "").Trim().ToUpperInvariant();
+        packagePrefix = (packagePrefix ?? "").Trim().ToUpperInvariant();
+
+        if (string.IsNullOrEmpty(leadPrefix) || string.IsNullOrEmpty(packagePrefix))
+        {
+            TempData["Error"] = "Both prefixes are required.";
+            return RedirectToAction(nameof(NumberSeries));
+        }
+        if (leadPrefix.Length > 20 || packagePrefix.Length > 20)
+        {
+            TempData["Error"] = "Prefix max length is 20 characters.";
+            return RedirectToAction(nameof(NumberSeries));
+        }
+
+        await _companies.UpdateNumberSeriesAsync(_tenant.CompanyId, leadPrefix, packagePrefix, _tenant.UserId);
+        TempData["Success"] = "Number series updated. New leads/packages will use the new prefixes.";
+        return RedirectToAction(nameof(NumberSeries));
+    }
 }
