@@ -1,0 +1,44 @@
+# ───────────────── Build output ─────────────────
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Bb]uild/
+[Dd]ebug/
+[Rr]elease/
+*.dll
+*.pdb
+*.exe
+*.exe.config
+*.cache
+*.suo
+*.user
+*.userprefs
+*.sln.docstates
+
+# ───────────────── Visual Studio / Rider ─────────────────
+.vs/
+.idea/
+*.swp
+*.swo
+
+# ───────────────── ASP.NET Core ─────────────────
+appsettings.*.local.json
+*.Development.json
+secrets.json
+*.pfx
+*.publishsettings
+
+# ───────────────── User uploads (stored locally) ─────────────────
+TravelERP.Web/wwwroot/uploads/
+
+# ───────────────── Logs ─────────────────
+logs/
+*.log
+
+# ───────────────── OS ─────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ───────────────── Claude / agent caches ─────────────────
+.claude/settings.local.json
