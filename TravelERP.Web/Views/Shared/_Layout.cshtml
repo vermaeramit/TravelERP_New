@@ -96,79 +96,227 @@
                         </a>
                     </li>
 
-                    <li class="nav-header">OPERATIONS</li>
-                    <li class="nav-item">
-                        <a href="/Bookings" class="nav-link @NavActive("Bookings")">
-                            <i class="nav-icon bi bi-journal-bookmark-fill"></i><p>Bookings</p>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="/Customers" class="nav-link @NavActive("Customers")">
-                            <i class="nav-icon bi bi-people-fill"></i><p>Customers</p>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="/Packages" class="nav-link @NavActive("Packages")">
-                            <i class="nav-icon bi bi-map-fill"></i><p>Tour Packages</p>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="/Suppliers" class="nav-link @NavActive("Suppliers")">
-                            <i class="nav-icon bi bi-building"></i><p>Suppliers</p>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="/Visa" class="nav-link @NavActive("Visa")">
-                            <i class="nav-icon bi bi-passport"></i><p>Visa &amp; Documents</p>
-                        </a>
-                    </li>
+                    @if (CanSee("Leads") || CanSee("Customers") || CanSee("Bookings") || CanSee("Packages") || CanSee("Suppliers") || CanSee("Visa"))
+                    {
+                        <li class="nav-header">OPERATIONS</li>
+                    }
+                    @if (CanSee("Leads"))
+                    {
+                        <li class="nav-item">
+                            <a href="/Leads" class="nav-link @NavActive("Leads")">
+                                <i class="nav-icon bi bi-funnel-fill"></i><p>Leads</p>
+                            </a>
+                        </li>
+                    }
+                    @if (CanSee("Bookings"))
+                    {
+                        <li class="nav-item">
+                            <a href="/Bookings" class="nav-link @NavActive("Bookings")">
+                                <i class="nav-icon bi bi-journal-bookmark-fill"></i><p>Bookings</p>
+                            </a>
+                        </li>
+                    }
+                    @if (CanSee("Customers"))
+                    {
+                        <li class="nav-item">
+                            <a href="/Customers" class="nav-link @NavActive("Customers")">
+                                <i class="nav-icon bi bi-people-fill"></i><p>Customers</p>
+                            </a>
+                        </li>
+                    }
+                    @if (CanSee("Packages"))
+                    {
+                        <li class="nav-item">
+                            <a href="/Packages" class="nav-link @NavActive("Packages")">
+                                <i class="nav-icon bi bi-map-fill"></i><p>Tour Packages</p>
+                            </a>
+                        </li>
+                    }
+                    @if (CanSee("Suppliers"))
+                    {
+                        <li class="nav-item">
+                            <a href="/Suppliers" class="nav-link @NavActive("Suppliers")">
+                                <i class="nav-icon bi bi-building"></i><p>Suppliers</p>
+                            </a>
+                        </li>
+                    }
+                    @if (CanSee("Visa"))
+                    {
+                        <li class="nav-item">
+                            <a href="/Visa" class="nav-link @NavActive("Visa")">
+                                <i class="nav-icon bi bi-passport"></i><p>Visa &amp; Documents</p>
+                            </a>
+                        </li>
+                    }
 
-                    <li class="nav-header">FINANCE</li>
-                    <li class="nav-item">
-                        <a href="/Finance/Invoices" class="nav-link @NavActive("Finance")">
-                            <i class="nav-icon bi bi-receipt"></i><p>Invoices &amp; Payments</p>
-                        </a>
-                    </li>
+                    @if (CanSee("Finance"))
+                    {
+                        <li class="nav-header">FINANCE</li>
+                        <li class="nav-item">
+                            <a href="/Finance/Invoices" class="nav-link @NavActive("Finance")">
+                                <i class="nav-icon bi bi-receipt"></i><p>Invoices &amp; Payments</p>
+                            </a>
+                        </li>
+                    }
 
-                    <li class="nav-header">HR</li>
-                    <li class="nav-item @TreeviewOpen("HR")">
-                        <a href="#" class="nav-link">
-                            <i class="nav-icon bi bi-person-badge"></i>
-                            <p>Human Resources <i class="nav-arrow bi bi-chevron-right"></i></p>
-                        </a>
-                        <ul class="nav nav-treeview">
-                            <li class="nav-item">
-                                <a href="/HR/Employees" class="nav-link"><i class="nav-icon bi bi-person-lines-fill"></i><p>Employees</p></a>
-                            </li>
-                            <li class="nav-item">
-                                <a href="/HR/Leaves" class="nav-link"><i class="nav-icon bi bi-calendar-check"></i><p>Leave Management</p></a>
-                            </li>
-                        </ul>
-                    </li>
+                    @if (CanSee("HR"))
+                    {
+                        <li class="nav-header">HR</li>
+                        <li class="nav-item @TreeviewOpen("HR")">
+                            <a href="#" class="nav-link">
+                                <i class="nav-icon bi bi-person-badge"></i>
+                                <p>Human Resources <i class="nav-arrow bi bi-chevron-right"></i></p>
+                            </a>
+                            <ul class="nav nav-treeview">
+                                <li class="nav-item">
+                                    <a href="/HR/Employees" class="nav-link"><i class="nav-icon bi bi-person-lines-fill"></i><p>Employees</p></a>
+                                </li>
+                            </ul>
+                        </li>
+                    }
 
-                    <li class="nav-header">REPORTS &amp; SETTINGS</li>
-                    <li class="nav-item">
-                        <a href="/Reports" class="nav-link @NavActive("Reports")">
-                            <i class="nav-icon bi bi-bar-chart-fill"></i><p>Reports</p>
-                        </a>
-                    </li>
-                    <li class="nav-item @TreeviewOpen("Company")">
-                        <a href="#" class="nav-link">
-                            <i class="nav-icon bi bi-gear-fill"></i>
-                            <p>Company Setup <i class="nav-arrow bi bi-chevron-right"></i></p>
-                        </a>
-                        <ul class="nav nav-treeview">
-                            <li class="nav-item">
-                                <a href="/Company/Settings" class="nav-link"><i class="nav-icon bi bi-sliders"></i><p>Settings</p></a>
-                            </li>
-                            <li class="nav-item">
-                                <a href="/Company/Branches" class="nav-link"><i class="nav-icon bi bi-diagram-3"></i><p>Branches</p></a>
-                            </li>
-                            <li class="nav-item">
-                                <a href="/Company/Users" class="nav-link"><i class="nav-icon bi bi-people"></i><p>Users</p></a>
-                            </li>
-                        </ul>
-                    </li>
+                    @if (CanSee("Masters"))
+                    {
+                        <li class="nav-header">MASTERS</li>
+                        <li class="nav-item @TreeviewOpenAny("Destinations","Hotels","RoomTypes","MealPlans","Sightseeings","Itineraries")">
+                            <a href="#" class="nav-link">
+                                <i class="nav-icon bi bi-globe-asia-australia"></i>
+                                <p>Travel Masters <i class="nav-arrow bi bi-chevron-right"></i></p>
+                            </a>
+                            <ul class="nav nav-treeview">
+                                <li class="nav-item">
+                                    <a href="/Destinations" class="nav-link @NavActive("Destinations")">
+                                        <i class="nav-icon bi bi-geo-alt"></i><p>Destinations</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="/Hotels" class="nav-link @NavActive("Hotels")">
+                                        <i class="nav-icon bi bi-building"></i><p>Hotels</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="/RoomTypes" class="nav-link @NavActive("RoomTypes")">
+                                        <i class="nav-icon bi bi-door-closed"></i><p>Room Types</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="/MealPlans" class="nav-link @NavActive("MealPlans")">
+                                        <i class="nav-icon bi bi-egg-fried"></i><p>Meal Plans</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="/Sightseeings" class="nav-link @NavActive("Sightseeings")">
+                                        <i class="nav-icon bi bi-camera"></i><p>Sightseeing</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="/Itineraries" class="nav-link @NavActive("Itineraries")">
+                                        <i class="nav-icon bi bi-list-ul"></i><p>Itineraries</p>
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+                        <li class="nav-item @TreeviewOpenAny("Employees","Designations","LeadSources","LeadStatuses","ActivityTemplates","VisaTypes","MailTemplates")">
+                            <a href="#" class="nav-link">
+                                <i class="nav-icon bi bi-collection-fill"></i>
+                                <p>CRM &amp; HR Masters <i class="nav-arrow bi bi-chevron-right"></i></p>
+                            </a>
+                            <ul class="nav nav-treeview">
+                                <li class="nav-item">
+                                    <a href="/Employees" class="nav-link @NavActive("Employees")">
+                                        <i class="nav-icon bi bi-people"></i><p>Employees</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="/Designations" class="nav-link @NavActive("Designations")">
+                                        <i class="nav-icon bi bi-person-badge"></i><p>Designations</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="/LeadSources" class="nav-link @NavActive("LeadSources")">
+                                        <i class="nav-icon bi bi-megaphone"></i><p>Lead Sources</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="/LeadStatuses" class="nav-link @NavActive("LeadStatuses")">
+                                        <i class="nav-icon bi bi-flag"></i><p>Lead Statuses</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="/ActivityTemplates" class="nav-link @NavActive("ActivityTemplates")">
+                                        <i class="nav-icon bi bi-chat-square-text"></i><p>Activity Templates</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="/VisaTypes" class="nav-link @NavActive("VisaTypes")">
+                                        <i class="nav-icon bi bi-passport"></i><p>Visa Types</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="/MailTemplates" class="nav-link @NavActive("MailTemplates")">
+                                        <i class="nav-icon bi bi-envelope-paper"></i><p>Mail Templates</p>
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+                        <li class="nav-item @TreeviewOpenAny("BankAccounts")">
+                            <a href="#" class="nav-link">
+                                <i class="nav-icon bi bi-cash-stack"></i>
+                                <p>Finance Masters <i class="nav-arrow bi bi-chevron-right"></i></p>
+                            </a>
+                            <ul class="nav nav-treeview">
+                                <li class="nav-item">
+                                    <a href="/BankAccounts" class="nav-link @NavActive("BankAccounts")">
+                                        <i class="nav-icon bi bi-bank"></i><p>Bank Accounts</p>
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+                    }
+
+                    @if (CanSee("Reports") || CanSee("Roles") || CanSee("Settings"))
+                    {
+                        <li class="nav-header">REPORTS &amp; SETTINGS</li>
+                    }
+                    @if (CanSee("Reports"))
+                    {
+                        <li class="nav-item">
+                            <a href="/Reports" class="nav-link @NavActive("Reports")">
+                                <i class="nav-icon bi bi-bar-chart-fill"></i><p>Reports</p>
+                            </a>
+                        </li>
+                    }
+                    @if (CanSee("Roles"))
+                    {
+                        <li class="nav-item">
+                            <a href="/Roles" class="nav-link @NavActive("Roles")">
+                                <i class="nav-icon bi bi-shield-lock-fill"></i><p>Roles &amp; Permissions</p>
+                            </a>
+                        </li>
+                    }
+                    @if (CanSee("Settings"))
+                    {
+                        <li class="nav-item @TreeviewOpen("Company")">
+                            <a href="#" class="nav-link">
+                                <i class="nav-icon bi bi-gear-fill"></i>
+                                <p>Company Setup <i class="nav-arrow bi bi-chevron-right"></i></p>
+                            </a>
+                            <ul class="nav nav-treeview">
+                                <li class="nav-item">
+                                    <a href="/Company/Settings" class="nav-link"><i class="nav-icon bi bi-sliders"></i><p>Settings</p></a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="/Company/Users" class="nav-link"><i class="nav-icon bi bi-people"></i><p>Users</p></a>
+                                </li>
+                                @if (User.HasClaim("IsSuperAdmin", "true"))
+                                {
+                                    <li class="nav-item">
+                                        <a href="/Company/NumberSeries" class="nav-link"><i class="nav-icon bi bi-hash"></i><p>Number Series</p></a>
+                                    </li>
+                                }
+                            </ul>
+                        </li>
+                    }
 
                 </ul>
             </nav>
@@ -270,4 +418,11 @@
 
     string TreeviewOpen(string controller) =>
         ViewContext.RouteData.Values["controller"]?.ToString() == controller ? "menu-open" : "";
+
+    string TreeviewOpenAny(params string[] controllers) =>
+        controllers.Contains(ViewContext.RouteData.Values["controller"]?.ToString() ?? "") ? "menu-open" : "";
+
+    bool CanSee(string module) =>
+        User.HasClaim("IsSuperAdmin", "true") ||
+        User.HasClaim("Perm", $"{module}.View");
 }

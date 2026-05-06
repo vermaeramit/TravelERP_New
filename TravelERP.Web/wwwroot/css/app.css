@@ -4,14 +4,90 @@
     --erp-primary: #0d6efd;
     --erp-sidebar-bg: #1e2433;
     --erp-sidebar-width: 260px;
+    --erp-header-height: 56px;
 }
 
-/* ── Sidebar shell ── */
+/* ── Layout shell — sidebar fixed, content/footer shifted ── */
+html, body { height: 100%; }
+body { min-height: 100vh; }
+
+.app-wrapper {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Sidebar: pinned full-height with its own scroll */
 .app-sidebar {
+    position: fixed !important;
+    top: 0; left: 0; bottom: 0;
+    width: var(--erp-sidebar-width);
+    height: 100vh !important;
+    z-index: 1040;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     background-color: var(--erp-sidebar-bg) !important;
 }
+.app-sidebar .sidebar-brand { flex-shrink: 0; }
 .app-sidebar .sidebar-wrapper {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overflow-x: hidden;
     background-color: var(--erp-sidebar-bg) !important;
+}
+
+/* Slim scrollbar inside sidebar */
+.app-sidebar .sidebar-wrapper::-webkit-scrollbar { width: 6px; }
+.app-sidebar .sidebar-wrapper::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.15);
+    border-radius: 3px;
+}
+.app-sidebar .sidebar-wrapper::-webkit-scrollbar-track { background: transparent; }
+
+/* Header / main / footer pushed right by sidebar width */
+.app-header,
+.app-main,
+.app-footer { margin-left: var(--erp-sidebar-width); }
+
+.app-header {
+    position: sticky;
+    top: 0;
+    z-index: 1030;
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.app-main {
+    flex: 1 0 auto;        /* grow to push footer down */
+    display: flex;
+    flex-direction: column;
+}
+.app-main .app-content { flex: 1 0 auto; }
+
+.app-footer {
+    flex-shrink: 0;
+    padding: 0.75rem 1.5rem;
+    background: #fff;
+    border-top: 1px solid var(--bs-border-color);
+    color: var(--bs-secondary-color);
+    font-size: 0.85rem;
+}
+
+/* Mobile: hide sidebar by default, full-width content */
+@media (max-width: 991.98px) {
+    .app-header, .app-main, .app-footer { margin-left: 0; }
+    .app-sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+        box-shadow: 0 0 30px rgba(0,0,0,0.4);
+    }
+    body.sidebar-open .app-sidebar { transform: translateX(0); }
+}
+
+/* Dark theme footer */
+[data-bs-theme="dark"] .app-footer {
+    background: var(--bs-body-bg);
+    border-top-color: rgba(255,255,255,0.08);
 }
 
 /* Sidebar brand */
