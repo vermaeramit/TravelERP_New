@@ -1,328 +1,541 @@
 -- ============================================================
--- TRAVEL ERP -- TENANT DATABASE SCHEMA
--- This script is run per company. Replace {DBNAME} with actual DB name.
+-- TENANT DB SCHEMA
+-- Run against each tenant DB (TravelERP_Client1, etc.)
 -- ============================================================
 
--- CREATE DATABASE {DBNAME};
--- GO
--- USE {DBNAME};
--- GO
-
 -- ============================================================
--- BRANCHES
+-- ROLES
 -- ============================================================
-CREATE TABLE Branches (
-    Id          INT IDENTITY(1,1) PRIMARY KEY,
-    Name        NVARCHAR(150) NOT NULL,
-    Code        NVARCHAR(20)  NOT NULL,
-    Address     NVARCHAR(300) NULL,
-    City        NVARCHAR(100) NULL,
-    Phone       NVARCHAR(30)  NULL,
-    Email       NVARCHAR(150) NULL,
-    IsHeadOffice BIT          NOT NULL DEFAULT 0,
-    IsActive    BIT           NOT NULL DEFAULT 1,
-    CreatedAt   DATETIME      NOT NULL DEFAULT GETUTCDATE(),
-    UpdatedAt   DATETIME      NULL,
-    CreatedBy   INT           NULL,
-    UpdatedBy   INT           NULL,
-    IsDeleted   BIT           NOT NULL DEFAULT 0
-);
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'Roles') AND type = 'U')
+BEGIN
+    CREATE TABLE Roles (
+        Id          INT IDENTITY(1,1) PRIMARY KEY,
+        RoleName    NVARCHAR(100)  NOT NULL,
+        Description NVARCHAR(300)  NULL,
+        IsSystem    BIT            NOT NULL DEFAULT 0,
+        IsActive    BIT            NOT NULL DEFAULT 1,
+        CreatedAt   DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
+        CreatedBy   INT            NOT NULL DEFAULT 0,
+        UpdatedAt   DATETIME2      NULL,
+        UpdatedBy   INT            NULL
+    );
+END
 GO
 
 -- ============================================================
--- CUSTOMERS
+-- ROLE PERMISSIONS
 -- ============================================================
-CREATE TABLE Customers (
-    Id               INT IDENTITY(1,1) PRIMARY KEY,
-    CustomerCode     NVARCHAR(20)  NOT NULL UNIQUE,
-    Name             NVARCHAR(150) NOT NULL,
-    Mobile           NVARCHAR(30)  NOT NULL,
-    Email            NVARCHAR(150) NULL,
-    Destination      NVARCHAR(200) NULL,
-    TravelingDate    DATE          NULL,
-    LeavingFrom      NVARCHAR(100) NULL,
-    TravelCity       NVARCHAR(100) NULL,
-    HotelRecommended NVARCHAR(200) NULL,
-    NoOfAdults       TINYINT       NULL,
-    NoOfChildren     TINYINT       NULL,
-    NoOfDays         TINYINT       NULL,
-    AssignedTo       NVARCHAR(150) NULL,
-    LeadSource       NVARCHAR(100) NULL,
-    Infant           NVARCHAR(50)  NULL,
-    Remark           NVARCHAR(MAX) NULL,
-    PassportNumber   NVARCHAR(50)  NULL,
-    PassportExpiry   DATE          NULL,
-    Notes            NVARCHAR(MAX) NULL,
-    CreatedAt        DATETIME      NOT NULL DEFAULT GETUTCDATE(),
-    UpdatedAt        DATETIME      NULL,
-    CreatedBy        INT           NULL,
-    UpdatedBy        INT           NULL,
-    IsDeleted        BIT           NOT NULL DEFAULT 0
-);
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'RolePermissions') AND type = 'U')
+BEGIN
+    CREATE TABLE RolePermissions (
+        Id        INT IDENTITY(1,1) PRIMARY KEY,
+        RoleId    INT           NOT NULL,
+        Module    NVARCHAR(50)  NOT NULL,
+        CanView   BIT           NOT NULL DEFAULT 0,
+        CanAdd    BIT           NOT NULL DEFAULT 0,
+        CanEdit   BIT           NOT NULL DEFAULT 0,
+        CanDelete BIT           NOT NULL DEFAULT 0,
+        CONSTRAINT FK_RolePerm_Role FOREIGN KEY (RoleId) REFERENCES Roles(Id) ON DELETE CASCADE,
+        CONSTRAINT UQ_RolePerm_Module UNIQUE (RoleId, Module)
+    );
+END
 GO
 
 -- ============================================================
--- SUPPLIERS
+-- DESTINATIONS (Master)
 -- ============================================================
-CREATE TABLE Suppliers (
-    Id              INT IDENTITY(1,1) PRIMARY KEY,
-    SupplierCode    NVARCHAR(20)  NOT NULL UNIQUE,
-    Name            NVARCHAR(150) NOT NULL,
-    Category        NVARCHAR(100) NOT NULL,
-    ContactPerson   NVARCHAR(150) NULL,
-    Email           NVARCHAR(150) NULL,
-    Phone           NVARCHAR(30)  NOT NULL,
-    AlternatePhone  NVARCHAR(30)  NULL,
-    Address         NVARCHAR(300) NULL,
-    City            NVARCHAR(100) NULL,
-    Country         NVARCHAR(100) NULL,
-    Website         NVARCHAR(300) NULL,
-    TaxNumber       NVARCHAR(100) NULL,
-    BankDetails     NVARCHAR(MAX) NULL,
-    IsActive        BIT           NOT NULL DEFAULT 1,
-    Notes           NVARCHAR(MAX) NULL,
-    CreditLimit     DECIMAL(12,2) NULL,
-    CreditDays      INT           NULL,
-    CreatedAt       DATETIME      NOT NULL DEFAULT GETUTCDATE(),
-    UpdatedAt       DATETIME      NULL,
-    CreatedBy       INT           NULL,
-    UpdatedBy       INT           NULL,
-    IsDeleted       BIT           NOT NULL DEFAULT 0
-);
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'Destinations') AND type = 'U')
+BEGIN
+    CREATE TABLE Destinations (
+        Id              INT IDENTITY(1,1) PRIMARY KEY,
+        Name            NVARCHAR(200)  NOT NULL,
+        ImageUrl        NVARCHAR(500)  NULL,
+        PackageTerms    NVARCHAR(MAX)  NULL,
+        InvoiceTerms    NVARCHAR(MAX)  NULL,
+        IsActive        BIT            NOT NULL DEFAULT 1,
+        CreatedAt       DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
+        CreatedBy       INT            NOT NULL DEFAULT 0,
+        UpdatedAt       DATETIME2      NULL,
+        UpdatedBy       INT            NULL
+    );
+    CREATE INDEX IX_Destinations_Name ON Destinations(Name);
+END
 GO
 
 -- ============================================================
--- TOUR PACKAGES
+-- DESTINATION REVIEWS (1-to-many)
 -- ============================================================
-CREATE TABLE TourPackages (
-    Id              INT IDENTITY(1,1) PRIMARY KEY,
-    PackageCode     NVARCHAR(20)  NOT NULL UNIQUE,
-    Name            NVARCHAR(200) NOT NULL,
-    Description     NVARCHAR(MAX) NULL,
-    Type            TINYINT       NOT NULL,
-    Status          TINYINT       NOT NULL DEFAULT 0,
-    Destination     NVARCHAR(200) NOT NULL,
-    Origin          NVARCHAR(200) NULL,
-    DurationDays    INT           NOT NULL DEFAULT 1,
-    DurationNights  INT           NOT NULL DEFAULT 0,
-    BasePrice       DECIMAL(12,2) NOT NULL DEFAULT 0,
-    ChildPrice      DECIMAL(12,2) NULL,
-    InfantPrice     DECIMAL(12,2) NULL,
-    Inclusions      NVARCHAR(MAX) NULL,
-    Exclusions      NVARCHAR(MAX) NULL,
-    Itinerary       NVARCHAR(MAX) NULL,
-    ImageUrl        NVARCHAR(500) NULL,
-    MaxCapacity     INT           NOT NULL DEFAULT 20,
-    ValidFrom       DATE          NULL,
-    ValidTo         DATE          NULL,
-    IsFeatured      BIT           NOT NULL DEFAULT 0,
-    CreatedAt       DATETIME      NOT NULL DEFAULT GETUTCDATE(),
-    UpdatedAt       DATETIME      NULL,
-    CreatedBy       INT           NULL,
-    UpdatedBy       INT           NULL,
-    IsDeleted       BIT           NOT NULL DEFAULT 0
-);
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'DestinationReviews') AND type = 'U')
+BEGIN
+    CREATE TABLE DestinationReviews (
+        Id              INT IDENTITY(1,1) PRIMARY KEY,
+        DestinationId   INT            NOT NULL,
+        TravelerName    NVARCHAR(200)  NOT NULL,
+        ImageUrl        NVARCHAR(500)  NULL,
+        ReviewText      NVARCHAR(MAX)  NULL,
+        DisplayOrder    INT            NOT NULL DEFAULT 0,
+        CONSTRAINT FK_DestReview_Dest FOREIGN KEY (DestinationId)
+            REFERENCES Destinations(Id) ON DELETE CASCADE
+    );
+    CREATE INDEX IX_DestReview_Dest ON DestinationReviews(DestinationId);
+END
 GO
 
 -- ============================================================
--- BOOKINGS
+-- ROOM TYPES (Master)
 -- ============================================================
-CREATE TABLE Bookings (
-    Id               INT IDENTITY(1,1) PRIMARY KEY,
-    BookingReference NVARCHAR(20)  NOT NULL UNIQUE,
-    CustomerId       INT           NOT NULL,
-    PackageId        INT           NULL,
-    BookingType      TINYINT       NOT NULL DEFAULT 0,
-    Status           TINYINT       NOT NULL DEFAULT 0,
-    PaymentStatus    TINYINT       NOT NULL DEFAULT 0,
-    TravelDate       DATE          NOT NULL,
-    ReturnDate       DATE          NULL,
-    Adults           INT           NOT NULL DEFAULT 1,
-    Children         INT           NOT NULL DEFAULT 0,
-    Infants          INT           NOT NULL DEFAULT 0,
-    Destination      NVARCHAR(200) NOT NULL,
-    TotalAmount      DECIMAL(12,2) NOT NULL DEFAULT 0,
-    PaidAmount       DECIMAL(12,2) NOT NULL DEFAULT 0,
-    DiscountAmount   DECIMAL(12,2) NOT NULL DEFAULT 0,
-    SpecialRequests  NVARCHAR(MAX) NULL,
-    InternalNotes    NVARCHAR(MAX) NULL,
-    BranchId         INT           NULL,
-    AgentId          INT           NULL,
-    CreatedAt        DATETIME      NOT NULL DEFAULT GETUTCDATE(),
-    UpdatedAt        DATETIME      NULL,
-    CreatedBy        INT           NULL,
-    UpdatedBy        INT           NULL,
-    IsDeleted        BIT           NOT NULL DEFAULT 0,
-    CONSTRAINT FK_Bookings_Customer FOREIGN KEY (CustomerId) REFERENCES Customers(Id),
-    CONSTRAINT FK_Bookings_Package  FOREIGN KEY (PackageId) REFERENCES TourPackages(Id)
-);
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'RoomTypes') AND type = 'U')
+BEGIN
+    CREATE TABLE RoomTypes (
+        Id          INT IDENTITY(1,1) PRIMARY KEY,
+        Name        NVARCHAR(100)  NOT NULL,
+        IsActive    BIT            NOT NULL DEFAULT 1,
+        CreatedAt   DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
+        CreatedBy   INT            NOT NULL DEFAULT 0,
+        UpdatedAt   DATETIME2      NULL,
+        UpdatedBy   INT            NULL
+    );
+END
 GO
 
 -- ============================================================
--- INVOICES
+-- HOTELS (Master)
 -- ============================================================
-CREATE TABLE Invoices (
-    Id              INT IDENTITY(1,1) PRIMARY KEY,
-    InvoiceNumber   NVARCHAR(20)  NOT NULL UNIQUE,
-    BookingId       INT           NOT NULL,
-    CustomerId      INT           NOT NULL,
-    Status          TINYINT       NOT NULL DEFAULT 0,
-    InvoiceDate     DATE          NOT NULL DEFAULT GETUTCDATE(),
-    DueDate         DATE          NOT NULL,
-    SubTotal        DECIMAL(12,2) NOT NULL DEFAULT 0,
-    TaxAmount       DECIMAL(12,2) NOT NULL DEFAULT 0,
-    DiscountAmount  DECIMAL(12,2) NOT NULL DEFAULT 0,
-    TotalAmount     DECIMAL(12,2) NOT NULL DEFAULT 0,
-    PaidAmount      DECIMAL(12,2) NOT NULL DEFAULT 0,
-    Notes           NVARCHAR(MAX) NULL,
-    TermsAndConditions NVARCHAR(MAX) NULL,
-    CreatedAt       DATETIME      NOT NULL DEFAULT GETUTCDATE(),
-    UpdatedAt       DATETIME      NULL,
-    CreatedBy       INT           NULL,
-    UpdatedBy       INT           NULL,
-    IsDeleted       BIT           NOT NULL DEFAULT 0,
-    CONSTRAINT FK_Invoices_Booking  FOREIGN KEY (BookingId)  REFERENCES Bookings(Id),
-    CONSTRAINT FK_Invoices_Customer FOREIGN KEY (CustomerId) REFERENCES Customers(Id)
-);
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'Hotels') AND type = 'U')
+BEGIN
+    CREATE TABLE Hotels (
+        Id              INT IDENTITY(1,1) PRIMARY KEY,
+        DestinationId   INT            NOT NULL,
+        Name            NVARCHAR(200)  NOT NULL,
+        Category        TINYINT        NOT NULL DEFAULT 3,  -- 1..5 stars
+        ImageUrl        NVARCHAR(500)  NULL,
+        IsActive        BIT            NOT NULL DEFAULT 1,
+        CreatedAt       DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
+        CreatedBy       INT            NOT NULL DEFAULT 0,
+        UpdatedAt       DATETIME2      NULL,
+        UpdatedBy       INT            NULL,
+        CONSTRAINT FK_Hotels_Destination FOREIGN KEY (DestinationId)
+            REFERENCES Destinations(Id)
+    );
+    CREATE INDEX IX_Hotels_Destination ON Hotels(DestinationId);
+END
 GO
 
 -- ============================================================
--- PAYMENTS
+-- SIGHTSEEINGS (Master)
 -- ============================================================
-CREATE TABLE Payments (
-    Id              INT IDENTITY(1,1) PRIMARY KEY,
-    InvoiceId       INT           NOT NULL,
-    CustomerId      INT           NOT NULL,
-    BookingId       INT           NOT NULL,
-    Amount          DECIMAL(12,2) NOT NULL,
-    Method          TINYINT       NOT NULL DEFAULT 0,
-    PaymentDate     DATE          NOT NULL DEFAULT GETUTCDATE(),
-    ReferenceNumber NVARCHAR(100) NULL,
-    Notes           NVARCHAR(500) NULL,
-    ReceivedBy      NVARCHAR(150) NOT NULL,
-    CreatedAt       DATETIME      NOT NULL DEFAULT GETUTCDATE(),
-    UpdatedAt       DATETIME      NULL,
-    CreatedBy       INT           NULL,
-    UpdatedBy       INT           NULL,
-    IsDeleted       BIT           NOT NULL DEFAULT 0,
-    CONSTRAINT FK_Payments_Invoice FOREIGN KEY (InvoiceId) REFERENCES Invoices(Id)
-);
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'Sightseeings') AND type = 'U')
+BEGIN
+    CREATE TABLE Sightseeings (
+        Id              INT IDENTITY(1,1) PRIMARY KEY,
+        DestinationId   INT            NOT NULL,
+        Name            NVARCHAR(200)  NOT NULL,
+        ImageUrl        NVARCHAR(500)  NULL,
+        IsActive        BIT            NOT NULL DEFAULT 1,
+        CreatedAt       DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
+        CreatedBy       INT            NOT NULL DEFAULT 0,
+        UpdatedAt       DATETIME2      NULL,
+        UpdatedBy       INT            NULL,
+        CONSTRAINT FK_Sightseeings_Destination FOREIGN KEY (DestinationId)
+            REFERENCES Destinations(Id)
+    );
+    CREATE INDEX IX_Sightseeings_Destination ON Sightseeings(DestinationId);
+END
 GO
 
 -- ============================================================
--- EMPLOYEES
+-- ITINERARIES (Master)
 -- ============================================================
-CREATE TABLE Employees (
-    Id              INT IDENTITY(1,1) PRIMARY KEY,
-    EmployeeCode    NVARCHAR(20)  NOT NULL UNIQUE,
-    FirstName       NVARCHAR(100) NOT NULL,
-    LastName        NVARCHAR(100) NOT NULL,
-    Email           NVARCHAR(150) NOT NULL,
-    Phone           NVARCHAR(30)  NOT NULL,
-    Gender          TINYINT       NULL,
-    DateOfBirth     DATE          NULL,
-    Designation     NVARCHAR(150) NOT NULL,
-    Department      NVARCHAR(100) NOT NULL,
-    BranchId        INT           NULL,
-    JoiningDate     DATE          NOT NULL,
-    LeavingDate     DATE          NULL,
-    Status          TINYINT       NOT NULL DEFAULT 0,
-    BasicSalary     DECIMAL(12,2) NOT NULL DEFAULT 0,
-    Address         NVARCHAR(300) NULL,
-    EmergencyContact NVARCHAR(200) NULL,
-    ProfileImageUrl NVARCHAR(500) NULL,
-    MasterUserId    INT           NULL,
-    CreatedAt       DATETIME      NOT NULL DEFAULT GETUTCDATE(),
-    UpdatedAt       DATETIME      NULL,
-    CreatedBy       INT           NULL,
-    UpdatedBy       INT           NULL,
-    IsDeleted       BIT           NOT NULL DEFAULT 0
-);
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'Itineraries') AND type = 'U')
+BEGIN
+    CREATE TABLE Itineraries (
+        Id              INT IDENTITY(1,1) PRIMARY KEY,
+        DestinationId   INT            NOT NULL,
+        Title           NVARCHAR(300)  NOT NULL,
+        Description     NVARCHAR(MAX)  NULL,
+        IsActive        BIT            NOT NULL DEFAULT 1,
+        CreatedAt       DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
+        CreatedBy       INT            NOT NULL DEFAULT 0,
+        UpdatedAt       DATETIME2      NULL,
+        UpdatedBy       INT            NULL,
+        CONSTRAINT FK_Itineraries_Destination FOREIGN KEY (DestinationId)
+            REFERENCES Destinations(Id)
+    );
+    CREATE INDEX IX_Itineraries_Destination ON Itineraries(DestinationId);
+END
 GO
 
 -- ============================================================
--- LEAVE REQUESTS
+-- DESIGNATIONS (Master)
 -- ============================================================
-CREATE TABLE LeaveRequests (
-    Id              INT IDENTITY(1,1) PRIMARY KEY,
-    EmployeeId      INT           NOT NULL,
-    LeaveType       TINYINT       NOT NULL,
-    FromDate        DATE          NOT NULL,
-    ToDate          DATE          NOT NULL,
-    TotalDays       INT           NOT NULL DEFAULT 1,
-    Reason          NVARCHAR(500) NOT NULL,
-    Status          TINYINT       NOT NULL DEFAULT 0,
-    ApprovedById    INT           NULL,
-    ApproverRemarks NVARCHAR(500) NULL,
-    ActionDate      DATETIME      NULL,
-    CreatedAt       DATETIME      NOT NULL DEFAULT GETUTCDATE(),
-    UpdatedAt       DATETIME      NULL,
-    CreatedBy       INT           NULL,
-    UpdatedBy       INT           NULL,
-    IsDeleted       BIT           NOT NULL DEFAULT 0,
-    CONSTRAINT FK_Leaves_Employee FOREIGN KEY (EmployeeId) REFERENCES Employees(Id)
-);
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'Designations') AND type = 'U')
+BEGIN
+    CREATE TABLE Designations (
+        Id          INT IDENTITY(1,1) PRIMARY KEY,
+        Name        NVARCHAR(100)  NOT NULL,
+        IsActive    BIT            NOT NULL DEFAULT 1,
+        CreatedAt   DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
+        CreatedBy   INT            NOT NULL DEFAULT 0,
+        UpdatedAt   DATETIME2      NULL,
+        UpdatedBy   INT            NULL
+    );
+END
 GO
 
 -- ============================================================
--- VISA APPLICATIONS
+-- LEAD SOURCES (Master)
 -- ============================================================
-CREATE TABLE VisaApplications (
-    Id                INT IDENTITY(1,1) PRIMARY KEY,
-    ApplicationNumber NVARCHAR(20)  NOT NULL UNIQUE,
-    CustomerId        INT           NOT NULL,
-    BookingId         INT           NULL,
-    VisaType          NVARCHAR(100) NOT NULL,
-    Country           NVARCHAR(100) NOT NULL,
-    Status            TINYINT       NOT NULL DEFAULT 0,
-    AppliedOn         DATE          NULL,
-    SubmittedOn       DATE          NULL,
-    ApprovedOn        DATE          NULL,
-    ExpiryDate        DATE          NULL,
-    RejectionReason   NVARCHAR(500) NULL,
-    VisaNumber        NVARCHAR(100) NULL,
-    Notes             NVARCHAR(MAX) NULL,
-    HandledById       INT           NULL,
-    CreatedAt         DATETIME      NOT NULL DEFAULT GETUTCDATE(),
-    UpdatedAt         DATETIME      NULL,
-    CreatedBy         INT           NULL,
-    UpdatedBy         INT           NULL,
-    IsDeleted         BIT           NOT NULL DEFAULT 0,
-    CONSTRAINT FK_Visa_Customer FOREIGN KEY (CustomerId) REFERENCES Customers(Id)
-);
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'LeadSources') AND type = 'U')
+BEGIN
+    CREATE TABLE LeadSources (
+        Id          INT IDENTITY(1,1) PRIMARY KEY,
+        Name        NVARCHAR(100)  NOT NULL,
+        IsActive    BIT            NOT NULL DEFAULT 1,
+        CreatedAt   DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
+        CreatedBy   INT            NOT NULL DEFAULT 0,
+        UpdatedAt   DATETIME2      NULL,
+        UpdatedBy   INT            NULL
+    );
+END
 GO
 
 -- ============================================================
--- PASSENGER DOCUMENTS
+-- VISA TYPES (Master)
 -- ============================================================
-CREATE TABLE PassengerDocuments (
-    Id              INT IDENTITY(1,1) PRIMARY KEY,
-    CustomerId      INT           NOT NULL,
-    BookingId       INT           NULL,
-    DocumentType    TINYINT       NOT NULL,
-    DocumentNumber  NVARCHAR(100) NOT NULL,
-    IssueDate       DATE          NULL,
-    ExpiryDate      DATE          NULL,
-    IssuingCountry  NVARCHAR(100) NULL,
-    FileUrl         NVARCHAR(500) NULL,
-    Notes           NVARCHAR(500) NULL,
-    CreatedAt       DATETIME      NOT NULL DEFAULT GETUTCDATE(),
-    UpdatedAt       DATETIME      NULL,
-    CreatedBy       INT           NULL,
-    UpdatedBy       INT           NULL,
-    IsDeleted       BIT           NOT NULL DEFAULT 0,
-    CONSTRAINT FK_Docs_Customer FOREIGN KEY (CustomerId) REFERENCES Customers(Id)
-);
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'VisaTypes') AND type = 'U')
+BEGIN
+    CREATE TABLE VisaTypes (
+        Id          INT IDENTITY(1,1) PRIMARY KEY,
+        Name        NVARCHAR(150)  NOT NULL,
+        Country     NVARCHAR(100)  NULL,
+        IsActive    BIT            NOT NULL DEFAULT 1,
+        CreatedAt   DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
+        CreatedBy   INT            NOT NULL DEFAULT 0,
+        UpdatedAt   DATETIME2      NULL,
+        UpdatedBy   INT            NULL
+    );
+END
 GO
 
 -- ============================================================
--- INDEXES
+-- MAIL TEMPLATES (Master)
 -- ============================================================
-CREATE INDEX IX_Customers_Email     ON Customers(Email);
-CREATE INDEX IX_Customers_Mobile    ON Customers(Mobile);
-CREATE INDEX IX_Bookings_CustomerId ON Bookings(CustomerId);
-CREATE INDEX IX_Bookings_TravelDate ON Bookings(TravelDate);
-CREATE INDEX IX_Bookings_Status     ON Bookings(Status);
-CREATE INDEX IX_Invoices_BookingId  ON Invoices(BookingId);
-CREATE INDEX IX_Payments_InvoiceId  ON Payments(InvoiceId);
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'MailTemplates') AND type = 'U')
+BEGIN
+    CREATE TABLE MailTemplates (
+        Id          INT IDENTITY(1,1) PRIMARY KEY,
+        Name        NVARCHAR(150)  NOT NULL,
+        Subject     NVARCHAR(300)  NOT NULL,
+        Body        NVARCHAR(MAX)  NULL,
+        Category    NVARCHAR(50)   NULL,   -- Booking, Invoice, Payment, Welcome, Other
+        IsActive    BIT            NOT NULL DEFAULT 1,
+        CreatedAt   DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
+        CreatedBy   INT            NOT NULL DEFAULT 0,
+        UpdatedAt   DATETIME2      NULL,
+        UpdatedBy   INT            NULL
+    );
+END
+GO
+
+-- ============================================================
+-- MEAL PLANS (Master)
+-- ============================================================
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'MealPlans') AND type = 'U')
+BEGIN
+    CREATE TABLE MealPlans (
+        Id          INT IDENTITY(1,1) PRIMARY KEY,
+        Code        NVARCHAR(10)   NOT NULL,
+        Name        NVARCHAR(100)  NOT NULL,
+        IsActive    BIT            NOT NULL DEFAULT 1,
+        CreatedAt   DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
+        CreatedBy   INT            NOT NULL DEFAULT 0,
+        UpdatedAt   DATETIME2      NULL,
+        UpdatedBy   INT            NULL
+    );
+END
+GO
+
+-- ============================================================
+-- BANK ACCOUNTS (Master)
+-- ============================================================
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'BankAccounts') AND type = 'U')
+BEGIN
+    CREATE TABLE BankAccounts (
+        Id              INT IDENTITY(1,1) PRIMARY KEY,
+        BankName        NVARCHAR(150)  NOT NULL,
+        HolderName      NVARCHAR(150)  NOT NULL,
+        AccountNumber   NVARCHAR(50)   NOT NULL,
+        IfscCode        NVARCHAR(20)   NULL,
+        Branch          NVARCHAR(150)  NULL,
+        AccountType     NVARCHAR(20)   NULL,    -- Savings / Current / OD
+        UpiId           NVARCHAR(100)  NULL,
+        IsDefault       BIT            NOT NULL DEFAULT 0,
+        IsActive        BIT            NOT NULL DEFAULT 1,
+        CreatedAt       DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
+        CreatedBy       INT            NOT NULL DEFAULT 0,
+        UpdatedAt       DATETIME2      NULL,
+        UpdatedBy       INT            NULL
+    );
+END
+GO
+
+-- ============================================================
+-- LEAD STATUSES (Master)
+-- ============================================================
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'LeadStatuses') AND type = 'U')
+BEGIN
+    CREATE TABLE LeadStatuses (
+        Id              INT IDENTITY(1,1) PRIMARY KEY,
+        Name            NVARCHAR(100)  NOT NULL,
+        Color           NVARCHAR(20)   NOT NULL DEFAULT 'secondary',  -- bootstrap variant
+        DisplayOrder    INT            NOT NULL DEFAULT 0,
+        IsDefault       BIT            NOT NULL DEFAULT 0,
+        IsClosed        BIT            NOT NULL DEFAULT 0,    -- terminal status (Converted/Lost)
+        IsActive        BIT            NOT NULL DEFAULT 1,
+        CreatedAt       DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
+        CreatedBy       INT            NOT NULL DEFAULT 0,
+        UpdatedAt       DATETIME2      NULL,
+        UpdatedBy       INT            NULL
+    );
+END
+GO
+
+-- ============================================================
+-- LEADS (operational) — depends on LeadStatuses, LeadSources, Destinations
+-- ============================================================
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'Leads') AND type = 'U')
+BEGIN
+    CREATE TABLE Leads (
+        Id                  INT IDENTITY(1,1) PRIMARY KEY,
+        LeadNumber          NVARCHAR(30)   NOT NULL,                       -- e.g. LD-2026-0001
+        StatusId            INT            NULL,                           -- FK → LeadStatuses
+        SourceId            INT            NULL,                           -- FK → LeadSources
+        AssignedToUserId    INT            NULL,                           -- MasterUsers.Id (cross-DB, loose)
+        DestinationId       INT            NULL,                           -- FK → Destinations
+
+        Name                NVARCHAR(150)  NOT NULL,
+        Mobile              NVARCHAR(30)   NULL,
+        Email               NVARCHAR(150)  NULL,
+
+        TravelingDate       DATE           NULL,
+        LeavingFrom         NVARCHAR(150)  NULL,
+        HotelRecommended    NVARCHAR(200)  NULL,
+
+        Adults              INT            NOT NULL DEFAULT 1,
+        Children            INT            NOT NULL DEFAULT 0,
+        Infants             INT            NOT NULL DEFAULT 0,
+        Days                INT            NULL,
+
+        Remark              NVARCHAR(MAX)  NULL,
+
+        IsActive            BIT            NOT NULL DEFAULT 1,
+        CreatedAt           DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
+        CreatedBy           INT            NOT NULL DEFAULT 0,
+        UpdatedAt           DATETIME2      NULL,
+        UpdatedBy           INT            NULL,
+
+        CONSTRAINT FK_Leads_Status      FOREIGN KEY (StatusId)      REFERENCES LeadStatuses(Id),
+        CONSTRAINT FK_Leads_Source      FOREIGN KEY (SourceId)      REFERENCES LeadSources(Id),
+        CONSTRAINT FK_Leads_Destination FOREIGN KEY (DestinationId) REFERENCES Destinations(Id),
+        CONSTRAINT UQ_Leads_LeadNumber  UNIQUE (LeadNumber)
+    );
+    CREATE INDEX IX_Leads_Status   ON Leads(StatusId);
+    CREATE INDEX IX_Leads_Assigned ON Leads(AssignedToUserId);
+    CREATE INDEX IX_Leads_Created  ON Leads(CreatedAt DESC);
+END
+GO
+
+-- ============================================================
+-- LEAD ACTIVITIES (timeline: notes, calls, emails, follow-ups, status changes)
+-- ============================================================
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'LeadActivities') AND type = 'U')
+BEGIN
+    CREATE TABLE LeadActivities (
+        Id              INT IDENTITY(1,1) PRIMARY KEY,
+        LeadId          INT             NOT NULL,
+        ActivityType    NVARCHAR(30)    NOT NULL,        -- Call/Email/WhatsApp/Meeting/Note/StatusChange
+        Subject         NVARCHAR(200)   NULL,
+        Notes           NVARCHAR(MAX)   NULL,
+        ActivityAt      DATETIME2       NOT NULL DEFAULT GETUTCDATE(),
+        NextFollowUpAt  DATETIME2       NULL,                  -- if set, schedules a future activity
+        IsCompleted     BIT             NOT NULL DEFAULT 1,    -- 0 only when scheduled in the future
+        CreatedByUserId INT             NOT NULL DEFAULT 0,    -- MasterUsers.Id (cross-DB, loose)
+        CreatedAt       DATETIME2       NOT NULL DEFAULT GETUTCDATE(),
+        UpdatedAt       DATETIME2       NULL,
+
+        CONSTRAINT FK_LeadActivity_Lead FOREIGN KEY (LeadId)
+            REFERENCES Leads(Id) ON DELETE CASCADE
+    );
+    CREATE INDEX IX_LeadActivity_Lead       ON LeadActivities(LeadId, ActivityAt DESC);
+    CREATE INDEX IX_LeadActivity_NextFollow ON LeadActivities(NextFollowUpAt);
+END
+GO
+
+-- ============================================================
+-- ACTIVITY TEMPLATES (predefined log snippets for fast follow-up entry)
+-- ============================================================
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'ActivityTemplates') AND type = 'U')
+BEGIN
+    CREATE TABLE ActivityTemplates (
+        Id              INT IDENTITY(1,1) PRIMARY KEY,
+        Name            NVARCHAR(150)  NOT NULL,        -- short label shown in dropdown
+        ActivityType    NVARCHAR(30)   NOT NULL DEFAULT 'All',  -- All/Call/Email/WhatsApp/Meeting/Note/FollowUp
+        Subject         NVARCHAR(200)  NULL,
+        Notes           NVARCHAR(MAX)  NULL,
+        DisplayOrder    INT            NOT NULL DEFAULT 0,
+        IsActive        BIT            NOT NULL DEFAULT 1,
+        CreatedAt       DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
+        CreatedBy       INT            NOT NULL DEFAULT 0,
+        UpdatedAt       DATETIME2      NULL,
+        UpdatedBy       INT            NULL
+    );
+END
+GO
+
+-- ============================================================
+-- EMPLOYEES (Master)
+-- Loose link to MasterUsers via UserId (not enforced — cross-DB)
+-- ============================================================
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'Employees') AND type = 'U')
+BEGIN
+    CREATE TABLE Employees (
+        Id              INT IDENTITY(1,1) PRIMARY KEY,
+        UserId          INT            NULL,           -- MasterUsers.Id (cross-DB, loose)
+        DesignationId   INT            NULL,
+        FirstName       NVARCHAR(100)  NOT NULL,
+        LastName        NVARCHAR(100)  NULL,
+        Email           NVARCHAR(150)  NOT NULL,       -- CRM Login
+        Mobile          NVARCHAR(30)   NULL,
+        DateOfBirth     DATE           NULL,
+        ImageUrl        NVARCHAR(500)  NULL,
+        ReplyEmail      NVARCHAR(150)  NULL,           -- Mail Id (To get travelers reply)
+        IsActive        BIT            NOT NULL DEFAULT 1,
+        CreatedAt       DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
+        CreatedBy       INT            NOT NULL DEFAULT 0,
+        UpdatedAt       DATETIME2      NULL,
+        UpdatedBy       INT            NULL,
+        CONSTRAINT FK_Employees_Designation FOREIGN KEY (DesignationId)
+            REFERENCES Designations(Id)
+    );
+    CREATE INDEX IX_Employees_UserId ON Employees(UserId);
+END
+GO
+
+-- ============================================================
+-- PACKAGES (operational — quotes/itineraries with multiple price options)
+-- ============================================================
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'Packages') AND type = 'U')
+BEGIN
+    CREATE TABLE Packages (
+        Id              INT IDENTITY(1,1) PRIMARY KEY,
+        PackageNumber   NVARCHAR(40)   NOT NULL,            -- e.g. PKG-2026-0001
+        LeadId          INT            NULL,                -- nullable: standalone or from-lead
+        Title           NVARCHAR(200)  NOT NULL,
+        DestinationId   INT            NULL,
+        CustomerName    NVARCHAR(150)  NOT NULL,
+        CustomerMobile  NVARCHAR(30)   NULL,
+        CustomerEmail   NVARCHAR(150)  NULL,
+        Adults          INT            NOT NULL DEFAULT 1,
+        Children        INT            NOT NULL DEFAULT 0,
+        Infants         INT            NOT NULL DEFAULT 0,
+        Days            INT            NULL,
+        Nights          INT            NULL,
+        StartDate       DATE           NULL,
+        PriceMode       NVARCHAR(20)   NOT NULL DEFAULT 'Total',  -- Total / PerPax
+        Currency        NVARCHAR(10)   NOT NULL DEFAULT 'INR',
+        FlightDetails   NVARCHAR(MAX)  NULL,
+        Inclusions      NVARCHAR(MAX)  NULL,
+        Exclusions      NVARCHAR(MAX)  NULL,
+        Notes           NVARCHAR(MAX)  NULL,
+        IsActive        BIT            NOT NULL DEFAULT 1,
+        CreatedAt       DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
+        CreatedBy       INT            NOT NULL DEFAULT 0,
+        UpdatedAt       DATETIME2      NULL,
+        UpdatedBy       INT            NULL,
+        CONSTRAINT FK_Packages_Lead        FOREIGN KEY (LeadId)        REFERENCES Leads(Id),
+        CONSTRAINT FK_Packages_Destination FOREIGN KEY (DestinationId) REFERENCES Destinations(Id),
+        CONSTRAINT UQ_Packages_PackageNumber UNIQUE (PackageNumber)
+    );
+    CREATE INDEX IX_Packages_Lead    ON Packages(LeadId);
+    CREATE INDEX IX_Packages_Created ON Packages(CreatedAt DESC);
+END
+GO
+
+-- ============================================================
+-- PACKAGE OPTIONS (Standard/Deluxe/Luxury price tiers per package)
+-- ============================================================
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'PackageOptions') AND type = 'U')
+BEGIN
+    CREATE TABLE PackageOptions (
+        Id              INT IDENTITY(1,1) PRIMARY KEY,
+        PackageId       INT            NOT NULL,
+        OptionName      NVARCHAR(150)  NOT NULL,
+        DisplayOrder    INT            NOT NULL DEFAULT 0,
+        LandPrice       DECIMAL(18,2)  NOT NULL DEFAULT 0,
+        FlightPrice     DECIMAL(18,2)  NOT NULL DEFAULT 0,
+        FinalPrice      DECIMAL(18,2)  NOT NULL DEFAULT 0,
+        IsRecommended   BIT            NOT NULL DEFAULT 0,
+        Notes           NVARCHAR(MAX)  NULL,
+        CONSTRAINT FK_PackageOption_Package FOREIGN KEY (PackageId)
+            REFERENCES Packages(Id) ON DELETE CASCADE
+    );
+    CREATE INDEX IX_PackageOption_Package ON PackageOptions(PackageId, DisplayOrder);
+END
+GO
+
+-- ============================================================
+-- PACKAGE OPTION HOTELS (per-option hotel breakdown)
+-- ============================================================
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'PackageOptionHotels') AND type = 'U')
+BEGIN
+    CREATE TABLE PackageOptionHotels (
+        Id                INT IDENTITY(1,1) PRIMARY KEY,
+        PackageOptionId   INT            NOT NULL,
+        DisplayOrder      INT            NOT NULL DEFAULT 0,
+        Nights            INT            NOT NULL DEFAULT 1,
+        HotelId           INT            NULL,
+        RoomTypeId        INT            NULL,
+        MealPlanId        INT            NULL,
+        OtherText         NVARCHAR(300)  NULL,             -- free text notes per row
+        CONSTRAINT FK_POH_Option   FOREIGN KEY (PackageOptionId) REFERENCES PackageOptions(Id) ON DELETE CASCADE,
+        CONSTRAINT FK_POH_Hotel    FOREIGN KEY (HotelId)         REFERENCES Hotels(Id),
+        CONSTRAINT FK_POH_RoomType FOREIGN KEY (RoomTypeId)      REFERENCES RoomTypes(Id),
+        CONSTRAINT FK_POH_MealPlan FOREIGN KEY (MealPlanId)      REFERENCES MealPlans(Id)
+    );
+    CREATE INDEX IX_POH_Option ON PackageOptionHotels(PackageOptionId, DisplayOrder);
+END
+GO
+
+-- ============================================================
+-- PACKAGE DAYS (day-wise itinerary; shared across options)
+-- ============================================================
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'PackageDays') AND type = 'U')
+BEGIN
+    CREATE TABLE PackageDays (
+        Id            INT IDENTITY(1,1) PRIMARY KEY,
+        PackageId     INT            NOT NULL,
+        DayNumber     INT            NOT NULL,
+        Title         NVARCHAR(200)  NOT NULL,
+        Description   NVARCHAR(MAX)  NULL,
+        CONSTRAINT FK_PackageDay_Package FOREIGN KEY (PackageId)
+            REFERENCES Packages(Id) ON DELETE CASCADE
+    );
+    CREATE INDEX IX_PackageDay_Package ON PackageDays(PackageId, DayNumber);
+END
+GO
+
+-- ============================================================
+-- PACKAGE DAY SIGHTSEEINGS (many-to-many)
+-- ============================================================
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'PackageDaySightseeings') AND type = 'U')
+BEGIN
+    CREATE TABLE PackageDaySightseeings (
+        Id              INT IDENTITY(1,1) PRIMARY KEY,
+        PackageDayId    INT NOT NULL,
+        SightseeingId   INT NOT NULL,
+        CONSTRAINT FK_PDS_Day         FOREIGN KEY (PackageDayId)  REFERENCES PackageDays(Id) ON DELETE CASCADE,
+        CONSTRAINT FK_PDS_Sightseeing FOREIGN KEY (SightseeingId) REFERENCES Sightseeings(Id)
+    );
+    CREATE INDEX IX_PDS_Day ON PackageDaySightseeings(PackageDayId);
+END
 GO

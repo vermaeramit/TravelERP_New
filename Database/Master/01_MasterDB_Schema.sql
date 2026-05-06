@@ -85,9 +85,23 @@ BEGIN
         CreatedBy       INT           NULL,
         UpdatedBy       INT           NULL,
         IsDeleted       BIT           NOT NULL DEFAULT 0,
+        TenantRoleId    INT           NULL,
         CONSTRAINT FK_MasterUsers_Company FOREIGN KEY (CompanyId) REFERENCES Companies(Id)
     );
 END
+GO
+
+-- Add TenantRoleId to existing MasterUsers table if missing
+IF COL_LENGTH('MasterUsers','TenantRoleId') IS NULL
+    ALTER TABLE MasterUsers ADD TenantRoleId INT NULL;
+GO
+
+-- Add configurable number prefixes (idempotent)
+IF COL_LENGTH('Companies','LeadPrefix') IS NULL
+    ALTER TABLE Companies ADD LeadPrefix NVARCHAR(20) NOT NULL DEFAULT 'LD';
+GO
+IF COL_LENGTH('Companies','PackagePrefix') IS NULL
+    ALTER TABLE Companies ADD PackagePrefix NVARCHAR(20) NOT NULL DEFAULT 'PKG';
 GO
 
 -- ============================================================

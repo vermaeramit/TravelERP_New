@@ -1,44 +1,30 @@
 -- ============================================================
--- TRAVEL ERP -- MASTER DATABASE STORED PROCEDURES
--- ALL stored procedures live here (master + all tenant ops)
--- Tenant procedures use @DatabaseName for cross-DB dynamic SQL
+-- TRAVEL ERP — MASTER DATABASE STORED PROCEDURES
+-- Only procedures that have active repos/controllers
 -- ============================================================
 
 USE TravelERP_Master;
 GO
 
 -- ============================================================
--- CLIENT DATABASE NAME GENERATOR
--- Returns next name: TravelERP_Client1, TravelERP_Client2 ...
--- Inserts a reservation row atomically to prevent duplicates
+-- CLIENT DB NAME GENERATOR
 -- ============================================================
 CREATE OR ALTER PROCEDURE sp_Company_GenerateDbName
     @DatabaseName NVARCHAR(100) OUTPUT
 AS BEGIN
     SET NOCOUNT ON;
-
-    -- Remove any orphaned rows from previously failed registrations
     DELETE FROM ClientSequence WHERE CompanyId IS NULL;
-
     DECLARE @nextId INT;
-
-    INSERT INTO ClientSequence (DatabaseName)
-    VALUES ('__PENDING__');
-
+    INSERT INTO ClientSequence (DatabaseName) VALUES ('__PENDING__');
     SET @nextId = SCOPE_IDENTITY();
-
     SET @DatabaseName = 'TravelERP_Client' + CAST(@nextId AS NVARCHAR(10));
-
-    UPDATE ClientSequence
-    SET DatabaseName = @DatabaseName
-    WHERE Id = @nextId;
+    UPDATE ClientSequence SET DatabaseName = @DatabaseName WHERE Id = @nextId;
 END
 GO
 
 -- ============================================================
--- COMPANY STORED PROCEDURES
+-- COMPANY PROCEDURES
 -- ============================================================
-
 CREATE OR ALTER PROCEDURE sp_Company_GetById
     @Id INT
 AS BEGIN
@@ -74,31 +60,27 @@ CREATE OR ALTER PROCEDURE sp_Company_Insert
     @LogoUrl         NVARCHAR(500) = NULL,
     @LicenseNumber   NVARCHAR(100) = NULL,
     @TaxNumber       NVARCHAR(100) = NULL,
-    @Status          TINYINT = 2,
+    @Status          TINYINT       = 2,
     @TrialEndsAt     DATETIME,
-    @SubscriptionEndsAt DATETIME = NULL,
-    @PlanName        NVARCHAR(50) = 'Trial',
-    @MaxUsers        INT = 5,
+    @SubscriptionEndsAt DATETIME   = NULL,
+    @PlanName        NVARCHAR(50)  = 'Trial',
+    @MaxUsers        INT           = 5,
     @TimeZone        NVARCHAR(100) = 'UTC',
-    @Currency        NVARCHAR(10) = 'INR',
-    @CurrencySymbol  NVARCHAR(5) = N'₹',
-    @CreatedAt       DATETIME = NULL,
-    @CreatedBy       INT = NULL,
+    @Currency        NVARCHAR(10)  = 'INR',
+    @CurrencySymbol  NVARCHAR(5)   = N'₹',
+    @CreatedAt       DATETIME      = NULL,
+    @CreatedBy       INT           = NULL,
     @NewId           INT OUTPUT
 AS BEGIN
     SET NOCOUNT ON;
     SET @CreatedAt = ISNULL(@CreatedAt, GETUTCDATE());
-
     INSERT INTO Companies (Name, Slug, DatabaseName, Email, Phone, Address, City, Country,
         LogoUrl, LicenseNumber, TaxNumber, Status, TrialEndsAt, SubscriptionEndsAt,
         PlanName, MaxUsers, TimeZone, Currency, CurrencySymbol, CreatedAt, CreatedBy, IsDeleted)
     VALUES (@Name, @Slug, @DatabaseName, @Email, @Phone, @Address, @City, @Country,
         @LogoUrl, @LicenseNumber, @TaxNumber, @Status, @TrialEndsAt, @SubscriptionEndsAt,
         @PlanName, @MaxUsers, @TimeZone, @Currency, @CurrencySymbol, @CreatedAt, @CreatedBy, 0);
-
     SET @NewId = SCOPE_IDENTITY();
-
-    -- Link sequence entry to the company
     UPDATE ClientSequence SET CompanyId = @NewId WHERE DatabaseName = @DatabaseName;
 END
 GO
@@ -115,25 +97,39 @@ CREATE OR ALTER PROCEDURE sp_Company_Update
     @LicenseNumber   NVARCHAR(100) = NULL,
     @TaxNumber       NVARCHAR(100) = NULL,
     @Status          TINYINT,
-    @SubscriptionEndsAt DATETIME = NULL,
+    @SubscriptionEndsAt DATETIME   = NULL,
     @PlanName        NVARCHAR(50),
     @MaxUsers        INT,
     @TimeZone        NVARCHAR(100),
     @Currency        NVARCHAR(10),
     @CurrencySymbol  NVARCHAR(5),
-    @UpdatedAt       DATETIME = NULL,
-    @UpdatedBy       INT = NULL
+    @UpdatedAt       DATETIME      = NULL,
+    @UpdatedBy       INT           = NULL
 AS BEGIN
     SET NOCOUNT ON;
     SET @UpdatedAt = ISNULL(@UpdatedAt, GETUTCDATE());
-
     UPDATE Companies SET
-        Name = @Name, Email = @Email, Phone = @Phone, Address = @Address,
-        City = @City, Country = @Country, LogoUrl = @LogoUrl,
-        LicenseNumber = @LicenseNumber, TaxNumber = @TaxNumber, Status = @Status,
-        SubscriptionEndsAt = @SubscriptionEndsAt, PlanName = @PlanName, MaxUsers = @MaxUsers,
-        TimeZone = @TimeZone, Currency = @Currency, CurrencySymbol = @CurrencySymbol,
-        UpdatedAt = @UpdatedAt, UpdatedBy = @UpdatedBy
+        Name=@Name, Email=@Email, Phone=@Phone, Address=@Address, City=@City, Country=@Country,
+        LogoUrl=@LogoUrl, LicenseNumber=@LicenseNumber, TaxNumber=@TaxNumber, Status=@Status,
+        SubscriptionEndsAt=@SubscriptionEndsAt, PlanName=@PlanName, MaxUsers=@MaxUsers,
+        TimeZone=@TimeZone, Currency=@Currency, CurrencySymbol=@CurrencySymbol,
+        UpdatedAt=@UpdatedAt, UpdatedBy=@UpdatedBy
+    WHERE Id = @Id;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Company_UpdateNumberSeries
+    @Id            INT,
+    @LeadPrefix    NVARCHAR(20),
+    @PackagePrefix NVARCHAR(20),
+    @UpdatedBy     INT = NULL
+AS BEGIN
+    SET NOCOUNT ON;
+    UPDATE Companies SET
+        LeadPrefix    = @LeadPrefix,
+        PackagePrefix = @PackagePrefix,
+        UpdatedAt     = GETUTCDATE(),
+        UpdatedBy     = @UpdatedBy
     WHERE Id = @Id;
 END
 GO
@@ -147,9 +143,8 @@ END
 GO
 
 -- ============================================================
--- USER STORED PROCEDURES
+-- USER PROCEDURES
 -- ============================================================
-
 CREATE OR ALTER PROCEDURE sp_User_GetById
     @Id INT
 AS BEGIN
@@ -185,21 +180,19 @@ CREATE OR ALTER PROCEDURE sp_User_Insert
     @FullName        NVARCHAR(150),
     @Email           NVARCHAR(150),
     @PasswordHash    NVARCHAR(500),
-    @Role            TINYINT = 2,
-    @IsActive        BIT = 1,
+    @Role            TINYINT       = 2,
+    @IsActive        BIT           = 1,
     @ProfileImageUrl NVARCHAR(500) = NULL,
-    @CreatedAt       DATETIME = NULL,
-    @CreatedBy       INT = NULL,
+    @CreatedAt       DATETIME      = NULL,
+    @CreatedBy       INT           = NULL,
     @NewId           INT OUTPUT
 AS BEGIN
     SET NOCOUNT ON;
     SET @CreatedAt = ISNULL(@CreatedAt, GETUTCDATE());
-
     INSERT INTO MasterUsers (CompanyId, FullName, Email, PasswordHash, Role, IsActive,
         ProfileImageUrl, CreatedAt, CreatedBy, IsDeleted)
     VALUES (@CompanyId, @FullName, @Email, @PasswordHash, @Role, @IsActive,
         @ProfileImageUrl, @CreatedAt, @CreatedBy, 0);
-
     SET @NewId = SCOPE_IDENTITY();
 END
 GO
@@ -211,15 +204,14 @@ CREATE OR ALTER PROCEDURE sp_User_Update
     @Role            TINYINT,
     @IsActive        BIT,
     @ProfileImageUrl NVARCHAR(500) = NULL,
-    @UpdatedAt       DATETIME = NULL,
-    @UpdatedBy       INT = NULL
+    @UpdatedAt       DATETIME      = NULL,
+    @UpdatedBy       INT           = NULL
 AS BEGIN
     SET NOCOUNT ON;
     SET @UpdatedAt = ISNULL(@UpdatedAt, GETUTCDATE());
-
     UPDATE MasterUsers SET
-        FullName = @FullName, Email = @Email, Role = @Role, IsActive = @IsActive,
-        ProfileImageUrl = @ProfileImageUrl, UpdatedAt = @UpdatedAt, UpdatedBy = @UpdatedBy
+        FullName=@FullName, Email=@Email, Role=@Role, IsActive=@IsActive,
+        ProfileImageUrl=@ProfileImageUrl, UpdatedAt=@UpdatedAt, UpdatedBy=@UpdatedBy
     WHERE Id = @Id;
 END
 GO
@@ -241,971 +233,913 @@ AS BEGIN
 END
 GO
 
--- ============================================================
--- ============================================================
--- TENANT STORED PROCEDURES (Dynamic Cross-DB)
--- All use @DatabaseName to query the correct client database
--- Data lives in [TravelERP_ClientN].dbo.TableName
--- ============================================================
--- ============================================================
-
--- ============================================================
--- CUSTOMER PROCEDURES
--- ============================================================
-
-CREATE OR ALTER PROCEDURE sp_Customer_GetById
-    @DatabaseName NVARCHAR(100),
-    @Id           INT
+CREATE OR ALTER PROCEDURE sp_User_SetTenantRole
+    @Id           INT,
+    @TenantRoleId INT
 AS BEGIN
     SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'
-        SELECT * FROM [' + @DatabaseName + N'].dbo.Customers
-        WHERE Id = @Id AND IsDeleted = 0';
-    EXEC sp_executesql @sql, N'@Id INT', @Id;
+    UPDATE MasterUsers SET TenantRoleId = @TenantRoleId WHERE Id = @Id;
 END
 GO
 
-CREATE OR ALTER PROCEDURE sp_Customer_GetAll
-    @DatabaseName NVARCHAR(100),
-    @BranchId     INT = NULL
+-- ============================================================
+-- ROLE PROCEDURES (cross-DB, tenant data)
+-- ============================================================
+CREATE OR ALTER PROCEDURE sp_Role_GetAll
+    @DatabaseName NVARCHAR(100)
 AS BEGIN
     SET NOCOUNT ON;
     DECLARE @sql NVARCHAR(MAX) = N'
-        SELECT * FROM [' + @DatabaseName + N'].dbo.Customers
-        WHERE IsDeleted = 0
-        ORDER BY Name';
+        SELECT * FROM [' + @DatabaseName + N'].dbo.Roles
+        WHERE IsActive = 1 ORDER BY IsSystem DESC, RoleName';
     EXEC sp_executesql @sql;
 END
 GO
 
-CREATE OR ALTER PROCEDURE sp_Customer_Search
-    @DatabaseName NVARCHAR(100),
-    @Keyword      NVARCHAR(100)
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @kw  NVARCHAR(102) = '%' + @Keyword + '%';
-    DECLARE @sql NVARCHAR(MAX) = N'
-        SELECT * FROM [' + @DatabaseName + N'].dbo.Customers
-        WHERE IsDeleted = 0 AND (
-            Name LIKE @kw OR Email LIKE @kw OR Mobile LIKE @kw
-            OR PassportNumber LIKE @kw OR CustomerCode LIKE @kw OR Destination LIKE @kw)
-        ORDER BY Name';
-    EXEC sp_executesql @sql, N'@kw NVARCHAR(102)', @kw;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Customer_Insert
-    @DatabaseName    NVARCHAR(100),
-    @CustomerCode    NVARCHAR(20),
-    @Name            NVARCHAR(150),
-    @Mobile          NVARCHAR(30),
-    @Email           NVARCHAR(150) = NULL,
-    @Destination     NVARCHAR(200) = NULL,
-    @TravelingDate   DATE          = NULL,
-    @LeavingFrom     NVARCHAR(100) = NULL,
-    @TravelCity      NVARCHAR(100) = NULL,
-    @HotelRecommended NVARCHAR(200)= NULL,
-    @NoOfAdults      TINYINT       = NULL,
-    @NoOfChildren    TINYINT       = NULL,
-    @NoOfDays        TINYINT       = NULL,
-    @AssignedTo      NVARCHAR(150) = NULL,
-    @LeadSource      NVARCHAR(100) = NULL,
-    @Infant          NVARCHAR(50)  = NULL,
-    @Remark          NVARCHAR(MAX) = NULL,
-    @PassportNumber  NVARCHAR(50)  = NULL,
-    @PassportExpiry  DATE          = NULL,
-    @Notes           NVARCHAR(MAX) = NULL,
-    @CreatedAt       DATETIME      = NULL,
-    @CreatedBy       INT           = NULL,
-    @NewId           INT OUTPUT
-AS BEGIN
-    SET NOCOUNT ON;
-    SET @CreatedAt = ISNULL(@CreatedAt, GETUTCDATE());
-
-    DECLARE @sql NVARCHAR(MAX) = N'
-        INSERT INTO [' + @DatabaseName + N'].dbo.Customers
-            (CustomerCode,Name,Mobile,Email,Destination,TravelingDate,LeavingFrom,TravelCity,
-             HotelRecommended,NoOfAdults,NoOfChildren,NoOfDays,AssignedTo,LeadSource,
-             Infant,Remark,PassportNumber,PassportExpiry,Notes,CreatedAt,CreatedBy,IsDeleted)
-        VALUES
-            (@CustomerCode,@Name,@Mobile,@Email,@Destination,@TravelingDate,@LeavingFrom,@TravelCity,
-             @HotelRecommended,@NoOfAdults,@NoOfChildren,@NoOfDays,@AssignedTo,@LeadSource,
-             @Infant,@Remark,@PassportNumber,@PassportExpiry,@Notes,@CreatedAt,@CreatedBy,0)';
-
-    DECLARE @params NVARCHAR(MAX) = N'
-        @CustomerCode NVARCHAR(20),@Name NVARCHAR(150),@Mobile NVARCHAR(30),
-        @Email NVARCHAR(150),@Destination NVARCHAR(200),@TravelingDate DATE,
-        @LeavingFrom NVARCHAR(100),@TravelCity NVARCHAR(100),@HotelRecommended NVARCHAR(200),
-        @NoOfAdults TINYINT,@NoOfChildren TINYINT,@NoOfDays TINYINT,
-        @AssignedTo NVARCHAR(150),@LeadSource NVARCHAR(100),@Infant NVARCHAR(50),
-        @Remark NVARCHAR(MAX),@PassportNumber NVARCHAR(50),@PassportExpiry DATE,
-        @Notes NVARCHAR(MAX),@CreatedAt DATETIME,@CreatedBy INT';
-
-    EXEC sp_executesql @sql, @params,
-        @CustomerCode,@Name,@Mobile,@Email,@Destination,@TravelingDate,@LeavingFrom,@TravelCity,
-        @HotelRecommended,@NoOfAdults,@NoOfChildren,@NoOfDays,@AssignedTo,@LeadSource,
-        @Infant,@Remark,@PassportNumber,@PassportExpiry,@Notes,@CreatedAt,@CreatedBy;
-
-    DECLARE @idSql NVARCHAR(MAX) = N'SELECT @NewId = MAX(Id) FROM [' + @DatabaseName + N'].dbo.Customers';
-    EXEC sp_executesql @idSql, N'@NewId INT OUTPUT', @NewId OUTPUT;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Customer_Update
-    @DatabaseName    NVARCHAR(100),
-    @Id              INT,
-    @Name            NVARCHAR(150),
-    @Mobile          NVARCHAR(30),
-    @Email           NVARCHAR(150) = NULL,
-    @Destination     NVARCHAR(200) = NULL,
-    @TravelingDate   DATE          = NULL,
-    @LeavingFrom     NVARCHAR(100) = NULL,
-    @TravelCity      NVARCHAR(100) = NULL,
-    @HotelRecommended NVARCHAR(200)= NULL,
-    @NoOfAdults      TINYINT       = NULL,
-    @NoOfChildren    TINYINT       = NULL,
-    @NoOfDays        TINYINT       = NULL,
-    @AssignedTo      NVARCHAR(150) = NULL,
-    @LeadSource      NVARCHAR(100) = NULL,
-    @Infant          NVARCHAR(50)  = NULL,
-    @Remark          NVARCHAR(MAX) = NULL,
-    @PassportNumber  NVARCHAR(50)  = NULL,
-    @PassportExpiry  DATE          = NULL,
-    @Notes           NVARCHAR(MAX) = NULL,
-    @UpdatedAt       DATETIME      = NULL,
-    @UpdatedBy       INT           = NULL
-AS BEGIN
-    SET NOCOUNT ON;
-    SET @UpdatedAt = ISNULL(@UpdatedAt, GETUTCDATE());
-
-    DECLARE @sql NVARCHAR(MAX) = N'
-        UPDATE [' + @DatabaseName + N'].dbo.Customers SET
-            Name=@Name,Mobile=@Mobile,Email=@Email,Destination=@Destination,
-            TravelingDate=@TravelingDate,LeavingFrom=@LeavingFrom,TravelCity=@TravelCity,
-            HotelRecommended=@HotelRecommended,NoOfAdults=@NoOfAdults,NoOfChildren=@NoOfChildren,
-            NoOfDays=@NoOfDays,AssignedTo=@AssignedTo,LeadSource=@LeadSource,
-            Infant=@Infant,Remark=@Remark,PassportNumber=@PassportNumber,PassportExpiry=@PassportExpiry,
-            Notes=@Notes,UpdatedAt=@UpdatedAt,UpdatedBy=@UpdatedBy
-        WHERE Id=@Id';
-
-    EXEC sp_executesql @sql,
-        N'@Id INT,@Name NVARCHAR(150),@Mobile NVARCHAR(30),@Email NVARCHAR(150),
-          @Destination NVARCHAR(200),@TravelingDate DATE,@LeavingFrom NVARCHAR(100),
-          @TravelCity NVARCHAR(100),@HotelRecommended NVARCHAR(200),
-          @NoOfAdults TINYINT,@NoOfChildren TINYINT,@NoOfDays TINYINT,
-          @AssignedTo NVARCHAR(150),@LeadSource NVARCHAR(100),@Infant NVARCHAR(50),
-          @Remark NVARCHAR(MAX),@PassportNumber NVARCHAR(50),@PassportExpiry DATE,
-          @Notes NVARCHAR(MAX),@UpdatedAt DATETIME,@UpdatedBy INT',
-        @Id,@Name,@Mobile,@Email,@Destination,@TravelingDate,@LeavingFrom,@TravelCity,
-        @HotelRecommended,@NoOfAdults,@NoOfChildren,@NoOfDays,@AssignedTo,@LeadSource,
-        @Infant,@Remark,@PassportNumber,@PassportExpiry,@Notes,@UpdatedAt,@UpdatedBy;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Customer_Delete
+CREATE OR ALTER PROCEDURE sp_Role_GetById
     @DatabaseName NVARCHAR(100),
     @Id           INT
 AS BEGIN
     SET NOCOUNT ON;
     DECLARE @sql NVARCHAR(MAX) = N'
-        UPDATE [' + @DatabaseName + N'].dbo.Customers
-        SET IsDeleted=1, UpdatedAt=GETUTCDATE() WHERE Id=@Id';
+        SELECT * FROM [' + @DatabaseName + N'].dbo.Roles WHERE Id = @Id';
     EXEC sp_executesql @sql, N'@Id INT', @Id;
 END
 GO
 
-CREATE OR ALTER PROCEDURE sp_Customer_GenerateCode
-    @DatabaseName NVARCHAR(100)
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @count INT;
-    DECLARE @sql NVARCHAR(MAX) = N'SELECT @count = COUNT(1) FROM [' + @DatabaseName + N'].dbo.Customers';
-    EXEC sp_executesql @sql, N'@count INT OUTPUT', @count OUTPUT;
-    SELECT 'CUS' + RIGHT('00000' + CAST(@count + 1 AS VARCHAR), 5);
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Customer_GetTotalCount
-    @DatabaseName NVARCHAR(100)
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'SELECT COUNT(1) FROM [' + @DatabaseName + N'].dbo.Customers WHERE IsDeleted=0';
-    EXEC sp_executesql @sql;
-END
-GO
-
--- ============================================================
--- BOOKING PROCEDURES
--- ============================================================
-
-CREATE OR ALTER PROCEDURE sp_Booking_GetById
+CREATE OR ALTER PROCEDURE sp_Role_Insert
     @DatabaseName NVARCHAR(100),
-    @Id           INT
+    @RoleName     NVARCHAR(100),
+    @Description  NVARCHAR(300) = NULL,
+    @IsSystem     BIT           = 0,
+    @CreatedBy    INT           = 0,
+    @NewId        INT OUTPUT
 AS BEGIN
     SET NOCOUNT ON;
     DECLARE @sql NVARCHAR(MAX) = N'
-        SELECT b.*, c.Name, c.Email AS CustomerEmail, c.Mobile AS CustomerPhone,
-               p.Name AS PackageName, p.PackageCode
-        FROM [' + @DatabaseName + N'].dbo.Bookings b
-        LEFT JOIN [' + @DatabaseName + N'].dbo.Customers c ON b.CustomerId = c.Id
-        LEFT JOIN [' + @DatabaseName + N'].dbo.TourPackages p ON b.PackageId = p.Id
-        WHERE b.Id = @Id AND b.IsDeleted = 0';
-    EXEC sp_executesql @sql, N'@Id INT', @Id;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Booking_GetByReference
-    @DatabaseName     NVARCHAR(100),
-    @BookingReference NVARCHAR(20)
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'
-        SELECT b.*, c.Name AS CustomerName
-        FROM [' + @DatabaseName + N'].dbo.Bookings b
-        LEFT JOIN [' + @DatabaseName + N'].dbo.Customers c ON b.CustomerId = c.Id
-        WHERE b.BookingReference = @BookingReference AND b.IsDeleted = 0';
-    EXEC sp_executesql @sql, N'@BookingReference NVARCHAR(20)', @BookingReference;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Booking_GetAll
-    @DatabaseName NVARCHAR(100),
-    @BranchId     INT = NULL
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'
-        SELECT b.*, c.Name AS CustomerName, p.Name AS PackageName
-        FROM [' + @DatabaseName + N'].dbo.Bookings b
-        LEFT JOIN [' + @DatabaseName + N'].dbo.Customers c ON b.CustomerId = c.Id
-        LEFT JOIN [' + @DatabaseName + N'].dbo.TourPackages p ON b.PackageId = p.Id
-        WHERE b.IsDeleted = 0
-          AND (@BranchId IS NULL OR b.BranchId = @BranchId)
-        ORDER BY b.CreatedAt DESC';
-    EXEC sp_executesql @sql, N'@BranchId INT', @BranchId;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Booking_GetByCustomer
-    @DatabaseName NVARCHAR(100),
-    @CustomerId   INT
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'
-        SELECT b.*, p.Name AS PackageName
-        FROM [' + @DatabaseName + N'].dbo.Bookings b
-        LEFT JOIN [' + @DatabaseName + N'].dbo.TourPackages p ON b.PackageId = p.Id
-        WHERE b.CustomerId = @CustomerId AND b.IsDeleted = 0
-        ORDER BY b.CreatedAt DESC';
-    EXEC sp_executesql @sql, N'@CustomerId INT', @CustomerId;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Booking_GetByStatus
-    @DatabaseName NVARCHAR(100),
-    @Status       TINYINT
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'
-        SELECT b.*, c.Name AS CustomerName
-        FROM [' + @DatabaseName + N'].dbo.Bookings b
-        LEFT JOIN [' + @DatabaseName + N'].dbo.Customers c ON b.CustomerId = c.Id
-        WHERE b.Status = @Status AND b.IsDeleted = 0
-        ORDER BY b.TravelDate';
-    EXEC sp_executesql @sql, N'@Status TINYINT', @Status;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Booking_GetByDateRange
-    @DatabaseName NVARCHAR(100),
-    @FromDate     DATE,
-    @ToDate       DATE
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'
-        SELECT b.*, c.Name AS CustomerName
-        FROM [' + @DatabaseName + N'].dbo.Bookings b
-        LEFT JOIN [' + @DatabaseName + N'].dbo.Customers c ON b.CustomerId = c.Id
-        WHERE b.TravelDate BETWEEN @FromDate AND @ToDate AND b.IsDeleted = 0
-        ORDER BY b.TravelDate';
-    EXEC sp_executesql @sql, N'@FromDate DATE, @ToDate DATE', @FromDate, @ToDate;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Booking_Insert
-    @DatabaseName     NVARCHAR(100),
-    @BookingReference NVARCHAR(20),
-    @CustomerId       INT,
-    @PackageId        INT           = NULL,
-    @BookingType      TINYINT,
-    @Status           TINYINT       = 0,
-    @PaymentStatus    TINYINT       = 0,
-    @TravelDate       DATE,
-    @ReturnDate       DATE          = NULL,
-    @Adults           INT           = 1,
-    @Children         INT           = 0,
-    @Infants          INT           = 0,
-    @Destination      NVARCHAR(200),
-    @TotalAmount      DECIMAL(12,2) = 0,
-    @PaidAmount       DECIMAL(12,2) = 0,
-    @DiscountAmount   DECIMAL(12,2) = 0,
-    @SpecialRequests  NVARCHAR(MAX) = NULL,
-    @InternalNotes    NVARCHAR(MAX) = NULL,
-    @BranchId         INT           = NULL,
-    @AgentId          INT           = NULL,
-    @CreatedAt        DATETIME      = NULL,
-    @CreatedBy        INT           = NULL,
-    @NewId            INT OUTPUT
-AS BEGIN
-    SET NOCOUNT ON;
-    SET @CreatedAt = ISNULL(@CreatedAt, GETUTCDATE());
-
-    DECLARE @sql NVARCHAR(MAX) = N'
-        INSERT INTO [' + @DatabaseName + N'].dbo.Bookings
-            (BookingReference,CustomerId,PackageId,BookingType,Status,PaymentStatus,
-             TravelDate,ReturnDate,Adults,Children,Infants,Destination,TotalAmount,
-             PaidAmount,DiscountAmount,SpecialRequests,InternalNotes,BranchId,AgentId,
-             CreatedAt,CreatedBy,IsDeleted)
-        VALUES
-            (@BookingReference,@CustomerId,@PackageId,@BookingType,@Status,@PaymentStatus,
-             @TravelDate,@ReturnDate,@Adults,@Children,@Infants,@Destination,@TotalAmount,
-             @PaidAmount,@DiscountAmount,@SpecialRequests,@InternalNotes,@BranchId,@AgentId,
-             @CreatedAt,@CreatedBy,0)';
-
+        INSERT INTO [' + @DatabaseName + N'].dbo.Roles
+            (RoleName, Description, IsSystem, IsActive, CreatedAt, CreatedBy)
+        VALUES (@RoleName, @Description, @IsSystem, 1, GETUTCDATE(), @CreatedBy);
+        SELECT @NewId = SCOPE_IDENTITY();';
     EXEC sp_executesql @sql,
-        N'@BookingReference NVARCHAR(20),@CustomerId INT,@PackageId INT,@BookingType TINYINT,
-          @Status TINYINT,@PaymentStatus TINYINT,@TravelDate DATE,@ReturnDate DATE,
-          @Adults INT,@Children INT,@Infants INT,@Destination NVARCHAR(200),
-          @TotalAmount DECIMAL(12,2),@PaidAmount DECIMAL(12,2),@DiscountAmount DECIMAL(12,2),
-          @SpecialRequests NVARCHAR(MAX),@InternalNotes NVARCHAR(MAX),
-          @BranchId INT,@AgentId INT,@CreatedAt DATETIME,@CreatedBy INT',
-        @BookingReference,@CustomerId,@PackageId,@BookingType,@Status,@PaymentStatus,
-        @TravelDate,@ReturnDate,@Adults,@Children,@Infants,@Destination,
-        @TotalAmount,@PaidAmount,@DiscountAmount,@SpecialRequests,@InternalNotes,
-        @BranchId,@AgentId,@CreatedAt,@CreatedBy;
-
-    DECLARE @idSql NVARCHAR(MAX) = N'SELECT @NewId = MAX(Id) FROM [' + @DatabaseName + N'].dbo.Bookings';
-    EXEC sp_executesql @idSql, N'@NewId INT OUTPUT', @NewId OUTPUT;
+        N'@RoleName NVARCHAR(100), @Description NVARCHAR(300), @IsSystem BIT, @CreatedBy INT, @NewId INT OUTPUT',
+        @RoleName, @Description, @IsSystem, @CreatedBy, @NewId OUTPUT;
 END
 GO
 
-CREATE OR ALTER PROCEDURE sp_Booking_Update
-    @DatabaseName    NVARCHAR(100),
-    @Id              INT,
-    @PackageId       INT           = NULL,
-    @BookingType     TINYINT,
-    @Status          TINYINT,
-    @PaymentStatus   TINYINT,
-    @TravelDate      DATE,
-    @ReturnDate      DATE          = NULL,
-    @Adults          INT,
-    @Children        INT,
-    @Infants         INT,
-    @Destination     NVARCHAR(200),
-    @TotalAmount     DECIMAL(12,2),
-    @PaidAmount      DECIMAL(12,2),
-    @DiscountAmount  DECIMAL(12,2),
-    @SpecialRequests NVARCHAR(MAX) = NULL,
-    @InternalNotes   NVARCHAR(MAX) = NULL,
-    @UpdatedAt       DATETIME      = NULL,
-    @UpdatedBy       INT           = NULL
-AS BEGIN
-    SET NOCOUNT ON;
-    SET @UpdatedAt = ISNULL(@UpdatedAt, GETUTCDATE());
-
-    DECLARE @sql NVARCHAR(MAX) = N'
-        UPDATE [' + @DatabaseName + N'].dbo.Bookings SET
-            PackageId=@PackageId,BookingType=@BookingType,Status=@Status,
-            PaymentStatus=@PaymentStatus,TravelDate=@TravelDate,ReturnDate=@ReturnDate,
-            Adults=@Adults,Children=@Children,Infants=@Infants,Destination=@Destination,
-            TotalAmount=@TotalAmount,PaidAmount=@PaidAmount,DiscountAmount=@DiscountAmount,
-            SpecialRequests=@SpecialRequests,InternalNotes=@InternalNotes,
-            UpdatedAt=@UpdatedAt,UpdatedBy=@UpdatedBy
-        WHERE Id=@Id';
-
-    EXEC sp_executesql @sql,
-        N'@Id INT,@PackageId INT,@BookingType TINYINT,@Status TINYINT,@PaymentStatus TINYINT,
-          @TravelDate DATE,@ReturnDate DATE,@Adults INT,@Children INT,@Infants INT,
-          @Destination NVARCHAR(200),@TotalAmount DECIMAL(12,2),@PaidAmount DECIMAL(12,2),
-          @DiscountAmount DECIMAL(12,2),@SpecialRequests NVARCHAR(MAX),
-          @InternalNotes NVARCHAR(MAX),@UpdatedAt DATETIME,@UpdatedBy INT',
-        @Id,@PackageId,@BookingType,@Status,@PaymentStatus,@TravelDate,@ReturnDate,
-        @Adults,@Children,@Infants,@Destination,@TotalAmount,@PaidAmount,
-        @DiscountAmount,@SpecialRequests,@InternalNotes,@UpdatedAt,@UpdatedBy;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Booking_UpdateStatus
+CREATE OR ALTER PROCEDURE sp_Role_Update
     @DatabaseName NVARCHAR(100),
     @Id           INT,
-    @Status       TINYINT
+    @RoleName     NVARCHAR(100),
+    @Description  NVARCHAR(300) = NULL,
+    @UpdatedBy    INT           = 0
 AS BEGIN
     SET NOCOUNT ON;
     DECLARE @sql NVARCHAR(MAX) = N'
-        UPDATE [' + @DatabaseName + N'].dbo.Bookings
-        SET Status=@Status, UpdatedAt=GETUTCDATE() WHERE Id=@Id';
-    EXEC sp_executesql @sql, N'@Id INT, @Status TINYINT', @Id, @Status;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Booking_GenerateReference
-    @DatabaseName NVARCHAR(100)
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @count INT;
-    DECLARE @sql NVARCHAR(MAX) = N'SELECT @count = COUNT(1) FROM [' + @DatabaseName + N'].dbo.Bookings';
-    EXEC sp_executesql @sql, N'@count INT OUTPUT', @count OUTPUT;
-    SELECT 'BK' + FORMAT(GETDATE(), 'yyMM') + RIGHT('0000' + CAST(@count + 1 AS VARCHAR), 4);
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Booking_GetTotalRevenue
-    @DatabaseName NVARCHAR(100),
-    @FromDate     DATETIME = NULL,
-    @ToDate       DATETIME = NULL
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'
-        SELECT ISNULL(SUM(TotalAmount), 0)
-        FROM [' + @DatabaseName + N'].dbo.Bookings
-        WHERE IsDeleted = 0 AND Status != 3
-          AND (@FromDate IS NULL OR CreatedAt >= @FromDate)
-          AND (@ToDate   IS NULL OR CreatedAt <= @ToDate)';
-    EXEC sp_executesql @sql, N'@FromDate DATETIME, @ToDate DATETIME', @FromDate, @ToDate;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Booking_GetTotalCount
-    @DatabaseName NVARCHAR(100)
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'SELECT COUNT(1) FROM [' + @DatabaseName + N'].dbo.Bookings WHERE IsDeleted=0';
-    EXEC sp_executesql @sql;
-END
-GO
-
--- ============================================================
--- PACKAGE PROCEDURES
--- ============================================================
-
-CREATE OR ALTER PROCEDURE sp_Package_GetById
-    @DatabaseName NVARCHAR(100),
-    @Id           INT
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'SELECT * FROM [' + @DatabaseName + N'].dbo.TourPackages WHERE Id=@Id AND IsDeleted=0';
-    EXEC sp_executesql @sql, N'@Id INT', @Id;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Package_GetAll
-    @DatabaseName NVARCHAR(100)
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'SELECT * FROM [' + @DatabaseName + N'].dbo.TourPackages WHERE IsDeleted=0 ORDER BY Name';
-    EXEC sp_executesql @sql;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Package_GetByType
-    @DatabaseName NVARCHAR(100),
-    @Type         TINYINT
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'SELECT * FROM [' + @DatabaseName + N'].dbo.TourPackages WHERE Type=@Type AND IsDeleted=0 ORDER BY Name';
-    EXEC sp_executesql @sql, N'@Type TINYINT', @Type;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Package_GetFeatured
-    @DatabaseName NVARCHAR(100)
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'SELECT * FROM [' + @DatabaseName + N'].dbo.TourPackages WHERE IsFeatured=1 AND IsDeleted=0 AND Status=0 ORDER BY Name';
-    EXEC sp_executesql @sql;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Package_Search
-    @DatabaseName NVARCHAR(100),
-    @Keyword      NVARCHAR(100)
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @kw NVARCHAR(102) = '%' + @Keyword + '%';
-    DECLARE @sql NVARCHAR(MAX) = N'
-        SELECT * FROM [' + @DatabaseName + N'].dbo.TourPackages
-        WHERE IsDeleted=0 AND (Name LIKE @kw OR Destination LIKE @kw OR PackageCode LIKE @kw)
-        ORDER BY Name';
-    EXEC sp_executesql @sql, N'@kw NVARCHAR(102)', @kw;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Package_Insert
-    @DatabaseName   NVARCHAR(100),
-    @PackageCode    NVARCHAR(20),
-    @Name           NVARCHAR(200),
-    @Description    NVARCHAR(MAX) = NULL,
-    @Type           TINYINT,
-    @Status         TINYINT       = 0,
-    @Destination    NVARCHAR(200),
-    @Origin         NVARCHAR(200) = NULL,
-    @DurationDays   INT           = 1,
-    @DurationNights INT           = 0,
-    @BasePrice      DECIMAL(12,2) = 0,
-    @ChildPrice     DECIMAL(12,2) = NULL,
-    @InfantPrice    DECIMAL(12,2) = NULL,
-    @Inclusions     NVARCHAR(MAX) = NULL,
-    @Exclusions     NVARCHAR(MAX) = NULL,
-    @Itinerary      NVARCHAR(MAX) = NULL,
-    @ImageUrl       NVARCHAR(500) = NULL,
-    @MaxCapacity    INT           = 20,
-    @ValidFrom      DATE          = NULL,
-    @ValidTo        DATE          = NULL,
-    @IsFeatured     BIT           = 0,
-    @CreatedAt      DATETIME      = NULL,
-    @CreatedBy      INT           = NULL,
-    @NewId          INT OUTPUT
-AS BEGIN
-    SET NOCOUNT ON;
-    SET @CreatedAt = ISNULL(@CreatedAt, GETUTCDATE());
-
-    DECLARE @sql NVARCHAR(MAX) = N'
-        INSERT INTO [' + @DatabaseName + N'].dbo.TourPackages
-            (PackageCode,Name,Description,Type,Status,Destination,Origin,DurationDays,DurationNights,
-             BasePrice,ChildPrice,InfantPrice,Inclusions,Exclusions,Itinerary,ImageUrl,
-             MaxCapacity,ValidFrom,ValidTo,IsFeatured,CreatedAt,CreatedBy,IsDeleted)
-        VALUES
-            (@PackageCode,@Name,@Description,@Type,@Status,@Destination,@Origin,@DurationDays,@DurationNights,
-             @BasePrice,@ChildPrice,@InfantPrice,@Inclusions,@Exclusions,@Itinerary,@ImageUrl,
-             @MaxCapacity,@ValidFrom,@ValidTo,@IsFeatured,@CreatedAt,@CreatedBy,0)';
-
+        UPDATE [' + @DatabaseName + N'].dbo.Roles
+        SET RoleName = @RoleName, Description = @Description,
+            UpdatedAt = GETUTCDATE(), UpdatedBy = @UpdatedBy
+        WHERE Id = @Id AND IsSystem = 0';
     EXEC sp_executesql @sql,
-        N'@PackageCode NVARCHAR(20),@Name NVARCHAR(200),@Description NVARCHAR(MAX),
-          @Type TINYINT,@Status TINYINT,@Destination NVARCHAR(200),@Origin NVARCHAR(200),
-          @DurationDays INT,@DurationNights INT,@BasePrice DECIMAL(12,2),
-          @ChildPrice DECIMAL(12,2),@InfantPrice DECIMAL(12,2),@Inclusions NVARCHAR(MAX),
-          @Exclusions NVARCHAR(MAX),@Itinerary NVARCHAR(MAX),@ImageUrl NVARCHAR(500),
-          @MaxCapacity INT,@ValidFrom DATE,@ValidTo DATE,@IsFeatured BIT,
-          @CreatedAt DATETIME,@CreatedBy INT',
-        @PackageCode,@Name,@Description,@Type,@Status,@Destination,@Origin,
-        @DurationDays,@DurationNights,@BasePrice,@ChildPrice,@InfantPrice,
-        @Inclusions,@Exclusions,@Itinerary,@ImageUrl,
-        @MaxCapacity,@ValidFrom,@ValidTo,@IsFeatured,@CreatedAt,@CreatedBy;
-
-    DECLARE @idSql NVARCHAR(MAX) = N'SELECT @NewId = MAX(Id) FROM [' + @DatabaseName + N'].dbo.TourPackages';
-    EXEC sp_executesql @idSql, N'@NewId INT OUTPUT', @NewId OUTPUT;
+        N'@Id INT, @RoleName NVARCHAR(100), @Description NVARCHAR(300), @UpdatedBy INT',
+        @Id, @RoleName, @Description, @UpdatedBy;
 END
 GO
 
-CREATE OR ALTER PROCEDURE sp_Package_Update
-    @DatabaseName   NVARCHAR(100),
-    @Id             INT,
-    @Name           NVARCHAR(200),
-    @Description    NVARCHAR(MAX) = NULL,
-    @Type           TINYINT,
-    @Status         TINYINT,
-    @Destination    NVARCHAR(200),
-    @Origin         NVARCHAR(200) = NULL,
-    @DurationDays   INT,
-    @DurationNights INT,
-    @BasePrice      DECIMAL(12,2),
-    @ChildPrice     DECIMAL(12,2) = NULL,
-    @InfantPrice    DECIMAL(12,2) = NULL,
-    @Inclusions     NVARCHAR(MAX) = NULL,
-    @Exclusions     NVARCHAR(MAX) = NULL,
-    @Itinerary      NVARCHAR(MAX) = NULL,
-    @ImageUrl       NVARCHAR(500) = NULL,
-    @MaxCapacity    INT,
-    @ValidFrom      DATE          = NULL,
-    @ValidTo        DATE          = NULL,
-    @IsFeatured     BIT           = 0,
-    @UpdatedAt      DATETIME      = NULL,
-    @UpdatedBy      INT           = NULL
-AS BEGIN
-    SET NOCOUNT ON;
-    SET @UpdatedAt = ISNULL(@UpdatedAt, GETUTCDATE());
-
-    DECLARE @sql NVARCHAR(MAX) = N'
-        UPDATE [' + @DatabaseName + N'].dbo.TourPackages SET
-            Name=@Name,Description=@Description,Type=@Type,Status=@Status,
-            Destination=@Destination,Origin=@Origin,DurationDays=@DurationDays,
-            DurationNights=@DurationNights,BasePrice=@BasePrice,ChildPrice=@ChildPrice,
-            InfantPrice=@InfantPrice,Inclusions=@Inclusions,Exclusions=@Exclusions,
-            Itinerary=@Itinerary,ImageUrl=@ImageUrl,MaxCapacity=@MaxCapacity,
-            ValidFrom=@ValidFrom,ValidTo=@ValidTo,IsFeatured=@IsFeatured,
-            UpdatedAt=@UpdatedAt,UpdatedBy=@UpdatedBy
-        WHERE Id=@Id';
-
-    EXEC sp_executesql @sql,
-        N'@Id INT,@Name NVARCHAR(200),@Description NVARCHAR(MAX),@Type TINYINT,@Status TINYINT,
-          @Destination NVARCHAR(200),@Origin NVARCHAR(200),@DurationDays INT,@DurationNights INT,
-          @BasePrice DECIMAL(12,2),@ChildPrice DECIMAL(12,2),@InfantPrice DECIMAL(12,2),
-          @Inclusions NVARCHAR(MAX),@Exclusions NVARCHAR(MAX),@Itinerary NVARCHAR(MAX),
-          @ImageUrl NVARCHAR(500),@MaxCapacity INT,@ValidFrom DATE,@ValidTo DATE,
-          @IsFeatured BIT,@UpdatedAt DATETIME,@UpdatedBy INT',
-        @Id,@Name,@Description,@Type,@Status,@Destination,@Origin,@DurationDays,@DurationNights,
-        @BasePrice,@ChildPrice,@InfantPrice,@Inclusions,@Exclusions,@Itinerary,@ImageUrl,
-        @MaxCapacity,@ValidFrom,@ValidTo,@IsFeatured,@UpdatedAt,@UpdatedBy;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Package_Delete
-    @DatabaseName NVARCHAR(100),
-    @Id           INT
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'UPDATE [' + @DatabaseName + N'].dbo.TourPackages SET IsDeleted=1,UpdatedAt=GETUTCDATE() WHERE Id=@Id';
-    EXEC sp_executesql @sql, N'@Id INT', @Id;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Package_GenerateCode
-    @DatabaseName NVARCHAR(100)
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @count INT;
-    DECLARE @sql NVARCHAR(MAX) = N'SELECT @count = COUNT(1) FROM [' + @DatabaseName + N'].dbo.TourPackages';
-    EXEC sp_executesql @sql, N'@count INT OUTPUT', @count OUTPUT;
-    SELECT 'PKG' + RIGHT('00000' + CAST(@count + 1 AS VARCHAR), 5);
-END
-GO
-
--- ============================================================
--- INVOICE PROCEDURES
--- ============================================================
-
-CREATE OR ALTER PROCEDURE sp_Invoice_GetById
+CREATE OR ALTER PROCEDURE sp_Role_Delete
     @DatabaseName NVARCHAR(100),
     @Id           INT
 AS BEGIN
     SET NOCOUNT ON;
     DECLARE @sql NVARCHAR(MAX) = N'
-        SELECT i.*, c.Name AS CustomerName, c.Email AS CustomerEmail,
-               b.BookingReference, b.Destination
-        FROM [' + @DatabaseName + N'].dbo.Invoices i
-        LEFT JOIN [' + @DatabaseName + N'].dbo.Customers c ON i.CustomerId = c.Id
-        LEFT JOIN [' + @DatabaseName + N'].dbo.Bookings  b ON i.BookingId  = b.Id
-        WHERE i.Id=@Id AND i.IsDeleted=0';
+        UPDATE [' + @DatabaseName + N'].dbo.Roles
+        SET IsActive = 0 WHERE Id = @Id AND IsSystem = 0';
     EXEC sp_executesql @sql, N'@Id INT', @Id;
 END
 GO
 
-CREATE OR ALTER PROCEDURE sp_Invoice_GetAll
+CREATE OR ALTER PROCEDURE sp_RolePermission_GetByRole
+    @DatabaseName NVARCHAR(100),
+    @RoleId       INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT * FROM [' + @DatabaseName + N'].dbo.RolePermissions WHERE RoleId = @RoleId';
+    EXEC sp_executesql @sql, N'@RoleId INT', @RoleId;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_RolePermission_Upsert
+    @DatabaseName NVARCHAR(100),
+    @RoleId       INT,
+    @Module       NVARCHAR(50),
+    @CanView      BIT,
+    @CanAdd       BIT,
+    @CanEdit      BIT,
+    @CanDelete    BIT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        IF EXISTS (SELECT 1 FROM [' + @DatabaseName + N'].dbo.RolePermissions
+                   WHERE RoleId = @RoleId AND Module = @Module)
+            UPDATE [' + @DatabaseName + N'].dbo.RolePermissions
+            SET CanView=@CanView, CanAdd=@CanAdd, CanEdit=@CanEdit, CanDelete=@CanDelete
+            WHERE RoleId = @RoleId AND Module = @Module
+        ELSE
+            INSERT INTO [' + @DatabaseName + N'].dbo.RolePermissions
+                (RoleId, Module, CanView, CanAdd, CanEdit, CanDelete)
+            VALUES (@RoleId, @Module, @CanView, @CanAdd, @CanEdit, @CanDelete)';
+    EXEC sp_executesql @sql,
+        N'@RoleId INT, @Module NVARCHAR(50), @CanView BIT, @CanAdd BIT, @CanEdit BIT, @CanDelete BIT',
+        @RoleId, @Module, @CanView, @CanAdd, @CanEdit, @CanDelete;
+END
+GO
+
+-- ============================================================
+-- DESTINATION PROCEDURES (cross-DB, tenant data)
+-- ============================================================
+CREATE OR ALTER PROCEDURE sp_Destination_GetAll
     @DatabaseName NVARCHAR(100)
 AS BEGIN
     SET NOCOUNT ON;
     DECLARE @sql NVARCHAR(MAX) = N'
-        SELECT i.*, c.Name AS CustomerName, b.BookingReference
-        FROM [' + @DatabaseName + N'].dbo.Invoices i
-        LEFT JOIN [' + @DatabaseName + N'].dbo.Customers c ON i.CustomerId = c.Id
-        LEFT JOIN [' + @DatabaseName + N'].dbo.Bookings  b ON i.BookingId  = b.Id
-        WHERE i.IsDeleted=0 ORDER BY i.InvoiceDate DESC';
+        SELECT * FROM [' + @DatabaseName + N'].dbo.Destinations
+        WHERE IsActive = 1 ORDER BY Name';
     EXEC sp_executesql @sql;
 END
 GO
 
-CREATE OR ALTER PROCEDURE sp_Invoice_GetByBooking
+CREATE OR ALTER PROCEDURE sp_Destination_GetById
     @DatabaseName NVARCHAR(100),
-    @BookingId    INT
+    @Id           INT
 AS BEGIN
     SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'SELECT * FROM [' + @DatabaseName + N'].dbo.Invoices WHERE BookingId=@BookingId AND IsDeleted=0';
-    EXEC sp_executesql @sql, N'@BookingId INT', @BookingId;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT * FROM [' + @DatabaseName + N'].dbo.Destinations WHERE Id = @Id;
+        SELECT * FROM [' + @DatabaseName + N'].dbo.DestinationReviews
+        WHERE DestinationId = @Id ORDER BY DisplayOrder, Id;';
+    EXEC sp_executesql @sql, N'@Id INT', @Id;
 END
 GO
 
-CREATE OR ALTER PROCEDURE sp_Invoice_GetByCustomer
+CREATE OR ALTER PROCEDURE sp_Destination_Insert
+    @DatabaseName  NVARCHAR(100),
+    @Name          NVARCHAR(200),
+    @ImageUrl      NVARCHAR(500) = NULL,
+    @PackageTerms  NVARCHAR(MAX) = NULL,
+    @InvoiceTerms  NVARCHAR(MAX) = NULL,
+    @CreatedBy     INT           = 0,
+    @NewId         INT OUTPUT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        INSERT INTO [' + @DatabaseName + N'].dbo.Destinations
+            (Name, ImageUrl, PackageTerms, InvoiceTerms, IsActive, CreatedAt, CreatedBy)
+        VALUES (@Name, @ImageUrl, @PackageTerms, @InvoiceTerms, 1, GETUTCDATE(), @CreatedBy);
+        SELECT @NewId = SCOPE_IDENTITY();';
+    EXEC sp_executesql @sql,
+        N'@Name NVARCHAR(200), @ImageUrl NVARCHAR(500), @PackageTerms NVARCHAR(MAX), @InvoiceTerms NVARCHAR(MAX), @CreatedBy INT, @NewId INT OUTPUT',
+        @Name, @ImageUrl, @PackageTerms, @InvoiceTerms, @CreatedBy, @NewId OUTPUT;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Destination_Update
+    @DatabaseName  NVARCHAR(100),
+    @Id            INT,
+    @Name          NVARCHAR(200),
+    @ImageUrl      NVARCHAR(500) = NULL,
+    @PackageTerms  NVARCHAR(MAX) = NULL,
+    @InvoiceTerms  NVARCHAR(MAX) = NULL,
+    @UpdatedBy     INT           = 0
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        UPDATE [' + @DatabaseName + N'].dbo.Destinations
+        SET Name = @Name,
+            ImageUrl = ISNULL(@ImageUrl, ImageUrl),
+            PackageTerms = @PackageTerms,
+            InvoiceTerms = @InvoiceTerms,
+            UpdatedAt = GETUTCDATE(),
+            UpdatedBy = @UpdatedBy
+        WHERE Id = @Id';
+    EXEC sp_executesql @sql,
+        N'@Id INT, @Name NVARCHAR(200), @ImageUrl NVARCHAR(500), @PackageTerms NVARCHAR(MAX), @InvoiceTerms NVARCHAR(MAX), @UpdatedBy INT',
+        @Id, @Name, @ImageUrl, @PackageTerms, @InvoiceTerms, @UpdatedBy;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Destination_Delete
     @DatabaseName NVARCHAR(100),
-    @CustomerId   INT
+    @Id           INT
 AS BEGIN
     SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'SELECT * FROM [' + @DatabaseName + N'].dbo.Invoices WHERE CustomerId=@CustomerId AND IsDeleted=0 ORDER BY InvoiceDate DESC';
-    EXEC sp_executesql @sql, N'@CustomerId INT', @CustomerId;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Invoice_Insert
-    @DatabaseName       NVARCHAR(100),
-    @InvoiceNumber      NVARCHAR(20),
-    @BookingId          INT,
-    @CustomerId         INT,
-    @Status             TINYINT       = 0,
-    @InvoiceDate        DATE,
-    @DueDate            DATE,
-    @SubTotal           DECIMAL(12,2),
-    @TaxAmount          DECIMAL(12,2) = 0,
-    @DiscountAmount     DECIMAL(12,2) = 0,
-    @TotalAmount        DECIMAL(12,2),
-    @PaidAmount         DECIMAL(12,2) = 0,
-    @Notes              NVARCHAR(MAX) = NULL,
-    @TermsAndConditions NVARCHAR(MAX) = NULL,
-    @CreatedAt          DATETIME      = NULL,
-    @CreatedBy          INT           = NULL,
-    @NewId              INT OUTPUT
-AS BEGIN
-    SET NOCOUNT ON;
-    SET @CreatedAt = ISNULL(@CreatedAt, GETUTCDATE());
-
     DECLARE @sql NVARCHAR(MAX) = N'
-        INSERT INTO [' + @DatabaseName + N'].dbo.Invoices
-            (InvoiceNumber,BookingId,CustomerId,Status,InvoiceDate,DueDate,SubTotal,
-             TaxAmount,DiscountAmount,TotalAmount,PaidAmount,Notes,TermsAndConditions,
-             CreatedAt,CreatedBy,IsDeleted)
-        VALUES
-            (@InvoiceNumber,@BookingId,@CustomerId,@Status,@InvoiceDate,@DueDate,@SubTotal,
-             @TaxAmount,@DiscountAmount,@TotalAmount,@PaidAmount,@Notes,@TermsAndConditions,
-             @CreatedAt,@CreatedBy,0)';
-
-    EXEC sp_executesql @sql,
-        N'@InvoiceNumber NVARCHAR(20),@BookingId INT,@CustomerId INT,@Status TINYINT,
-          @InvoiceDate DATE,@DueDate DATE,@SubTotal DECIMAL(12,2),@TaxAmount DECIMAL(12,2),
-          @DiscountAmount DECIMAL(12,2),@TotalAmount DECIMAL(12,2),@PaidAmount DECIMAL(12,2),
-          @Notes NVARCHAR(MAX),@TermsAndConditions NVARCHAR(MAX),@CreatedAt DATETIME,@CreatedBy INT',
-        @InvoiceNumber,@BookingId,@CustomerId,@Status,@InvoiceDate,@DueDate,@SubTotal,
-        @TaxAmount,@DiscountAmount,@TotalAmount,@PaidAmount,@Notes,@TermsAndConditions,
-        @CreatedAt,@CreatedBy;
-
-    DECLARE @idSql NVARCHAR(MAX) = N'SELECT @NewId = MAX(Id) FROM [' + @DatabaseName + N'].dbo.Invoices';
-    EXEC sp_executesql @idSql, N'@NewId INT OUTPUT', @NewId OUTPUT;
+        UPDATE [' + @DatabaseName + N'].dbo.Destinations
+        SET IsActive = 0 WHERE Id = @Id';
+    EXEC sp_executesql @sql, N'@Id INT', @Id;
 END
 GO
 
-CREATE OR ALTER PROCEDURE sp_Invoice_Update
-    @DatabaseName       NVARCHAR(100),
-    @Id                 INT,
-    @Status             TINYINT,
-    @DueDate            DATE,
-    @SubTotal           DECIMAL(12,2),
-    @TaxAmount          DECIMAL(12,2),
-    @DiscountAmount     DECIMAL(12,2),
-    @TotalAmount        DECIMAL(12,2),
-    @PaidAmount         DECIMAL(12,2),
-    @Notes              NVARCHAR(MAX) = NULL,
-    @TermsAndConditions NVARCHAR(MAX) = NULL,
-    @UpdatedAt          DATETIME      = NULL,
-    @UpdatedBy          INT           = NULL
+CREATE OR ALTER PROCEDURE sp_DestinationReview_DeleteByDestination
+    @DatabaseName  NVARCHAR(100),
+    @DestinationId INT
 AS BEGIN
     SET NOCOUNT ON;
-    SET @UpdatedAt = ISNULL(@UpdatedAt, GETUTCDATE());
-
     DECLARE @sql NVARCHAR(MAX) = N'
-        UPDATE [' + @DatabaseName + N'].dbo.Invoices SET
-            Status=@Status,DueDate=@DueDate,SubTotal=@SubTotal,TaxAmount=@TaxAmount,
-            DiscountAmount=@DiscountAmount,TotalAmount=@TotalAmount,PaidAmount=@PaidAmount,
-            Notes=@Notes,TermsAndConditions=@TermsAndConditions,
-            UpdatedAt=@UpdatedAt,UpdatedBy=@UpdatedBy
-        WHERE Id=@Id';
-
-    EXEC sp_executesql @sql,
-        N'@Id INT,@Status TINYINT,@DueDate DATE,@SubTotal DECIMAL(12,2),@TaxAmount DECIMAL(12,2),
-          @DiscountAmount DECIMAL(12,2),@TotalAmount DECIMAL(12,2),@PaidAmount DECIMAL(12,2),
-          @Notes NVARCHAR(MAX),@TermsAndConditions NVARCHAR(MAX),@UpdatedAt DATETIME,@UpdatedBy INT',
-        @Id,@Status,@DueDate,@SubTotal,@TaxAmount,@DiscountAmount,@TotalAmount,@PaidAmount,
-        @Notes,@TermsAndConditions,@UpdatedAt,@UpdatedBy;
+        DELETE FROM [' + @DatabaseName + N'].dbo.DestinationReviews
+        WHERE DestinationId = @DestinationId';
+    EXEC sp_executesql @sql, N'@DestinationId INT', @DestinationId;
 END
 GO
 
-CREATE OR ALTER PROCEDURE sp_Invoice_GenerateNumber
+CREATE OR ALTER PROCEDURE sp_DestinationReview_Insert
+    @DatabaseName  NVARCHAR(100),
+    @DestinationId INT,
+    @TravelerName  NVARCHAR(200),
+    @ImageUrl      NVARCHAR(500) = NULL,
+    @ReviewText    NVARCHAR(MAX) = NULL,
+    @DisplayOrder  INT           = 0
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        INSERT INTO [' + @DatabaseName + N'].dbo.DestinationReviews
+            (DestinationId, TravelerName, ImageUrl, ReviewText, DisplayOrder)
+        VALUES (@DestinationId, @TravelerName, @ImageUrl, @ReviewText, @DisplayOrder)';
+    EXEC sp_executesql @sql,
+        N'@DestinationId INT, @TravelerName NVARCHAR(200), @ImageUrl NVARCHAR(500), @ReviewText NVARCHAR(MAX), @DisplayOrder INT',
+        @DestinationId, @TravelerName, @ImageUrl, @ReviewText, @DisplayOrder;
+END
+GO
+
+-- ============================================================
+-- ROOM TYPE PROCEDURES
+-- ============================================================
+CREATE OR ALTER PROCEDURE sp_RoomType_GetAll
     @DatabaseName NVARCHAR(100)
 AS BEGIN
     SET NOCOUNT ON;
-    DECLARE @count INT;
-    DECLARE @sql NVARCHAR(MAX) = N'SELECT @count = COUNT(1) FROM [' + @DatabaseName + N'].dbo.Invoices';
-    EXEC sp_executesql @sql, N'@count INT OUTPUT', @count OUTPUT;
-    SELECT 'INV' + FORMAT(GETDATE(), 'yyMM') + RIGHT('0000' + CAST(@count + 1 AS VARCHAR), 4);
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Payment_Insert
-    @DatabaseName    NVARCHAR(100),
-    @InvoiceId       INT,
-    @CustomerId      INT,
-    @BookingId       INT,
-    @Amount          DECIMAL(12,2),
-    @Method          TINYINT,
-    @PaymentDate     DATE,
-    @ReferenceNumber NVARCHAR(100) = NULL,
-    @Notes           NVARCHAR(500) = NULL,
-    @ReceivedBy      NVARCHAR(150),
-    @CreatedAt       DATETIME      = NULL,
-    @CreatedBy       INT           = NULL,
-    @NewId           INT OUTPUT
-AS BEGIN
-    SET NOCOUNT ON;
-    SET @CreatedAt = ISNULL(@CreatedAt, GETUTCDATE());
-
     DECLARE @sql NVARCHAR(MAX) = N'
-        INSERT INTO [' + @DatabaseName + N'].dbo.Payments
-            (InvoiceId,CustomerId,BookingId,Amount,Method,PaymentDate,
-             ReferenceNumber,Notes,ReceivedBy,CreatedAt,CreatedBy,IsDeleted)
-        VALUES
-            (@InvoiceId,@CustomerId,@BookingId,@Amount,@Method,@PaymentDate,
-             @ReferenceNumber,@Notes,@ReceivedBy,@CreatedAt,@CreatedBy,0);
-
-        UPDATE [' + @DatabaseName + N'].dbo.Invoices
-        SET PaidAmount = PaidAmount + @Amount,
-            Status = CASE WHEN PaidAmount + @Amount >= TotalAmount THEN 2 ELSE 1 END,
-            UpdatedAt = GETUTCDATE()
-        WHERE Id = @InvoiceId;
-
-        UPDATE [' + @DatabaseName + N'].dbo.Bookings
-        SET PaidAmount = PaidAmount + @Amount,
-            PaymentStatus = CASE WHEN PaidAmount + @Amount >= TotalAmount THEN 2
-                                 WHEN PaidAmount + @Amount > 0 THEN 1 ELSE 0 END,
-            UpdatedAt = GETUTCDATE()
-        WHERE Id = @BookingId;';
-
-    EXEC sp_executesql @sql,
-        N'@InvoiceId INT,@CustomerId INT,@BookingId INT,@Amount DECIMAL(12,2),@Method TINYINT,
-          @PaymentDate DATE,@ReferenceNumber NVARCHAR(100),@Notes NVARCHAR(500),
-          @ReceivedBy NVARCHAR(150),@CreatedAt DATETIME,@CreatedBy INT',
-        @InvoiceId,@CustomerId,@BookingId,@Amount,@Method,@PaymentDate,
-        @ReferenceNumber,@Notes,@ReceivedBy,@CreatedAt,@CreatedBy;
-
-    DECLARE @idSql NVARCHAR(MAX) = N'SELECT @NewId = MAX(Id) FROM [' + @DatabaseName + N'].dbo.Payments';
-    EXEC sp_executesql @idSql, N'@NewId INT OUTPUT', @NewId OUTPUT;
+        SELECT * FROM [' + @DatabaseName + N'].dbo.RoomTypes
+        WHERE IsActive = 1 ORDER BY Name';
+    EXEC sp_executesql @sql;
 END
 GO
 
-CREATE OR ALTER PROCEDURE sp_Payment_GetByInvoice
+CREATE OR ALTER PROCEDURE sp_RoomType_GetById
     @DatabaseName NVARCHAR(100),
-    @InvoiceId    INT
+    @Id           INT
 AS BEGIN
     SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'SELECT * FROM [' + @DatabaseName + N'].dbo.Payments WHERE InvoiceId=@InvoiceId AND IsDeleted=0 ORDER BY PaymentDate DESC';
-    EXEC sp_executesql @sql, N'@InvoiceId INT', @InvoiceId;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT * FROM [' + @DatabaseName + N'].dbo.RoomTypes WHERE Id = @Id';
+    EXEC sp_executesql @sql, N'@Id INT', @Id;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_RoomType_Insert
+    @DatabaseName NVARCHAR(100),
+    @Name         NVARCHAR(100),
+    @CreatedBy    INT = 0,
+    @NewId        INT OUTPUT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        INSERT INTO [' + @DatabaseName + N'].dbo.RoomTypes (Name, IsActive, CreatedAt, CreatedBy)
+        VALUES (@Name, 1, GETUTCDATE(), @CreatedBy);
+        SELECT @NewId = SCOPE_IDENTITY();';
+    EXEC sp_executesql @sql,
+        N'@Name NVARCHAR(100), @CreatedBy INT, @NewId INT OUTPUT',
+        @Name, @CreatedBy, @NewId OUTPUT;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_RoomType_Update
+    @DatabaseName NVARCHAR(100),
+    @Id           INT,
+    @Name         NVARCHAR(100),
+    @UpdatedBy    INT = 0
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        UPDATE [' + @DatabaseName + N'].dbo.RoomTypes
+        SET Name = @Name, UpdatedAt = GETUTCDATE(), UpdatedBy = @UpdatedBy
+        WHERE Id = @Id';
+    EXEC sp_executesql @sql,
+        N'@Id INT, @Name NVARCHAR(100), @UpdatedBy INT',
+        @Id, @Name, @UpdatedBy;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_RoomType_Delete
+    @DatabaseName NVARCHAR(100),
+    @Id           INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        UPDATE [' + @DatabaseName + N'].dbo.RoomTypes SET IsActive = 0 WHERE Id = @Id';
+    EXEC sp_executesql @sql, N'@Id INT', @Id;
+END
+GO
+
+-- ============================================================
+-- HOTEL PROCEDURES
+-- ============================================================
+CREATE OR ALTER PROCEDURE sp_Hotel_GetAll
+    @DatabaseName NVARCHAR(100)
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT h.*, d.Name AS DestinationName
+        FROM [' + @DatabaseName + N'].dbo.Hotels h
+        INNER JOIN [' + @DatabaseName + N'].dbo.Destinations d ON h.DestinationId = d.Id
+        WHERE h.IsActive = 1 ORDER BY d.Name, h.Name';
+    EXEC sp_executesql @sql;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Hotel_GetById
+    @DatabaseName NVARCHAR(100),
+    @Id           INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT h.*, d.Name AS DestinationName
+        FROM [' + @DatabaseName + N'].dbo.Hotels h
+        INNER JOIN [' + @DatabaseName + N'].dbo.Destinations d ON h.DestinationId = d.Id
+        WHERE h.Id = @Id';
+    EXEC sp_executesql @sql, N'@Id INT', @Id;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Hotel_Insert
+    @DatabaseName  NVARCHAR(100),
+    @DestinationId INT,
+    @Name          NVARCHAR(200),
+    @Category      TINYINT       = 3,
+    @ImageUrl      NVARCHAR(500) = NULL,
+    @CreatedBy     INT           = 0,
+    @NewId         INT OUTPUT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        INSERT INTO [' + @DatabaseName + N'].dbo.Hotels
+            (DestinationId, Name, Category, ImageUrl, IsActive, CreatedAt, CreatedBy)
+        VALUES (@DestinationId, @Name, @Category, @ImageUrl, 1, GETUTCDATE(), @CreatedBy);
+        SELECT @NewId = SCOPE_IDENTITY();';
+    EXEC sp_executesql @sql,
+        N'@DestinationId INT, @Name NVARCHAR(200), @Category TINYINT, @ImageUrl NVARCHAR(500), @CreatedBy INT, @NewId INT OUTPUT',
+        @DestinationId, @Name, @Category, @ImageUrl, @CreatedBy, @NewId OUTPUT;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Hotel_Update
+    @DatabaseName  NVARCHAR(100),
+    @Id            INT,
+    @DestinationId INT,
+    @Name          NVARCHAR(200),
+    @Category      TINYINT       = 3,
+    @ImageUrl      NVARCHAR(500) = NULL,
+    @UpdatedBy     INT           = 0
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        UPDATE [' + @DatabaseName + N'].dbo.Hotels
+        SET DestinationId = @DestinationId,
+            Name = @Name,
+            Category = @Category,
+            ImageUrl = ISNULL(@ImageUrl, ImageUrl),
+            UpdatedAt = GETUTCDATE(),
+            UpdatedBy = @UpdatedBy
+        WHERE Id = @Id';
+    EXEC sp_executesql @sql,
+        N'@Id INT, @DestinationId INT, @Name NVARCHAR(200), @Category TINYINT, @ImageUrl NVARCHAR(500), @UpdatedBy INT',
+        @Id, @DestinationId, @Name, @Category, @ImageUrl, @UpdatedBy;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Hotel_Delete
+    @DatabaseName NVARCHAR(100),
+    @Id           INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        UPDATE [' + @DatabaseName + N'].dbo.Hotels SET IsActive = 0 WHERE Id = @Id';
+    EXEC sp_executesql @sql, N'@Id INT', @Id;
+END
+GO
+
+-- ============================================================
+-- SIGHTSEEING PROCEDURES
+-- ============================================================
+CREATE OR ALTER PROCEDURE sp_Sightseeing_GetAll
+    @DatabaseName NVARCHAR(100)
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT s.*, d.Name AS DestinationName
+        FROM [' + @DatabaseName + N'].dbo.Sightseeings s
+        INNER JOIN [' + @DatabaseName + N'].dbo.Destinations d ON s.DestinationId = d.Id
+        WHERE s.IsActive = 1 ORDER BY d.Name, s.Name';
+    EXEC sp_executesql @sql;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Sightseeing_GetById
+    @DatabaseName NVARCHAR(100),
+    @Id           INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT s.*, d.Name AS DestinationName
+        FROM [' + @DatabaseName + N'].dbo.Sightseeings s
+        INNER JOIN [' + @DatabaseName + N'].dbo.Destinations d ON s.DestinationId = d.Id
+        WHERE s.Id = @Id';
+    EXEC sp_executesql @sql, N'@Id INT', @Id;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Sightseeing_Insert
+    @DatabaseName  NVARCHAR(100),
+    @DestinationId INT,
+    @Name          NVARCHAR(200),
+    @ImageUrl      NVARCHAR(500) = NULL,
+    @CreatedBy     INT           = 0,
+    @NewId         INT OUTPUT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        INSERT INTO [' + @DatabaseName + N'].dbo.Sightseeings
+            (DestinationId, Name, ImageUrl, IsActive, CreatedAt, CreatedBy)
+        VALUES (@DestinationId, @Name, @ImageUrl, 1, GETUTCDATE(), @CreatedBy);
+        SELECT @NewId = SCOPE_IDENTITY();';
+    EXEC sp_executesql @sql,
+        N'@DestinationId INT, @Name NVARCHAR(200), @ImageUrl NVARCHAR(500), @CreatedBy INT, @NewId INT OUTPUT',
+        @DestinationId, @Name, @ImageUrl, @CreatedBy, @NewId OUTPUT;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Sightseeing_Update
+    @DatabaseName  NVARCHAR(100),
+    @Id            INT,
+    @DestinationId INT,
+    @Name          NVARCHAR(200),
+    @ImageUrl      NVARCHAR(500) = NULL,
+    @UpdatedBy     INT           = 0
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        UPDATE [' + @DatabaseName + N'].dbo.Sightseeings
+        SET DestinationId = @DestinationId,
+            Name = @Name,
+            ImageUrl = ISNULL(@ImageUrl, ImageUrl),
+            UpdatedAt = GETUTCDATE(),
+            UpdatedBy = @UpdatedBy
+        WHERE Id = @Id';
+    EXEC sp_executesql @sql,
+        N'@Id INT, @DestinationId INT, @Name NVARCHAR(200), @ImageUrl NVARCHAR(500), @UpdatedBy INT',
+        @Id, @DestinationId, @Name, @ImageUrl, @UpdatedBy;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Sightseeing_Delete
+    @DatabaseName NVARCHAR(100),
+    @Id           INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        UPDATE [' + @DatabaseName + N'].dbo.Sightseeings SET IsActive = 0 WHERE Id = @Id';
+    EXEC sp_executesql @sql, N'@Id INT', @Id;
+END
+GO
+
+-- ============================================================
+-- ITINERARY PROCEDURES
+-- ============================================================
+CREATE OR ALTER PROCEDURE sp_Itinerary_GetAll
+    @DatabaseName NVARCHAR(100)
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT i.*, d.Name AS DestinationName
+        FROM [' + @DatabaseName + N'].dbo.Itineraries i
+        INNER JOIN [' + @DatabaseName + N'].dbo.Destinations d ON i.DestinationId = d.Id
+        WHERE i.IsActive = 1 ORDER BY d.Name, i.Title';
+    EXEC sp_executesql @sql;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Itinerary_GetById
+    @DatabaseName NVARCHAR(100),
+    @Id           INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT i.*, d.Name AS DestinationName
+        FROM [' + @DatabaseName + N'].dbo.Itineraries i
+        INNER JOIN [' + @DatabaseName + N'].dbo.Destinations d ON i.DestinationId = d.Id
+        WHERE i.Id = @Id';
+    EXEC sp_executesql @sql, N'@Id INT', @Id;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Itinerary_Insert
+    @DatabaseName  NVARCHAR(100),
+    @DestinationId INT,
+    @Title         NVARCHAR(300),
+    @Description   NVARCHAR(MAX) = NULL,
+    @CreatedBy     INT           = 0,
+    @NewId         INT OUTPUT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        INSERT INTO [' + @DatabaseName + N'].dbo.Itineraries
+            (DestinationId, Title, Description, IsActive, CreatedAt, CreatedBy)
+        VALUES (@DestinationId, @Title, @Description, 1, GETUTCDATE(), @CreatedBy);
+        SELECT @NewId = SCOPE_IDENTITY();';
+    EXEC sp_executesql @sql,
+        N'@DestinationId INT, @Title NVARCHAR(300), @Description NVARCHAR(MAX), @CreatedBy INT, @NewId INT OUTPUT',
+        @DestinationId, @Title, @Description, @CreatedBy, @NewId OUTPUT;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Itinerary_Update
+    @DatabaseName  NVARCHAR(100),
+    @Id            INT,
+    @DestinationId INT,
+    @Title         NVARCHAR(300),
+    @Description   NVARCHAR(MAX) = NULL,
+    @UpdatedBy     INT           = 0
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        UPDATE [' + @DatabaseName + N'].dbo.Itineraries
+        SET DestinationId = @DestinationId,
+            Title = @Title,
+            Description = @Description,
+            UpdatedAt = GETUTCDATE(),
+            UpdatedBy = @UpdatedBy
+        WHERE Id = @Id';
+    EXEC sp_executesql @sql,
+        N'@Id INT, @DestinationId INT, @Title NVARCHAR(300), @Description NVARCHAR(MAX), @UpdatedBy INT',
+        @Id, @DestinationId, @Title, @Description, @UpdatedBy;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Itinerary_Delete
+    @DatabaseName NVARCHAR(100),
+    @Id           INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        UPDATE [' + @DatabaseName + N'].dbo.Itineraries SET IsActive = 0 WHERE Id = @Id';
+    EXEC sp_executesql @sql, N'@Id INT', @Id;
+END
+GO
+
+-- ============================================================
+-- DESIGNATION PROCEDURES
+-- ============================================================
+CREATE OR ALTER PROCEDURE sp_Designation_GetAll
+    @DatabaseName NVARCHAR(100)
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT * FROM [' + @DatabaseName + N'].dbo.Designations WHERE IsActive = 1 ORDER BY Name';
+    EXEC sp_executesql @sql;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Designation_Insert
+    @DatabaseName NVARCHAR(100),
+    @Name         NVARCHAR(100),
+    @CreatedBy    INT = 0,
+    @NewId        INT OUTPUT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        INSERT INTO [' + @DatabaseName + N'].dbo.Designations (Name, IsActive, CreatedAt, CreatedBy)
+        VALUES (@Name, 1, GETUTCDATE(), @CreatedBy);
+        SELECT @NewId = SCOPE_IDENTITY();';
+    EXEC sp_executesql @sql,
+        N'@Name NVARCHAR(100), @CreatedBy INT, @NewId INT OUTPUT',
+        @Name, @CreatedBy, @NewId OUTPUT;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Designation_Update
+    @DatabaseName NVARCHAR(100),
+    @Id           INT,
+    @Name         NVARCHAR(100),
+    @UpdatedBy    INT = 0
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        UPDATE [' + @DatabaseName + N'].dbo.Designations
+        SET Name = @Name, UpdatedAt = GETUTCDATE(), UpdatedBy = @UpdatedBy
+        WHERE Id = @Id';
+    EXEC sp_executesql @sql,
+        N'@Id INT, @Name NVARCHAR(100), @UpdatedBy INT',
+        @Id, @Name, @UpdatedBy;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Designation_Delete
+    @DatabaseName NVARCHAR(100),
+    @Id           INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        UPDATE [' + @DatabaseName + N'].dbo.Designations SET IsActive = 0 WHERE Id = @Id';
+    EXEC sp_executesql @sql, N'@Id INT', @Id;
+END
+GO
+
+-- ============================================================
+-- LEAD SOURCE PROCEDURES
+-- ============================================================
+CREATE OR ALTER PROCEDURE sp_LeadSource_GetAll
+    @DatabaseName NVARCHAR(100)
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT * FROM [' + @DatabaseName + N'].dbo.LeadSources WHERE IsActive = 1 ORDER BY Name';
+    EXEC sp_executesql @sql;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_LeadSource_Insert
+    @DatabaseName NVARCHAR(100),
+    @Name         NVARCHAR(100),
+    @CreatedBy    INT = 0,
+    @NewId        INT OUTPUT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        INSERT INTO [' + @DatabaseName + N'].dbo.LeadSources (Name, IsActive, CreatedAt, CreatedBy)
+        VALUES (@Name, 1, GETUTCDATE(), @CreatedBy);
+        SELECT @NewId = SCOPE_IDENTITY();';
+    EXEC sp_executesql @sql,
+        N'@Name NVARCHAR(100), @CreatedBy INT, @NewId INT OUTPUT',
+        @Name, @CreatedBy, @NewId OUTPUT;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_LeadSource_Update
+    @DatabaseName NVARCHAR(100),
+    @Id           INT,
+    @Name         NVARCHAR(100),
+    @UpdatedBy    INT = 0
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        UPDATE [' + @DatabaseName + N'].dbo.LeadSources
+        SET Name = @Name, UpdatedAt = GETUTCDATE(), UpdatedBy = @UpdatedBy
+        WHERE Id = @Id';
+    EXEC sp_executesql @sql,
+        N'@Id INT, @Name NVARCHAR(100), @UpdatedBy INT',
+        @Id, @Name, @UpdatedBy;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_LeadSource_Delete
+    @DatabaseName NVARCHAR(100),
+    @Id           INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        UPDATE [' + @DatabaseName + N'].dbo.LeadSources SET IsActive = 0 WHERE Id = @Id';
+    EXEC sp_executesql @sql, N'@Id INT', @Id;
+END
+GO
+
+-- ============================================================
+-- VISA TYPE PROCEDURES
+-- ============================================================
+CREATE OR ALTER PROCEDURE sp_VisaType_GetAll
+    @DatabaseName NVARCHAR(100)
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT * FROM [' + @DatabaseName + N'].dbo.VisaTypes WHERE IsActive = 1 ORDER BY Country, Name';
+    EXEC sp_executesql @sql;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_VisaType_Insert
+    @DatabaseName NVARCHAR(100),
+    @Name         NVARCHAR(150),
+    @Country      NVARCHAR(100) = NULL,
+    @CreatedBy    INT = 0,
+    @NewId        INT OUTPUT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        INSERT INTO [' + @DatabaseName + N'].dbo.VisaTypes (Name, Country, IsActive, CreatedAt, CreatedBy)
+        VALUES (@Name, @Country, 1, GETUTCDATE(), @CreatedBy);
+        SELECT @NewId = SCOPE_IDENTITY();';
+    EXEC sp_executesql @sql,
+        N'@Name NVARCHAR(150), @Country NVARCHAR(100), @CreatedBy INT, @NewId INT OUTPUT',
+        @Name, @Country, @CreatedBy, @NewId OUTPUT;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_VisaType_Update
+    @DatabaseName NVARCHAR(100),
+    @Id           INT,
+    @Name         NVARCHAR(150),
+    @Country      NVARCHAR(100) = NULL,
+    @UpdatedBy    INT = 0
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        UPDATE [' + @DatabaseName + N'].dbo.VisaTypes
+        SET Name = @Name, Country = @Country,
+            UpdatedAt = GETUTCDATE(), UpdatedBy = @UpdatedBy
+        WHERE Id = @Id';
+    EXEC sp_executesql @sql,
+        N'@Id INT, @Name NVARCHAR(150), @Country NVARCHAR(100), @UpdatedBy INT',
+        @Id, @Name, @Country, @UpdatedBy;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_VisaType_Delete
+    @DatabaseName NVARCHAR(100),
+    @Id           INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        UPDATE [' + @DatabaseName + N'].dbo.VisaTypes SET IsActive = 0 WHERE Id = @Id';
+    EXEC sp_executesql @sql, N'@Id INT', @Id;
+END
+GO
+
+-- ============================================================
+-- MAIL TEMPLATE PROCEDURES
+-- ============================================================
+CREATE OR ALTER PROCEDURE sp_MailTemplate_GetAll
+    @DatabaseName NVARCHAR(100)
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT * FROM [' + @DatabaseName + N'].dbo.MailTemplates
+        WHERE IsActive = 1 ORDER BY Category, Name';
+    EXEC sp_executesql @sql;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_MailTemplate_GetById
+    @DatabaseName NVARCHAR(100),
+    @Id           INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT * FROM [' + @DatabaseName + N'].dbo.MailTemplates WHERE Id = @Id';
+    EXEC sp_executesql @sql, N'@Id INT', @Id;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_MailTemplate_Insert
+    @DatabaseName NVARCHAR(100),
+    @Name         NVARCHAR(150),
+    @Subject      NVARCHAR(300),
+    @Body         NVARCHAR(MAX) = NULL,
+    @Category     NVARCHAR(50)  = NULL,
+    @CreatedBy    INT = 0,
+    @NewId        INT OUTPUT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        INSERT INTO [' + @DatabaseName + N'].dbo.MailTemplates
+            (Name, Subject, Body, Category, IsActive, CreatedAt, CreatedBy)
+        VALUES (@Name, @Subject, @Body, @Category, 1, GETUTCDATE(), @CreatedBy);
+        SELECT @NewId = SCOPE_IDENTITY();';
+    EXEC sp_executesql @sql,
+        N'@Name NVARCHAR(150), @Subject NVARCHAR(300), @Body NVARCHAR(MAX), @Category NVARCHAR(50), @CreatedBy INT, @NewId INT OUTPUT',
+        @Name, @Subject, @Body, @Category, @CreatedBy, @NewId OUTPUT;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_MailTemplate_Update
+    @DatabaseName NVARCHAR(100),
+    @Id           INT,
+    @Name         NVARCHAR(150),
+    @Subject      NVARCHAR(300),
+    @Body         NVARCHAR(MAX) = NULL,
+    @Category     NVARCHAR(50)  = NULL,
+    @UpdatedBy    INT = 0
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        UPDATE [' + @DatabaseName + N'].dbo.MailTemplates
+        SET Name = @Name, Subject = @Subject, Body = @Body, Category = @Category,
+            UpdatedAt = GETUTCDATE(), UpdatedBy = @UpdatedBy
+        WHERE Id = @Id';
+    EXEC sp_executesql @sql,
+        N'@Id INT, @Name NVARCHAR(150), @Subject NVARCHAR(300), @Body NVARCHAR(MAX), @Category NVARCHAR(50), @UpdatedBy INT',
+        @Id, @Name, @Subject, @Body, @Category, @UpdatedBy;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_MailTemplate_Delete
+    @DatabaseName NVARCHAR(100),
+    @Id           INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        UPDATE [' + @DatabaseName + N'].dbo.MailTemplates SET IsActive = 0 WHERE Id = @Id';
+    EXEC sp_executesql @sql, N'@Id INT', @Id;
 END
 GO
 
 -- ============================================================
 -- EMPLOYEE PROCEDURES
 -- ============================================================
+CREATE OR ALTER PROCEDURE sp_Employee_GetAll
+    @DatabaseName NVARCHAR(100)
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT e.*, d.Name AS DesignationName
+        FROM [' + @DatabaseName + N'].dbo.Employees e
+        LEFT JOIN [' + @DatabaseName + N'].dbo.Designations d ON e.DesignationId = d.Id
+        WHERE e.IsActive = 1
+        ORDER BY e.FirstName, e.LastName';
+    EXEC sp_executesql @sql;
+END
+GO
 
 CREATE OR ALTER PROCEDURE sp_Employee_GetById
     @DatabaseName NVARCHAR(100),
     @Id           INT
 AS BEGIN
     SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'SELECT * FROM [' + @DatabaseName + N'].dbo.Employees WHERE Id=@Id AND IsDeleted=0';
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT e.*, d.Name AS DesignationName
+        FROM [' + @DatabaseName + N'].dbo.Employees e
+        LEFT JOIN [' + @DatabaseName + N'].dbo.Designations d ON e.DesignationId = d.Id
+        WHERE e.Id = @Id';
     EXEC sp_executesql @sql, N'@Id INT', @Id;
 END
 GO
 
-CREATE OR ALTER PROCEDURE sp_Employee_GetAll
-    @DatabaseName NVARCHAR(100),
-    @BranchId     INT = NULL
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'
-        SELECT * FROM [' + @DatabaseName + N'].dbo.Employees
-        WHERE IsDeleted=0 AND (@BranchId IS NULL OR BranchId=@BranchId)
-        ORDER BY FirstName, LastName';
-    EXEC sp_executesql @sql, N'@BranchId INT', @BranchId;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Employee_GetByDepartment
-    @DatabaseName NVARCHAR(100),
-    @Department   NVARCHAR(100)
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'SELECT * FROM [' + @DatabaseName + N'].dbo.Employees WHERE Department=@Department AND IsDeleted=0 ORDER BY FirstName';
-    EXEC sp_executesql @sql, N'@Department NVARCHAR(100)', @Department;
-END
-GO
-
 CREATE OR ALTER PROCEDURE sp_Employee_Insert
-    @DatabaseName    NVARCHAR(100),
-    @EmployeeCode    NVARCHAR(20),
-    @FirstName       NVARCHAR(100),
-    @LastName        NVARCHAR(100),
-    @Email           NVARCHAR(150),
-    @Phone           NVARCHAR(30),
-    @Gender          TINYINT       = NULL,
-    @DateOfBirth     DATE          = NULL,
-    @Designation     NVARCHAR(150),
-    @Department      NVARCHAR(100),
-    @BranchId        INT           = NULL,
-    @JoiningDate     DATE,
-    @Status          TINYINT       = 0,
-    @BasicSalary     DECIMAL(12,2) = 0,
-    @Address         NVARCHAR(300) = NULL,
-    @EmergencyContact NVARCHAR(200) = NULL,
-    @ProfileImageUrl NVARCHAR(500) = NULL,
-    @MasterUserId    INT           = NULL,
-    @CreatedAt       DATETIME      = NULL,
-    @CreatedBy       INT           = NULL,
-    @NewId           INT OUTPUT
+    @DatabaseName  NVARCHAR(100),
+    @UserId        INT           = NULL,
+    @DesignationId INT           = NULL,
+    @FirstName     NVARCHAR(100),
+    @LastName      NVARCHAR(100) = NULL,
+    @Email         NVARCHAR(150),
+    @Mobile        NVARCHAR(30)  = NULL,
+    @DateOfBirth   DATE          = NULL,
+    @ImageUrl      NVARCHAR(500) = NULL,
+    @ReplyEmail    NVARCHAR(150) = NULL,
+    @CreatedBy     INT           = 0,
+    @NewId         INT OUTPUT
 AS BEGIN
     SET NOCOUNT ON;
-    SET @CreatedAt = ISNULL(@CreatedAt, GETUTCDATE());
-
     DECLARE @sql NVARCHAR(MAX) = N'
         INSERT INTO [' + @DatabaseName + N'].dbo.Employees
-            (EmployeeCode,FirstName,LastName,Email,Phone,Gender,DateOfBirth,Designation,
-             Department,BranchId,JoiningDate,Status,BasicSalary,Address,EmergencyContact,
-             ProfileImageUrl,MasterUserId,CreatedAt,CreatedBy,IsDeleted)
-        VALUES
-            (@EmployeeCode,@FirstName,@LastName,@Email,@Phone,@Gender,@DateOfBirth,@Designation,
-             @Department,@BranchId,@JoiningDate,@Status,@BasicSalary,@Address,@EmergencyContact,
-             @ProfileImageUrl,@MasterUserId,@CreatedAt,@CreatedBy,0)';
-
+            (UserId, DesignationId, FirstName, LastName, Email, Mobile, DateOfBirth, ImageUrl, ReplyEmail,
+             IsActive, CreatedAt, CreatedBy)
+        VALUES (@UserId, @DesignationId, @FirstName, @LastName, @Email, @Mobile, @DateOfBirth, @ImageUrl, @ReplyEmail,
+            1, GETUTCDATE(), @CreatedBy);
+        SELECT @NewId = SCOPE_IDENTITY();';
     EXEC sp_executesql @sql,
-        N'@EmployeeCode NVARCHAR(20),@FirstName NVARCHAR(100),@LastName NVARCHAR(100),
-          @Email NVARCHAR(150),@Phone NVARCHAR(30),@Gender TINYINT,@DateOfBirth DATE,
-          @Designation NVARCHAR(150),@Department NVARCHAR(100),@BranchId INT,@JoiningDate DATE,
-          @Status TINYINT,@BasicSalary DECIMAL(12,2),@Address NVARCHAR(300),
-          @EmergencyContact NVARCHAR(200),@ProfileImageUrl NVARCHAR(500),
-          @MasterUserId INT,@CreatedAt DATETIME,@CreatedBy INT',
-        @EmployeeCode,@FirstName,@LastName,@Email,@Phone,@Gender,@DateOfBirth,@Designation,
-        @Department,@BranchId,@JoiningDate,@Status,@BasicSalary,@Address,@EmergencyContact,
-        @ProfileImageUrl,@MasterUserId,@CreatedAt,@CreatedBy;
-
-    DECLARE @idSql NVARCHAR(MAX) = N'SELECT @NewId = MAX(Id) FROM [' + @DatabaseName + N'].dbo.Employees';
-    EXEC sp_executesql @idSql, N'@NewId INT OUTPUT', @NewId OUTPUT;
+        N'@UserId INT, @DesignationId INT, @FirstName NVARCHAR(100), @LastName NVARCHAR(100), @Email NVARCHAR(150), @Mobile NVARCHAR(30), @DateOfBirth DATE, @ImageUrl NVARCHAR(500), @ReplyEmail NVARCHAR(150), @CreatedBy INT, @NewId INT OUTPUT',
+        @UserId, @DesignationId, @FirstName, @LastName, @Email, @Mobile, @DateOfBirth, @ImageUrl, @ReplyEmail, @CreatedBy, @NewId OUTPUT;
 END
 GO
 
 CREATE OR ALTER PROCEDURE sp_Employee_Update
-    @DatabaseName    NVARCHAR(100),
-    @Id              INT,
-    @FirstName       NVARCHAR(100),
-    @LastName        NVARCHAR(100),
-    @Email           NVARCHAR(150),
-    @Phone           NVARCHAR(30),
-    @Gender          TINYINT       = NULL,
-    @DateOfBirth     DATE          = NULL,
-    @Designation     NVARCHAR(150),
-    @Department      NVARCHAR(100),
-    @BranchId        INT           = NULL,
-    @Status          TINYINT,
-    @BasicSalary     DECIMAL(12,2),
-    @Address         NVARCHAR(300) = NULL,
-    @EmergencyContact NVARCHAR(200) = NULL,
-    @ProfileImageUrl NVARCHAR(500) = NULL,
-    @UpdatedAt       DATETIME      = NULL,
-    @UpdatedBy       INT           = NULL
+    @DatabaseName  NVARCHAR(100),
+    @Id            INT,
+    @DesignationId INT           = NULL,
+    @FirstName     NVARCHAR(100),
+    @LastName      NVARCHAR(100) = NULL,
+    @Email         NVARCHAR(150),
+    @Mobile        NVARCHAR(30)  = NULL,
+    @DateOfBirth   DATE          = NULL,
+    @ImageUrl      NVARCHAR(500) = NULL,
+    @ReplyEmail    NVARCHAR(150) = NULL,
+    @UpdatedBy     INT           = 0
 AS BEGIN
     SET NOCOUNT ON;
-    SET @UpdatedAt = ISNULL(@UpdatedAt, GETUTCDATE());
-
     DECLARE @sql NVARCHAR(MAX) = N'
-        UPDATE [' + @DatabaseName + N'].dbo.Employees SET
-            FirstName=@FirstName,LastName=@LastName,Email=@Email,Phone=@Phone,
-            Gender=@Gender,DateOfBirth=@DateOfBirth,Designation=@Designation,
-            Department=@Department,BranchId=@BranchId,Status=@Status,BasicSalary=@BasicSalary,
-            Address=@Address,EmergencyContact=@EmergencyContact,ProfileImageUrl=@ProfileImageUrl,
-            UpdatedAt=@UpdatedAt,UpdatedBy=@UpdatedBy
-        WHERE Id=@Id';
-
+        UPDATE [' + @DatabaseName + N'].dbo.Employees
+        SET DesignationId = @DesignationId,
+            FirstName = @FirstName,
+            LastName = @LastName,
+            Email = @Email,
+            Mobile = @Mobile,
+            DateOfBirth = @DateOfBirth,
+            ImageUrl = ISNULL(@ImageUrl, ImageUrl),
+            ReplyEmail = @ReplyEmail,
+            UpdatedAt = GETUTCDATE(),
+            UpdatedBy = @UpdatedBy
+        WHERE Id = @Id';
     EXEC sp_executesql @sql,
-        N'@Id INT,@FirstName NVARCHAR(100),@LastName NVARCHAR(100),@Email NVARCHAR(150),
-          @Phone NVARCHAR(30),@Gender TINYINT,@DateOfBirth DATE,@Designation NVARCHAR(150),
-          @Department NVARCHAR(100),@BranchId INT,@Status TINYINT,@BasicSalary DECIMAL(12,2),
-          @Address NVARCHAR(300),@EmergencyContact NVARCHAR(200),@ProfileImageUrl NVARCHAR(500),
-          @UpdatedAt DATETIME,@UpdatedBy INT',
-        @Id,@FirstName,@LastName,@Email,@Phone,@Gender,@DateOfBirth,@Designation,
-        @Department,@BranchId,@Status,@BasicSalary,@Address,@EmergencyContact,
-        @ProfileImageUrl,@UpdatedAt,@UpdatedBy;
+        N'@Id INT, @DesignationId INT, @FirstName NVARCHAR(100), @LastName NVARCHAR(100), @Email NVARCHAR(150), @Mobile NVARCHAR(30), @DateOfBirth DATE, @ImageUrl NVARCHAR(500), @ReplyEmail NVARCHAR(150), @UpdatedBy INT',
+        @Id, @DesignationId, @FirstName, @LastName, @Email, @Mobile, @DateOfBirth, @ImageUrl, @ReplyEmail, @UpdatedBy;
 END
 GO
 
@@ -1214,553 +1148,938 @@ CREATE OR ALTER PROCEDURE sp_Employee_Delete
     @Id           INT
 AS BEGIN
     SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'UPDATE [' + @DatabaseName + N'].dbo.Employees SET IsDeleted=1,Status=1,UpdatedAt=GETUTCDATE() WHERE Id=@Id';
+    DECLARE @sql NVARCHAR(MAX) = N'
+        UPDATE [' + @DatabaseName + N'].dbo.Employees SET IsActive = 0 WHERE Id = @Id';
     EXEC sp_executesql @sql, N'@Id INT', @Id;
 END
 GO
 
-CREATE OR ALTER PROCEDURE sp_Employee_GenerateCode
+-- ============================================================
+-- MEAL PLAN PROCEDURES
+-- ============================================================
+CREATE OR ALTER PROCEDURE sp_MealPlan_GetAll
     @DatabaseName NVARCHAR(100)
 AS BEGIN
     SET NOCOUNT ON;
-    DECLARE @count INT;
-    DECLARE @sql NVARCHAR(MAX) = N'SELECT @count = COUNT(1) FROM [' + @DatabaseName + N'].dbo.Employees';
-    EXEC sp_executesql @sql, N'@count INT OUTPUT', @count OUTPUT;
-    SELECT 'EMP' + RIGHT('00000' + CAST(@count + 1 AS VARCHAR), 5);
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Employee_GetTotalCount
-    @DatabaseName NVARCHAR(100)
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'SELECT COUNT(1) FROM [' + @DatabaseName + N'].dbo.Employees WHERE IsDeleted=0 AND Status=0';
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT * FROM [' + @DatabaseName + N'].dbo.MealPlans WHERE IsActive = 1 ORDER BY Code';
     EXEC sp_executesql @sql;
 END
 GO
 
--- ============================================================
--- LEAVE PROCEDURES
--- ============================================================
-
-CREATE OR ALTER PROCEDURE sp_Leave_Insert
+CREATE OR ALTER PROCEDURE sp_MealPlan_Insert
     @DatabaseName NVARCHAR(100),
-    @EmployeeId   INT,
-    @LeaveType    TINYINT,
-    @FromDate     DATE,
-    @ToDate       DATE,
-    @TotalDays    INT,
-    @Reason       NVARCHAR(500),
-    @Status       TINYINT  = 0,
-    @CreatedAt    DATETIME = NULL,
-    @CreatedBy    INT      = NULL,
+    @Code         NVARCHAR(10),
+    @Name         NVARCHAR(100),
+    @CreatedBy    INT = 0,
     @NewId        INT OUTPUT
 AS BEGIN
     SET NOCOUNT ON;
-    SET @CreatedAt = ISNULL(@CreatedAt, GETUTCDATE());
-
     DECLARE @sql NVARCHAR(MAX) = N'
-        INSERT INTO [' + @DatabaseName + N'].dbo.LeaveRequests
-            (EmployeeId,LeaveType,FromDate,ToDate,TotalDays,Reason,Status,CreatedAt,CreatedBy,IsDeleted)
-        VALUES (@EmployeeId,@LeaveType,@FromDate,@ToDate,@TotalDays,@Reason,@Status,@CreatedAt,@CreatedBy,0)';
-
+        INSERT INTO [' + @DatabaseName + N'].dbo.MealPlans (Code, Name, IsActive, CreatedAt, CreatedBy)
+        VALUES (@Code, @Name, 1, GETUTCDATE(), @CreatedBy);
+        SELECT @NewId = SCOPE_IDENTITY();';
     EXEC sp_executesql @sql,
-        N'@EmployeeId INT,@LeaveType TINYINT,@FromDate DATE,@ToDate DATE,@TotalDays INT,
-          @Reason NVARCHAR(500),@Status TINYINT,@CreatedAt DATETIME,@CreatedBy INT',
-        @EmployeeId,@LeaveType,@FromDate,@ToDate,@TotalDays,@Reason,@Status,@CreatedAt,@CreatedBy;
-
-    DECLARE @idSql NVARCHAR(MAX) = N'SELECT @NewId = MAX(Id) FROM [' + @DatabaseName + N'].dbo.LeaveRequests';
-    EXEC sp_executesql @idSql, N'@NewId INT OUTPUT', @NewId OUTPUT;
+        N'@Code NVARCHAR(10), @Name NVARCHAR(100), @CreatedBy INT, @NewId INT OUTPUT',
+        @Code, @Name, @CreatedBy, @NewId OUTPUT;
 END
 GO
 
-CREATE OR ALTER PROCEDURE sp_Leave_GetByEmployee
+CREATE OR ALTER PROCEDURE sp_MealPlan_Update
     @DatabaseName NVARCHAR(100),
-    @EmployeeId   INT
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'SELECT * FROM [' + @DatabaseName + N'].dbo.LeaveRequests WHERE EmployeeId=@EmployeeId AND IsDeleted=0 ORDER BY FromDate DESC';
-    EXEC sp_executesql @sql, N'@EmployeeId INT', @EmployeeId;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Leave_GetPending
-    @DatabaseName NVARCHAR(100)
+    @Id           INT,
+    @Code         NVARCHAR(10),
+    @Name         NVARCHAR(100),
+    @UpdatedBy    INT = 0
 AS BEGIN
     SET NOCOUNT ON;
     DECLARE @sql NVARCHAR(MAX) = N'
-        SELECT l.*, e.FirstName, e.LastName, e.Department, e.Designation
-        FROM [' + @DatabaseName + N'].dbo.LeaveRequests l
-        INNER JOIN [' + @DatabaseName + N'].dbo.Employees e ON l.EmployeeId = e.Id
-        WHERE l.Status=0 AND l.IsDeleted=0 ORDER BY l.CreatedAt';
-    EXEC sp_executesql @sql;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Leave_UpdateStatus
-    @DatabaseName    NVARCHAR(100),
-    @Id              INT,
-    @Status          TINYINT,
-    @ApprovedById    INT,
-    @ApproverRemarks NVARCHAR(500) = NULL,
-    @ActionDate      DATETIME      = NULL
-AS BEGIN
-    SET NOCOUNT ON;
-    SET @ActionDate = ISNULL(@ActionDate, GETUTCDATE());
-
-    DECLARE @sql NVARCHAR(MAX) = N'
-        UPDATE [' + @DatabaseName + N'].dbo.LeaveRequests SET
-            Status=@Status,ApprovedById=@ApprovedById,ApproverRemarks=@ApproverRemarks,
-            ActionDate=@ActionDate,UpdatedAt=GETUTCDATE()
-        WHERE Id=@Id';
-
+        UPDATE [' + @DatabaseName + N'].dbo.MealPlans
+        SET Code = @Code, Name = @Name, UpdatedAt = GETUTCDATE(), UpdatedBy = @UpdatedBy
+        WHERE Id = @Id';
     EXEC sp_executesql @sql,
-        N'@Id INT,@Status TINYINT,@ApprovedById INT,@ApproverRemarks NVARCHAR(500),@ActionDate DATETIME',
-        @Id,@Status,@ApprovedById,@ApproverRemarks,@ActionDate;
+        N'@Id INT, @Code NVARCHAR(10), @Name NVARCHAR(100), @UpdatedBy INT',
+        @Id, @Code, @Name, @UpdatedBy;
 END
 GO
 
--- ============================================================
--- VISA PROCEDURES
--- ============================================================
-
-CREATE OR ALTER PROCEDURE sp_Visa_GetById
+CREATE OR ALTER PROCEDURE sp_MealPlan_Delete
     @DatabaseName NVARCHAR(100),
     @Id           INT
 AS BEGIN
     SET NOCOUNT ON;
     DECLARE @sql NVARCHAR(MAX) = N'
-        SELECT v.*, c.Name AS CustomerName, c.PassportNumber
-        FROM [' + @DatabaseName + N'].dbo.VisaApplications v
-        LEFT JOIN [' + @DatabaseName + N'].dbo.Customers c ON v.CustomerId = c.Id
-        WHERE v.Id=@Id AND v.IsDeleted=0';
+        UPDATE [' + @DatabaseName + N'].dbo.MealPlans SET IsActive = 0 WHERE Id = @Id';
     EXEC sp_executesql @sql, N'@Id INT', @Id;
 END
 GO
 
-CREATE OR ALTER PROCEDURE sp_Visa_GetAll
+-- ============================================================
+-- BANK ACCOUNT PROCEDURES
+-- ============================================================
+CREATE OR ALTER PROCEDURE sp_BankAccount_GetAll
     @DatabaseName NVARCHAR(100)
 AS BEGIN
     SET NOCOUNT ON;
     DECLARE @sql NVARCHAR(MAX) = N'
-        SELECT v.*, c.Name AS CustomerName
-        FROM [' + @DatabaseName + N'].dbo.VisaApplications v
-        LEFT JOIN [' + @DatabaseName + N'].dbo.Customers c ON v.CustomerId = c.Id
-        WHERE v.IsDeleted=0 ORDER BY v.CreatedAt DESC';
+        SELECT * FROM [' + @DatabaseName + N'].dbo.BankAccounts
+        WHERE IsActive = 1 ORDER BY IsDefault DESC, BankName';
     EXEC sp_executesql @sql;
 END
 GO
 
-CREATE OR ALTER PROCEDURE sp_Visa_GetByCustomer
+CREATE OR ALTER PROCEDURE sp_BankAccount_GetById
     @DatabaseName NVARCHAR(100),
-    @CustomerId   INT
+    @Id           INT
 AS BEGIN
     SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'SELECT * FROM [' + @DatabaseName + N'].dbo.VisaApplications WHERE CustomerId=@CustomerId AND IsDeleted=0 ORDER BY CreatedAt DESC';
-    EXEC sp_executesql @sql, N'@CustomerId INT', @CustomerId;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT * FROM [' + @DatabaseName + N'].dbo.BankAccounts WHERE Id = @Id';
+    EXEC sp_executesql @sql, N'@Id INT', @Id;
 END
 GO
 
-CREATE OR ALTER PROCEDURE sp_Visa_Insert
+CREATE OR ALTER PROCEDURE sp_BankAccount_Insert
+    @DatabaseName  NVARCHAR(100),
+    @BankName      NVARCHAR(150),
+    @HolderName    NVARCHAR(150),
+    @AccountNumber NVARCHAR(50),
+    @IfscCode      NVARCHAR(20)  = NULL,
+    @Branch        NVARCHAR(150) = NULL,
+    @AccountType   NVARCHAR(20)  = NULL,
+    @UpiId         NVARCHAR(100) = NULL,
+    @IsDefault     BIT           = 0,
+    @CreatedBy     INT           = 0,
+    @NewId         INT OUTPUT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        IF @IsDefault = 1
+            UPDATE [' + @DatabaseName + N'].dbo.BankAccounts SET IsDefault = 0 WHERE IsDefault = 1;
+        INSERT INTO [' + @DatabaseName + N'].dbo.BankAccounts
+            (BankName, HolderName, AccountNumber, IfscCode, Branch, AccountType, UpiId,
+             IsDefault, IsActive, CreatedAt, CreatedBy)
+        VALUES (@BankName, @HolderName, @AccountNumber, @IfscCode, @Branch, @AccountType, @UpiId,
+            @IsDefault, 1, GETUTCDATE(), @CreatedBy);
+        SELECT @NewId = SCOPE_IDENTITY();';
+    EXEC sp_executesql @sql,
+        N'@BankName NVARCHAR(150), @HolderName NVARCHAR(150), @AccountNumber NVARCHAR(50), @IfscCode NVARCHAR(20), @Branch NVARCHAR(150), @AccountType NVARCHAR(20), @UpiId NVARCHAR(100), @IsDefault BIT, @CreatedBy INT, @NewId INT OUTPUT',
+        @BankName, @HolderName, @AccountNumber, @IfscCode, @Branch, @AccountType, @UpiId, @IsDefault, @CreatedBy, @NewId OUTPUT;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_BankAccount_Update
+    @DatabaseName  NVARCHAR(100),
+    @Id            INT,
+    @BankName      NVARCHAR(150),
+    @HolderName    NVARCHAR(150),
+    @AccountNumber NVARCHAR(50),
+    @IfscCode      NVARCHAR(20)  = NULL,
+    @Branch        NVARCHAR(150) = NULL,
+    @AccountType   NVARCHAR(20)  = NULL,
+    @UpiId         NVARCHAR(100) = NULL,
+    @IsDefault     BIT           = 0,
+    @UpdatedBy     INT           = 0
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        IF @IsDefault = 1
+            UPDATE [' + @DatabaseName + N'].dbo.BankAccounts SET IsDefault = 0 WHERE IsDefault = 1 AND Id <> @Id;
+        UPDATE [' + @DatabaseName + N'].dbo.BankAccounts
+        SET BankName = @BankName, HolderName = @HolderName, AccountNumber = @AccountNumber,
+            IfscCode = @IfscCode, Branch = @Branch, AccountType = @AccountType, UpiId = @UpiId,
+            IsDefault = @IsDefault, UpdatedAt = GETUTCDATE(), UpdatedBy = @UpdatedBy
+        WHERE Id = @Id';
+    EXEC sp_executesql @sql,
+        N'@Id INT, @BankName NVARCHAR(150), @HolderName NVARCHAR(150), @AccountNumber NVARCHAR(50), @IfscCode NVARCHAR(20), @Branch NVARCHAR(150), @AccountType NVARCHAR(20), @UpiId NVARCHAR(100), @IsDefault BIT, @UpdatedBy INT',
+        @Id, @BankName, @HolderName, @AccountNumber, @IfscCode, @Branch, @AccountType, @UpiId, @IsDefault, @UpdatedBy;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_BankAccount_Delete
+    @DatabaseName NVARCHAR(100),
+    @Id           INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        UPDATE [' + @DatabaseName + N'].dbo.BankAccounts SET IsActive = 0 WHERE Id = @Id';
+    EXEC sp_executesql @sql, N'@Id INT', @Id;
+END
+GO
+
+-- ============================================================
+-- LEAD STATUS PROCEDURES
+-- ============================================================
+CREATE OR ALTER PROCEDURE sp_LeadStatus_GetAll
+    @DatabaseName NVARCHAR(100)
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT * FROM [' + @DatabaseName + N'].dbo.LeadStatuses
+        WHERE IsActive = 1 ORDER BY DisplayOrder, Id';
+    EXEC sp_executesql @sql;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_LeadStatus_Insert
+    @DatabaseName NVARCHAR(100),
+    @Name         NVARCHAR(100),
+    @Color        NVARCHAR(20)  = 'secondary',
+    @DisplayOrder INT           = 0,
+    @IsDefault    BIT           = 0,
+    @IsClosed     BIT           = 0,
+    @CreatedBy    INT           = 0,
+    @NewId        INT OUTPUT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        IF @IsDefault = 1
+            UPDATE [' + @DatabaseName + N'].dbo.LeadStatuses SET IsDefault = 0 WHERE IsDefault = 1;
+        INSERT INTO [' + @DatabaseName + N'].dbo.LeadStatuses
+            (Name, Color, DisplayOrder, IsDefault, IsClosed, IsActive, CreatedAt, CreatedBy)
+        VALUES (@Name, @Color, @DisplayOrder, @IsDefault, @IsClosed, 1, GETUTCDATE(), @CreatedBy);
+        SELECT @NewId = SCOPE_IDENTITY();';
+    EXEC sp_executesql @sql,
+        N'@Name NVARCHAR(100), @Color NVARCHAR(20), @DisplayOrder INT, @IsDefault BIT, @IsClosed BIT, @CreatedBy INT, @NewId INT OUTPUT',
+        @Name, @Color, @DisplayOrder, @IsDefault, @IsClosed, @CreatedBy, @NewId OUTPUT;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_LeadStatus_Update
+    @DatabaseName NVARCHAR(100),
+    @Id           INT,
+    @Name         NVARCHAR(100),
+    @Color        NVARCHAR(20)  = 'secondary',
+    @DisplayOrder INT           = 0,
+    @IsDefault    BIT           = 0,
+    @IsClosed     BIT           = 0,
+    @UpdatedBy    INT           = 0
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        IF @IsDefault = 1
+            UPDATE [' + @DatabaseName + N'].dbo.LeadStatuses SET IsDefault = 0 WHERE IsDefault = 1 AND Id <> @Id;
+        UPDATE [' + @DatabaseName + N'].dbo.LeadStatuses
+        SET Name = @Name, Color = @Color, DisplayOrder = @DisplayOrder,
+            IsDefault = @IsDefault, IsClosed = @IsClosed,
+            UpdatedAt = GETUTCDATE(), UpdatedBy = @UpdatedBy
+        WHERE Id = @Id';
+    EXEC sp_executesql @sql,
+        N'@Id INT, @Name NVARCHAR(100), @Color NVARCHAR(20), @DisplayOrder INT, @IsDefault BIT, @IsClosed BIT, @UpdatedBy INT',
+        @Id, @Name, @Color, @DisplayOrder, @IsDefault, @IsClosed, @UpdatedBy;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_LeadStatus_Delete
+    @DatabaseName NVARCHAR(100),
+    @Id           INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        UPDATE [' + @DatabaseName + N'].dbo.LeadStatuses SET IsActive = 0 WHERE Id = @Id';
+    EXEC sp_executesql @sql, N'@Id INT', @Id;
+END
+GO
+
+-- ============================================================
+-- LEAD PROCEDURES
+-- ============================================================
+CREATE OR ALTER PROCEDURE sp_Lead_GetAll
+    @DatabaseName  NVARCHAR(100),
+    @StatusId      INT          = NULL,
+    @SourceId      INT          = NULL,
+    @AssignedTo    INT          = NULL,
+    @DestinationId INT          = NULL,
+    @DateFrom      DATE         = NULL,
+    @DateTo        DATE         = NULL,
+    @Search        NVARCHAR(150)= NULL,
+    @ShowClosed    BIT          = 0,
+    @Page          INT          = 1,
+    @PageSize      INT          = 10
+AS BEGIN
+    SET NOCOUNT ON;
+    IF @Page < 1 SET @Page = 1;
+    IF @PageSize < 1 SET @PageSize = 10;
+    IF @PageSize > 200 SET @PageSize = 200;
+
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT l.*,
+               s.Name AS StatusName, s.Color AS StatusColor, s.IsClosed AS StatusIsClosed,
+               src.Name AS SourceName,
+               d.Name AS DestinationName,
+               COUNT(*) OVER() AS TotalCount
+        FROM [' + @DatabaseName + N'].dbo.Leads l
+        LEFT JOIN [' + @DatabaseName + N'].dbo.LeadStatuses s   ON l.StatusId = s.Id
+        LEFT JOIN [' + @DatabaseName + N'].dbo.LeadSources  src ON l.SourceId = src.Id
+        LEFT JOIN [' + @DatabaseName + N'].dbo.Destinations d   ON l.DestinationId = d.Id
+        WHERE l.IsActive = 1
+          AND (@StatusId      IS NULL OR l.StatusId = @StatusId)
+          AND (@SourceId      IS NULL OR l.SourceId = @SourceId)
+          AND (@AssignedTo    IS NULL OR l.AssignedToUserId = @AssignedTo)
+          AND (@DestinationId IS NULL OR l.DestinationId = @DestinationId)
+          AND (@DateFrom      IS NULL OR CAST(l.CreatedAt AS DATE) >= @DateFrom)
+          AND (@DateTo        IS NULL OR CAST(l.CreatedAt AS DATE) <= @DateTo)
+          AND (@ShowClosed = 1 OR s.IsClosed = 0 OR s.IsClosed IS NULL)
+          AND (@Search IS NULL OR
+               l.Name LIKE ''%'' + @Search + ''%'' OR
+               l.Mobile LIKE ''%'' + @Search + ''%'' OR
+               l.Email LIKE ''%'' + @Search + ''%'' OR
+               l.LeadNumber LIKE ''%'' + @Search + ''%'')
+        ORDER BY l.CreatedAt DESC
+        OFFSET ((@Page - 1) * @PageSize) ROWS
+        FETCH NEXT @PageSize ROWS ONLY';
+    EXEC sp_executesql @sql,
+        N'@StatusId INT, @SourceId INT, @AssignedTo INT, @DestinationId INT, @DateFrom DATE, @DateTo DATE, @Search NVARCHAR(150), @ShowClosed BIT, @Page INT, @PageSize INT',
+        @StatusId, @SourceId, @AssignedTo, @DestinationId, @DateFrom, @DateTo, @Search, @ShowClosed, @Page, @PageSize;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Lead_GetById
+    @DatabaseName NVARCHAR(100),
+    @Id           INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT l.*,
+               s.Name AS StatusName, s.Color AS StatusColor, s.IsClosed AS StatusIsClosed,
+               src.Name AS SourceName,
+               d.Name AS DestinationName
+        FROM [' + @DatabaseName + N'].dbo.Leads l
+        LEFT JOIN [' + @DatabaseName + N'].dbo.LeadStatuses s   ON l.StatusId = s.Id
+        LEFT JOIN [' + @DatabaseName + N'].dbo.LeadSources  src ON l.SourceId = src.Id
+        LEFT JOIN [' + @DatabaseName + N'].dbo.Destinations d   ON l.DestinationId = d.Id
+        WHERE l.Id = @Id';
+    EXEC sp_executesql @sql, N'@Id INT', @Id;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Lead_Insert
+    @DatabaseName       NVARCHAR(100),
+    @Prefix             NVARCHAR(20)  = 'LD',
+    @StatusId           INT           = NULL,
+    @SourceId           INT           = NULL,
+    @AssignedToUserId   INT           = NULL,
+    @DestinationId      INT           = NULL,
+    @Name               NVARCHAR(150),
+    @Mobile             NVARCHAR(30)  = NULL,
+    @Email              NVARCHAR(150) = NULL,
+    @TravelingDate      DATE          = NULL,
+    @LeavingFrom        NVARCHAR(150) = NULL,
+    @HotelRecommended   NVARCHAR(200) = NULL,
+    @Adults             INT           = 1,
+    @Children           INT           = 0,
+    @Infants            INT           = 0,
+    @Days               INT           = NULL,
+    @Remark             NVARCHAR(MAX) = NULL,
+    @CreatedBy          INT           = 0,
+    @NewId              INT OUTPUT,
+    @LeadNumber         NVARCHAR(30) OUTPUT
+AS BEGIN
+    SET NOCOUNT ON;
+
+    IF @Prefix IS NULL OR LEN(@Prefix) = 0 SET @Prefix = N'LD';
+
+    -- Default StatusId to the configured default if not provided
+    IF @StatusId IS NULL
+    BEGIN
+        DECLARE @lookupSql NVARCHAR(MAX) = N'
+            SELECT TOP 1 @StatusOut = Id FROM [' + @DatabaseName + N'].dbo.LeadStatuses
+            WHERE IsDefault = 1 AND IsActive = 1';
+        EXEC sp_executesql @lookupSql, N'@StatusOut INT OUTPUT', @StatusOut = @StatusId OUTPUT;
+    END
+
+    -- Generate LeadNumber: {Prefix}-YYYY-NNNN (per-tenant per-year)
+    DECLARE @year INT = YEAR(GETUTCDATE());
+    DECLARE @count INT = 0;
+    DECLARE @prefixPattern NVARCHAR(50) = @Prefix + N'-' + CAST(@year AS NVARCHAR(4)) + N'-%';
+    DECLARE @countSql NVARCHAR(MAX) = N'
+        SELECT @c = COUNT(1) FROM [' + @DatabaseName + N'].dbo.Leads
+        WHERE LeadNumber LIKE @pat';
+    EXEC sp_executesql @countSql,
+        N'@c INT OUTPUT, @pat NVARCHAR(50)',
+        @c = @count OUTPUT, @pat = @prefixPattern;
+    SET @LeadNumber = @Prefix + N'-' + CAST(@year AS NVARCHAR(4)) + N'-' +
+                      RIGHT(N'0000' + CAST((@count + 1) AS NVARCHAR(10)), 4);
+
+    DECLARE @sql NVARCHAR(MAX) = N'
+        INSERT INTO [' + @DatabaseName + N'].dbo.Leads
+            (LeadNumber, StatusId, SourceId, AssignedToUserId, DestinationId,
+             Name, Mobile, Email, TravelingDate, LeavingFrom, HotelRecommended,
+             Adults, Children, Infants, Days, Remark,
+             IsActive, CreatedAt, CreatedBy)
+        VALUES (@LeadNumber, @StatusId, @SourceId, @AssignedToUserId, @DestinationId,
+            @Name, @Mobile, @Email, @TravelingDate, @LeavingFrom, @HotelRecommended,
+            @Adults, @Children, @Infants, @Days, @Remark,
+            1, GETUTCDATE(), @CreatedBy);
+        SELECT @NewId = SCOPE_IDENTITY();';
+    EXEC sp_executesql @sql,
+        N'@LeadNumber NVARCHAR(30), @StatusId INT, @SourceId INT, @AssignedToUserId INT, @DestinationId INT, @Name NVARCHAR(150), @Mobile NVARCHAR(30), @Email NVARCHAR(150), @TravelingDate DATE, @LeavingFrom NVARCHAR(150), @HotelRecommended NVARCHAR(200), @Adults INT, @Children INT, @Infants INT, @Days INT, @Remark NVARCHAR(MAX), @CreatedBy INT, @NewId INT OUTPUT',
+        @LeadNumber, @StatusId, @SourceId, @AssignedToUserId, @DestinationId,
+        @Name, @Mobile, @Email, @TravelingDate, @LeavingFrom, @HotelRecommended,
+        @Adults, @Children, @Infants, @Days, @Remark, @CreatedBy, @NewId OUTPUT;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Lead_Update
+    @DatabaseName       NVARCHAR(100),
+    @Id                 INT,
+    @StatusId           INT           = NULL,
+    @SourceId           INT           = NULL,
+    @AssignedToUserId   INT           = NULL,
+    @DestinationId      INT           = NULL,
+    @Name               NVARCHAR(150),
+    @Mobile             NVARCHAR(30)  = NULL,
+    @Email              NVARCHAR(150) = NULL,
+    @TravelingDate      DATE          = NULL,
+    @LeavingFrom        NVARCHAR(150) = NULL,
+    @HotelRecommended   NVARCHAR(200) = NULL,
+    @Adults             INT           = 1,
+    @Children           INT           = 0,
+    @Infants            INT           = 0,
+    @Days               INT           = NULL,
+    @Remark             NVARCHAR(MAX) = NULL,
+    @UpdatedBy          INT           = 0
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        UPDATE [' + @DatabaseName + N'].dbo.Leads
+        SET StatusId = @StatusId,
+            SourceId = @SourceId,
+            AssignedToUserId = @AssignedToUserId,
+            DestinationId = @DestinationId,
+            Name = @Name, Mobile = @Mobile, Email = @Email,
+            TravelingDate = @TravelingDate,
+            LeavingFrom = @LeavingFrom,
+            HotelRecommended = @HotelRecommended,
+            Adults = @Adults, Children = @Children, Infants = @Infants, Days = @Days,
+            Remark = @Remark,
+            UpdatedAt = GETUTCDATE(), UpdatedBy = @UpdatedBy
+        WHERE Id = @Id';
+    EXEC sp_executesql @sql,
+        N'@Id INT, @StatusId INT, @SourceId INT, @AssignedToUserId INT, @DestinationId INT, @Name NVARCHAR(150), @Mobile NVARCHAR(30), @Email NVARCHAR(150), @TravelingDate DATE, @LeavingFrom NVARCHAR(150), @HotelRecommended NVARCHAR(200), @Adults INT, @Children INT, @Infants INT, @Days INT, @Remark NVARCHAR(MAX), @UpdatedBy INT',
+        @Id, @StatusId, @SourceId, @AssignedToUserId, @DestinationId,
+        @Name, @Mobile, @Email, @TravelingDate, @LeavingFrom, @HotelRecommended,
+        @Adults, @Children, @Infants, @Days, @Remark, @UpdatedBy;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Lead_ChangeStatus
+    @DatabaseName NVARCHAR(100),
+    @Id           INT,
+    @StatusId     INT,
+    @UpdatedBy    INT = 0
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        DECLARE @oldStatusName NVARCHAR(100), @newStatusName NVARCHAR(100), @oldStatusId INT;
+
+        SELECT @oldStatusId = StatusId FROM [' + @DatabaseName + N'].dbo.Leads WHERE Id = @Id;
+
+        SELECT @oldStatusName = Name FROM [' + @DatabaseName + N'].dbo.LeadStatuses WHERE Id = @oldStatusId;
+        SELECT @newStatusName = Name FROM [' + @DatabaseName + N'].dbo.LeadStatuses WHERE Id = @StatusId;
+
+        UPDATE [' + @DatabaseName + N'].dbo.Leads
+        SET StatusId = @StatusId, UpdatedAt = GETUTCDATE(), UpdatedBy = @UpdatedBy
+        WHERE Id = @Id;
+
+        -- Auto-log the status change as an activity (only if status actually changed)
+        IF @oldStatusId IS NULL OR @oldStatusId <> @StatusId
+        BEGIN
+            INSERT INTO [' + @DatabaseName + N'].dbo.LeadActivities
+                (LeadId, ActivityType, Subject, Notes, ActivityAt, IsCompleted, CreatedByUserId, CreatedAt)
+            VALUES (@Id, ''StatusChange'',
+                    CONCAT(ISNULL(@oldStatusName, N''(none)''), '' → '', @newStatusName),
+                    NULL, GETUTCDATE(), 1, @UpdatedBy, GETUTCDATE());
+        END';
+    EXEC sp_executesql @sql,
+        N'@Id INT, @StatusId INT, @UpdatedBy INT',
+        @Id, @StatusId, @UpdatedBy;
+END
+GO
+
+-- ============================================================
+-- LEAD ACTIVITY PROCEDURES
+-- ============================================================
+CREATE OR ALTER PROCEDURE sp_LeadActivity_GetByLead
+    @DatabaseName NVARCHAR(100),
+    @LeadId       INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT * FROM [' + @DatabaseName + N'].dbo.LeadActivities
+        WHERE LeadId = @LeadId
+        ORDER BY
+            CASE WHEN IsCompleted = 0 THEN 0 ELSE 1 END,    -- pending follow-ups first
+            CASE WHEN IsCompleted = 0 THEN NextFollowUpAt END ASC,
+            ActivityAt DESC';
+    EXEC sp_executesql @sql, N'@LeadId INT', @LeadId;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_LeadActivity_GetById
+    @DatabaseName NVARCHAR(100),
+    @Id           INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT * FROM [' + @DatabaseName + N'].dbo.LeadActivities WHERE Id = @Id';
+    EXEC sp_executesql @sql, N'@Id INT', @Id;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_LeadActivity_Insert
     @DatabaseName     NVARCHAR(100),
-    @ApplicationNumber NVARCHAR(20),
-    @CustomerId       INT,
-    @BookingId        INT           = NULL,
-    @VisaType         NVARCHAR(100),
-    @Country          NVARCHAR(100),
-    @Status           TINYINT       = 0,
-    @AppliedOn        DATE          = NULL,
-    @HandledById      INT           = NULL,
+    @LeadId           INT,
+    @ActivityType     NVARCHAR(30),
+    @Subject          NVARCHAR(200) = NULL,
     @Notes            NVARCHAR(MAX) = NULL,
-    @CreatedAt        DATETIME      = NULL,
-    @CreatedBy        INT           = NULL,
+    @ActivityAt       DATETIME2     = NULL,
+    @NextFollowUpAt   DATETIME2     = NULL,
+    @IsCompleted      BIT           = 1,
+    @CreatedByUserId  INT           = 0,
     @NewId            INT OUTPUT
 AS BEGIN
     SET NOCOUNT ON;
-    SET @CreatedAt = ISNULL(@CreatedAt, GETUTCDATE());
-
     DECLARE @sql NVARCHAR(MAX) = N'
-        INSERT INTO [' + @DatabaseName + N'].dbo.VisaApplications
-            (ApplicationNumber,CustomerId,BookingId,VisaType,Country,Status,
-             AppliedOn,HandledById,Notes,CreatedAt,CreatedBy,IsDeleted)
-        VALUES
-            (@ApplicationNumber,@CustomerId,@BookingId,@VisaType,@Country,@Status,
-             @AppliedOn,@HandledById,@Notes,@CreatedAt,@CreatedBy,0)';
-
+        INSERT INTO [' + @DatabaseName + N'].dbo.LeadActivities
+            (LeadId, ActivityType, Subject, Notes, ActivityAt, NextFollowUpAt, IsCompleted, CreatedByUserId, CreatedAt)
+        VALUES (@LeadId, @ActivityType, @Subject, @Notes,
+                ISNULL(@ActivityAt, GETUTCDATE()), @NextFollowUpAt, @IsCompleted, @CreatedByUserId, GETUTCDATE());
+        SELECT @NewId = SCOPE_IDENTITY();';
     EXEC sp_executesql @sql,
-        N'@ApplicationNumber NVARCHAR(20),@CustomerId INT,@BookingId INT,@VisaType NVARCHAR(100),
-          @Country NVARCHAR(100),@Status TINYINT,@AppliedOn DATE,@HandledById INT,
-          @Notes NVARCHAR(MAX),@CreatedAt DATETIME,@CreatedBy INT',
-        @ApplicationNumber,@CustomerId,@BookingId,@VisaType,@Country,@Status,
-        @AppliedOn,@HandledById,@Notes,@CreatedAt,@CreatedBy;
-
-    DECLARE @idSql NVARCHAR(MAX) = N'SELECT @NewId = MAX(Id) FROM [' + @DatabaseName + N'].dbo.VisaApplications';
-    EXEC sp_executesql @idSql, N'@NewId INT OUTPUT', @NewId OUTPUT;
+        N'@LeadId INT, @ActivityType NVARCHAR(30), @Subject NVARCHAR(200), @Notes NVARCHAR(MAX), @ActivityAt DATETIME2, @NextFollowUpAt DATETIME2, @IsCompleted BIT, @CreatedByUserId INT, @NewId INT OUTPUT',
+        @LeadId, @ActivityType, @Subject, @Notes, @ActivityAt, @NextFollowUpAt, @IsCompleted, @CreatedByUserId, @NewId OUTPUT;
 END
 GO
 
-CREATE OR ALTER PROCEDURE sp_Visa_Update
+CREATE OR ALTER PROCEDURE sp_LeadActivity_Update
+    @DatabaseName     NVARCHAR(100),
+    @Id               INT,
+    @ActivityType     NVARCHAR(30),
+    @Subject          NVARCHAR(200) = NULL,
+    @Notes            NVARCHAR(MAX) = NULL,
+    @ActivityAt       DATETIME2     = NULL,
+    @NextFollowUpAt   DATETIME2     = NULL,
+    @IsCompleted      BIT           = 1
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        UPDATE [' + @DatabaseName + N'].dbo.LeadActivities
+        SET ActivityType = @ActivityType, Subject = @Subject, Notes = @Notes,
+            ActivityAt = ISNULL(@ActivityAt, ActivityAt),
+            NextFollowUpAt = @NextFollowUpAt,
+            IsCompleted = @IsCompleted,
+            UpdatedAt = GETUTCDATE()
+        WHERE Id = @Id';
+    EXEC sp_executesql @sql,
+        N'@Id INT, @ActivityType NVARCHAR(30), @Subject NVARCHAR(200), @Notes NVARCHAR(MAX), @ActivityAt DATETIME2, @NextFollowUpAt DATETIME2, @IsCompleted BIT',
+        @Id, @ActivityType, @Subject, @Notes, @ActivityAt, @NextFollowUpAt, @IsCompleted;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_LeadActivity_Complete
+    @DatabaseName NVARCHAR(100),
+    @Id           INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        UPDATE [' + @DatabaseName + N'].dbo.LeadActivities
+        SET IsCompleted = 1, UpdatedAt = GETUTCDATE()
+        WHERE Id = @Id';
+    EXEC sp_executesql @sql, N'@Id INT', @Id;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_LeadActivity_Delete
+    @DatabaseName NVARCHAR(100),
+    @Id           INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        DELETE FROM [' + @DatabaseName + N'].dbo.LeadActivities WHERE Id = @Id';
+    EXEC sp_executesql @sql, N'@Id INT', @Id;
+END
+GO
+
+-- ============================================================
+-- ACTIVITY TEMPLATE PROCEDURES
+-- ============================================================
+CREATE OR ALTER PROCEDURE sp_ActivityTemplate_GetAll
+    @DatabaseName NVARCHAR(100)
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT * FROM [' + @DatabaseName + N'].dbo.ActivityTemplates
+        WHERE IsActive = 1 ORDER BY DisplayOrder, ActivityType, Name';
+    EXEC sp_executesql @sql;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_ActivityTemplate_GetById
+    @DatabaseName NVARCHAR(100),
+    @Id           INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT * FROM [' + @DatabaseName + N'].dbo.ActivityTemplates WHERE Id = @Id';
+    EXEC sp_executesql @sql, N'@Id INT', @Id;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_ActivityTemplate_Insert
+    @DatabaseName  NVARCHAR(100),
+    @Name          NVARCHAR(150),
+    @ActivityType  NVARCHAR(30) = 'All',
+    @Subject       NVARCHAR(200) = NULL,
+    @Notes         NVARCHAR(MAX) = NULL,
+    @DisplayOrder  INT = 0,
+    @CreatedBy     INT = 0,
+    @NewId         INT OUTPUT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        INSERT INTO [' + @DatabaseName + N'].dbo.ActivityTemplates
+            (Name, ActivityType, Subject, Notes, DisplayOrder, IsActive, CreatedAt, CreatedBy)
+        VALUES (@Name, @ActivityType, @Subject, @Notes, @DisplayOrder, 1, GETUTCDATE(), @CreatedBy);
+        SELECT @NewId = SCOPE_IDENTITY();';
+    EXEC sp_executesql @sql,
+        N'@Name NVARCHAR(150), @ActivityType NVARCHAR(30), @Subject NVARCHAR(200), @Notes NVARCHAR(MAX), @DisplayOrder INT, @CreatedBy INT, @NewId INT OUTPUT',
+        @Name, @ActivityType, @Subject, @Notes, @DisplayOrder, @CreatedBy, @NewId OUTPUT;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_ActivityTemplate_Update
+    @DatabaseName  NVARCHAR(100),
+    @Id            INT,
+    @Name          NVARCHAR(150),
+    @ActivityType  NVARCHAR(30) = 'All',
+    @Subject       NVARCHAR(200) = NULL,
+    @Notes         NVARCHAR(MAX) = NULL,
+    @DisplayOrder  INT = 0,
+    @UpdatedBy     INT = 0
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        UPDATE [' + @DatabaseName + N'].dbo.ActivityTemplates
+        SET Name = @Name, ActivityType = @ActivityType, Subject = @Subject, Notes = @Notes,
+            DisplayOrder = @DisplayOrder, UpdatedAt = GETUTCDATE(), UpdatedBy = @UpdatedBy
+        WHERE Id = @Id';
+    EXEC sp_executesql @sql,
+        N'@Id INT, @Name NVARCHAR(150), @ActivityType NVARCHAR(30), @Subject NVARCHAR(200), @Notes NVARCHAR(MAX), @DisplayOrder INT, @UpdatedBy INT',
+        @Id, @Name, @ActivityType, @Subject, @Notes, @DisplayOrder, @UpdatedBy;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_ActivityTemplate_Delete
+    @DatabaseName NVARCHAR(100),
+    @Id           INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        UPDATE [' + @DatabaseName + N'].dbo.ActivityTemplates SET IsActive = 0 WHERE Id = @Id';
+    EXEC sp_executesql @sql, N'@Id INT', @Id;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Lead_Delete
+    @DatabaseName NVARCHAR(100),
+    @Id           INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        UPDATE [' + @DatabaseName + N'].dbo.Leads SET IsActive = 0 WHERE Id = @Id';
+    EXEC sp_executesql @sql, N'@Id INT', @Id;
+END
+GO
+
+-- ============================================================
+-- PACKAGE PROCEDURES
+-- ============================================================
+CREATE OR ALTER PROCEDURE sp_Package_GetAll
+    @DatabaseName NVARCHAR(100),
+    @Search       NVARCHAR(150)= NULL,
+    @Page         INT          = 1,
+    @PageSize     INT          = 20
+AS BEGIN
+    SET NOCOUNT ON;
+    IF @Page < 1 SET @Page = 1;
+    IF @PageSize < 1 SET @PageSize = 20;
+    IF @PageSize > 200 SET @PageSize = 200;
+
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT p.*,
+               d.Name AS DestinationName,
+               (SELECT COUNT(1) FROM [' + @DatabaseName + N'].dbo.PackageOptions o WHERE o.PackageId = p.Id) AS OptionCount,
+               (SELECT MIN(o.FinalPrice) FROM [' + @DatabaseName + N'].dbo.PackageOptions o WHERE o.PackageId = p.Id) AS MinPrice,
+               (SELECT MAX(o.FinalPrice) FROM [' + @DatabaseName + N'].dbo.PackageOptions o WHERE o.PackageId = p.Id) AS MaxPrice,
+               COUNT(*) OVER() AS TotalCount
+        FROM [' + @DatabaseName + N'].dbo.Packages p
+        LEFT JOIN [' + @DatabaseName + N'].dbo.Destinations d ON p.DestinationId = d.Id
+        WHERE p.IsActive = 1
+          AND (@Search IS NULL OR
+               p.PackageNumber LIKE ''%'' + @Search + ''%'' OR
+               p.Title LIKE ''%'' + @Search + ''%'' OR
+               p.CustomerName LIKE ''%'' + @Search + ''%'')
+        ORDER BY p.CreatedAt DESC
+        OFFSET ((@Page - 1) * @PageSize) ROWS
+        FETCH NEXT @PageSize ROWS ONLY';
+    EXEC sp_executesql @sql,
+        N'@Search NVARCHAR(150), @Page INT, @PageSize INT',
+        @Search, @Page, @PageSize;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Package_GetById
+    @DatabaseName NVARCHAR(100),
+    @Id           INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT p.*, d.Name AS DestinationName
+        FROM [' + @DatabaseName + N'].dbo.Packages p
+        LEFT JOIN [' + @DatabaseName + N'].dbo.Destinations d ON p.DestinationId = d.Id
+        WHERE p.Id = @Id;
+
+        SELECT * FROM [' + @DatabaseName + N'].dbo.PackageOptions
+        WHERE PackageId = @Id ORDER BY DisplayOrder, Id;
+
+        SELECT h.*, ho.Name AS HotelName, rt.Name AS RoomTypeName, mp.Code AS MealPlanCode, mp.Name AS MealPlanName
+        FROM [' + @DatabaseName + N'].dbo.PackageOptionHotels h
+        INNER JOIN [' + @DatabaseName + N'].dbo.PackageOptions o ON h.PackageOptionId = o.Id
+        LEFT JOIN [' + @DatabaseName + N'].dbo.Hotels    ho ON h.HotelId    = ho.Id
+        LEFT JOIN [' + @DatabaseName + N'].dbo.RoomTypes rt ON h.RoomTypeId = rt.Id
+        LEFT JOIN [' + @DatabaseName + N'].dbo.MealPlans mp ON h.MealPlanId = mp.Id
+        WHERE o.PackageId = @Id
+        ORDER BY h.PackageOptionId, h.DisplayOrder, h.Id;
+
+        SELECT * FROM [' + @DatabaseName + N'].dbo.PackageDays
+        WHERE PackageId = @Id ORDER BY DayNumber, Id;
+
+        SELECT pds.Id, pds.PackageDayId, pds.SightseeingId, s.Name AS SightseeingName
+        FROM [' + @DatabaseName + N'].dbo.PackageDaySightseeings pds
+        INNER JOIN [' + @DatabaseName + N'].dbo.PackageDays pd ON pds.PackageDayId = pd.Id
+        LEFT JOIN [' + @DatabaseName + N'].dbo.Sightseeings s ON pds.SightseeingId = s.Id
+        WHERE pd.PackageId = @Id
+        ORDER BY pds.PackageDayId, pds.Id;';
+    EXEC sp_executesql @sql, N'@Id INT', @Id;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Package_Insert
+    @DatabaseName    NVARCHAR(100),
+    @Prefix          NVARCHAR(20)  = 'PKG',
+    @LeadId          INT           = NULL,
+    @Title           NVARCHAR(200),
+    @DestinationId   INT           = NULL,
+    @CustomerName    NVARCHAR(150),
+    @CustomerMobile  NVARCHAR(30)  = NULL,
+    @CustomerEmail   NVARCHAR(150) = NULL,
+    @Adults          INT           = 1,
+    @Children        INT           = 0,
+    @Infants         INT           = 0,
+    @Days            INT           = NULL,
+    @Nights          INT           = NULL,
+    @StartDate       DATE          = NULL,
+    @PriceMode       NVARCHAR(20)  = 'Total',
+    @Currency        NVARCHAR(10)  = 'INR',
+    @FlightDetails   NVARCHAR(MAX) = NULL,
+    @Inclusions      NVARCHAR(MAX) = NULL,
+    @Exclusions      NVARCHAR(MAX) = NULL,
+    @Notes           NVARCHAR(MAX) = NULL,
+    @CreatedBy       INT           = 0,
+    @NewId           INT OUTPUT,
+    @PackageNumber   NVARCHAR(40) OUTPUT
+AS BEGIN
+    SET NOCOUNT ON;
+    IF @Prefix IS NULL OR LEN(@Prefix) = 0 SET @Prefix = N'PKG';
+
+    DECLARE @year INT = YEAR(GETUTCDATE());
+    DECLARE @count INT = 0;
+    DECLARE @pat NVARCHAR(50) = @Prefix + N'-' + CAST(@year AS NVARCHAR(4)) + N'-%';
+    DECLARE @countSql NVARCHAR(MAX) = N'
+        SELECT @c = COUNT(1) FROM [' + @DatabaseName + N'].dbo.Packages
+        WHERE PackageNumber LIKE @p';
+    EXEC sp_executesql @countSql, N'@c INT OUTPUT, @p NVARCHAR(50)',
+        @c = @count OUTPUT, @p = @pat;
+    SET @PackageNumber = @Prefix + N'-' + CAST(@year AS NVARCHAR(4)) + N'-' +
+                         RIGHT(N'0000' + CAST((@count + 1) AS NVARCHAR(10)), 4);
+
+    DECLARE @sql NVARCHAR(MAX) = N'
+        INSERT INTO [' + @DatabaseName + N'].dbo.Packages
+            (PackageNumber, LeadId, Title, DestinationId, CustomerName, CustomerMobile, CustomerEmail,
+             Adults, Children, Infants, Days, Nights, StartDate, PriceMode, Currency,
+             FlightDetails, Inclusions, Exclusions, Notes,
+             IsActive, CreatedAt, CreatedBy)
+        VALUES (@PackageNumber, @LeadId, @Title, @DestinationId, @CustomerName, @CustomerMobile, @CustomerEmail,
+            @Adults, @Children, @Infants, @Days, @Nights, @StartDate, @PriceMode, @Currency,
+            @FlightDetails, @Inclusions, @Exclusions, @Notes,
+            1, GETUTCDATE(), @CreatedBy);
+        SELECT @NewId = SCOPE_IDENTITY();';
+    EXEC sp_executesql @sql,
+        N'@PackageNumber NVARCHAR(40), @LeadId INT, @Title NVARCHAR(200), @DestinationId INT, @CustomerName NVARCHAR(150), @CustomerMobile NVARCHAR(30), @CustomerEmail NVARCHAR(150), @Adults INT, @Children INT, @Infants INT, @Days INT, @Nights INT, @StartDate DATE, @PriceMode NVARCHAR(20), @Currency NVARCHAR(10), @FlightDetails NVARCHAR(MAX), @Inclusions NVARCHAR(MAX), @Exclusions NVARCHAR(MAX), @Notes NVARCHAR(MAX), @CreatedBy INT, @NewId INT OUTPUT',
+        @PackageNumber, @LeadId, @Title, @DestinationId, @CustomerName, @CustomerMobile, @CustomerEmail,
+        @Adults, @Children, @Infants, @Days, @Nights, @StartDate, @PriceMode, @Currency,
+        @FlightDetails, @Inclusions, @Exclusions, @Notes, @CreatedBy, @NewId OUTPUT;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Package_Update
     @DatabaseName    NVARCHAR(100),
     @Id              INT,
-    @VisaType        NVARCHAR(100),
-    @Country         NVARCHAR(100),
-    @Status          TINYINT,
-    @AppliedOn       DATE          = NULL,
-    @SubmittedOn     DATE          = NULL,
-    @ApprovedOn      DATE          = NULL,
-    @ExpiryDate      DATE          = NULL,
-    @RejectionReason NVARCHAR(500) = NULL,
-    @VisaNumber      NVARCHAR(100) = NULL,
+    @Title           NVARCHAR(200),
+    @DestinationId   INT           = NULL,
+    @CustomerName    NVARCHAR(150),
+    @CustomerMobile  NVARCHAR(30)  = NULL,
+    @CustomerEmail   NVARCHAR(150) = NULL,
+    @Adults          INT           = 1,
+    @Children        INT           = 0,
+    @Infants         INT           = 0,
+    @Days            INT           = NULL,
+    @Nights          INT           = NULL,
+    @StartDate       DATE          = NULL,
+    @PriceMode       NVARCHAR(20)  = 'Total',
+    @Currency        NVARCHAR(10)  = 'INR',
+    @FlightDetails   NVARCHAR(MAX) = NULL,
+    @Inclusions      NVARCHAR(MAX) = NULL,
+    @Exclusions      NVARCHAR(MAX) = NULL,
     @Notes           NVARCHAR(MAX) = NULL,
-    @HandledById     INT           = NULL,
-    @UpdatedAt       DATETIME      = NULL,
-    @UpdatedBy       INT           = NULL
+    @UpdatedBy       INT           = 0
 AS BEGIN
     SET NOCOUNT ON;
-    SET @UpdatedAt = ISNULL(@UpdatedAt, GETUTCDATE());
-
     DECLARE @sql NVARCHAR(MAX) = N'
-        UPDATE [' + @DatabaseName + N'].dbo.VisaApplications SET
-            VisaType=@VisaType,Country=@Country,Status=@Status,AppliedOn=@AppliedOn,
-            SubmittedOn=@SubmittedOn,ApprovedOn=@ApprovedOn,ExpiryDate=@ExpiryDate,
-            RejectionReason=@RejectionReason,VisaNumber=@VisaNumber,Notes=@Notes,
-            HandledById=@HandledById,UpdatedAt=@UpdatedAt,UpdatedBy=@UpdatedBy
-        WHERE Id=@Id';
-
+        UPDATE [' + @DatabaseName + N'].dbo.Packages
+        SET Title = @Title, DestinationId = @DestinationId,
+            CustomerName = @CustomerName, CustomerMobile = @CustomerMobile, CustomerEmail = @CustomerEmail,
+            Adults = @Adults, Children = @Children, Infants = @Infants,
+            Days = @Days, Nights = @Nights, StartDate = @StartDate,
+            PriceMode = @PriceMode, Currency = @Currency,
+            FlightDetails = @FlightDetails, Inclusions = @Inclusions, Exclusions = @Exclusions,
+            Notes = @Notes,
+            UpdatedAt = GETUTCDATE(), UpdatedBy = @UpdatedBy
+        WHERE Id = @Id';
     EXEC sp_executesql @sql,
-        N'@Id INT,@VisaType NVARCHAR(100),@Country NVARCHAR(100),@Status TINYINT,
-          @AppliedOn DATE,@SubmittedOn DATE,@ApprovedOn DATE,@ExpiryDate DATE,
-          @RejectionReason NVARCHAR(500),@VisaNumber NVARCHAR(100),@Notes NVARCHAR(MAX),
-          @HandledById INT,@UpdatedAt DATETIME,@UpdatedBy INT',
-        @Id,@VisaType,@Country,@Status,@AppliedOn,@SubmittedOn,@ApprovedOn,@ExpiryDate,
-        @RejectionReason,@VisaNumber,@Notes,@HandledById,@UpdatedAt,@UpdatedBy;
+        N'@Id INT, @Title NVARCHAR(200), @DestinationId INT, @CustomerName NVARCHAR(150), @CustomerMobile NVARCHAR(30), @CustomerEmail NVARCHAR(150), @Adults INT, @Children INT, @Infants INT, @Days INT, @Nights INT, @StartDate DATE, @PriceMode NVARCHAR(20), @Currency NVARCHAR(10), @FlightDetails NVARCHAR(MAX), @Inclusions NVARCHAR(MAX), @Exclusions NVARCHAR(MAX), @Notes NVARCHAR(MAX), @UpdatedBy INT',
+        @Id, @Title, @DestinationId, @CustomerName, @CustomerMobile, @CustomerEmail,
+        @Adults, @Children, @Infants, @Days, @Nights, @StartDate, @PriceMode, @Currency,
+        @FlightDetails, @Inclusions, @Exclusions, @Notes, @UpdatedBy;
 END
 GO
 
-CREATE OR ALTER PROCEDURE sp_Visa_UpdateStatus
+CREATE OR ALTER PROCEDURE sp_Package_Delete
     @DatabaseName NVARCHAR(100),
-    @Id           INT,
-    @Status       TINYINT,
-    @Notes        NVARCHAR(MAX) = NULL
+    @Id           INT
 AS BEGIN
     SET NOCOUNT ON;
     DECLARE @sql NVARCHAR(MAX) = N'
-        UPDATE [' + @DatabaseName + N'].dbo.VisaApplications
-        SET Status=@Status,Notes=ISNULL(@Notes,Notes),UpdatedAt=GETUTCDATE() WHERE Id=@Id';
-    EXEC sp_executesql @sql, N'@Id INT,@Status TINYINT,@Notes NVARCHAR(MAX)', @Id,@Status,@Notes;
+        UPDATE [' + @DatabaseName + N'].dbo.Packages SET IsActive = 0 WHERE Id = @Id';
+    EXEC sp_executesql @sql, N'@Id INT', @Id;
 END
 GO
 
-CREATE OR ALTER PROCEDURE sp_Document_Insert
+-- Replace all options + their hotels for a package (transactional rebuild)
+CREATE OR ALTER PROCEDURE sp_Package_ReplaceOptions
+    @DatabaseName NVARCHAR(100),
+    @PackageId    INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        DELETE FROM [' + @DatabaseName + N'].dbo.PackageOptionHotels
+        WHERE PackageOptionId IN (SELECT Id FROM [' + @DatabaseName + N'].dbo.PackageOptions WHERE PackageId = @PackageId);
+
+        DELETE FROM [' + @DatabaseName + N'].dbo.PackageOptions WHERE PackageId = @PackageId;';
+    EXEC sp_executesql @sql, N'@PackageId INT', @PackageId;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_PackageOption_Insert
     @DatabaseName   NVARCHAR(100),
-    @CustomerId     INT,
-    @BookingId      INT           = NULL,
-    @DocumentType   TINYINT,
-    @DocumentNumber NVARCHAR(100),
-    @IssueDate      DATE          = NULL,
-    @ExpiryDate     DATE          = NULL,
-    @IssuingCountry NVARCHAR(100) = NULL,
-    @FileUrl        NVARCHAR(500) = NULL,
-    @Notes          NVARCHAR(500) = NULL,
-    @CreatedAt      DATETIME      = NULL,
-    @CreatedBy      INT           = NULL,
+    @PackageId      INT,
+    @OptionName     NVARCHAR(150),
+    @DisplayOrder   INT           = 0,
+    @LandPrice      DECIMAL(18,2) = 0,
+    @FlightPrice    DECIMAL(18,2) = 0,
+    @FinalPrice     DECIMAL(18,2) = 0,
+    @IsRecommended  BIT           = 0,
+    @Notes          NVARCHAR(MAX) = NULL,
     @NewId          INT OUTPUT
 AS BEGIN
     SET NOCOUNT ON;
-    SET @CreatedAt = ISNULL(@CreatedAt, GETUTCDATE());
-
     DECLARE @sql NVARCHAR(MAX) = N'
-        INSERT INTO [' + @DatabaseName + N'].dbo.PassengerDocuments
-            (CustomerId,BookingId,DocumentType,DocumentNumber,IssueDate,ExpiryDate,
-             IssuingCountry,FileUrl,Notes,CreatedAt,CreatedBy,IsDeleted)
-        VALUES
-            (@CustomerId,@BookingId,@DocumentType,@DocumentNumber,@IssueDate,@ExpiryDate,
-             @IssuingCountry,@FileUrl,@Notes,@CreatedAt,@CreatedBy,0)';
-
+        INSERT INTO [' + @DatabaseName + N'].dbo.PackageOptions
+            (PackageId, OptionName, DisplayOrder, LandPrice, FlightPrice, FinalPrice, IsRecommended, Notes)
+        VALUES (@PackageId, @OptionName, @DisplayOrder, @LandPrice, @FlightPrice, @FinalPrice, @IsRecommended, @Notes);
+        SELECT @NewId = SCOPE_IDENTITY();';
     EXEC sp_executesql @sql,
-        N'@CustomerId INT,@BookingId INT,@DocumentType TINYINT,@DocumentNumber NVARCHAR(100),
-          @IssueDate DATE,@ExpiryDate DATE,@IssuingCountry NVARCHAR(100),@FileUrl NVARCHAR(500),
-          @Notes NVARCHAR(500),@CreatedAt DATETIME,@CreatedBy INT',
-        @CustomerId,@BookingId,@DocumentType,@DocumentNumber,@IssueDate,@ExpiryDate,
-        @IssuingCountry,@FileUrl,@Notes,@CreatedAt,@CreatedBy;
-
-    DECLARE @idSql NVARCHAR(MAX) = N'SELECT @NewId = MAX(Id) FROM [' + @DatabaseName + N'].dbo.PassengerDocuments';
-    EXEC sp_executesql @idSql, N'@NewId INT OUTPUT', @NewId OUTPUT;
+        N'@PackageId INT, @OptionName NVARCHAR(150), @DisplayOrder INT, @LandPrice DECIMAL(18,2), @FlightPrice DECIMAL(18,2), @FinalPrice DECIMAL(18,2), @IsRecommended BIT, @Notes NVARCHAR(MAX), @NewId INT OUTPUT',
+        @PackageId, @OptionName, @DisplayOrder, @LandPrice, @FlightPrice, @FinalPrice, @IsRecommended, @Notes, @NewId OUTPUT;
 END
 GO
 
-CREATE OR ALTER PROCEDURE sp_Document_GetByCustomer
+CREATE OR ALTER PROCEDURE sp_PackageOptionHotel_Insert
+    @DatabaseName     NVARCHAR(100),
+    @PackageOptionId  INT,
+    @DisplayOrder     INT           = 0,
+    @Nights           INT           = 1,
+    @HotelId          INT           = NULL,
+    @RoomTypeId       INT           = NULL,
+    @MealPlanId       INT           = NULL,
+    @OtherText        NVARCHAR(300) = NULL
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        INSERT INTO [' + @DatabaseName + N'].dbo.PackageOptionHotels
+            (PackageOptionId, DisplayOrder, Nights, HotelId, RoomTypeId, MealPlanId, OtherText)
+        VALUES (@PackageOptionId, @DisplayOrder, @Nights, @HotelId, @RoomTypeId, @MealPlanId, @OtherText)';
+    EXEC sp_executesql @sql,
+        N'@PackageOptionId INT, @DisplayOrder INT, @Nights INT, @HotelId INT, @RoomTypeId INT, @MealPlanId INT, @OtherText NVARCHAR(300)',
+        @PackageOptionId, @DisplayOrder, @Nights, @HotelId, @RoomTypeId, @MealPlanId, @OtherText;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Package_ReplaceDays
     @DatabaseName NVARCHAR(100),
-    @CustomerId   INT
+    @PackageId    INT
 AS BEGIN
     SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'SELECT * FROM [' + @DatabaseName + N'].dbo.PassengerDocuments WHERE CustomerId=@CustomerId AND IsDeleted=0 ORDER BY CreatedAt DESC';
-    EXEC sp_executesql @sql, N'@CustomerId INT', @CustomerId;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        DELETE FROM [' + @DatabaseName + N'].dbo.PackageDaySightseeings
+        WHERE PackageDayId IN (SELECT Id FROM [' + @DatabaseName + N'].dbo.PackageDays WHERE PackageId = @PackageId);
+
+        DELETE FROM [' + @DatabaseName + N'].dbo.PackageDays WHERE PackageId = @PackageId;';
+    EXEC sp_executesql @sql, N'@PackageId INT', @PackageId;
 END
 GO
 
-CREATE OR ALTER PROCEDURE sp_Document_Delete
+CREATE OR ALTER PROCEDURE sp_PackageDay_Insert
     @DatabaseName NVARCHAR(100),
-    @Id           INT
+    @PackageId    INT,
+    @DayNumber    INT,
+    @Title        NVARCHAR(200),
+    @Description  NVARCHAR(MAX) = NULL,
+    @NewId        INT OUTPUT
 AS BEGIN
     SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'UPDATE [' + @DatabaseName + N'].dbo.PassengerDocuments SET IsDeleted=1,UpdatedAt=GETUTCDATE() WHERE Id=@Id';
-    EXEC sp_executesql @sql, N'@Id INT', @Id;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        INSERT INTO [' + @DatabaseName + N'].dbo.PackageDays (PackageId, DayNumber, Title, Description)
+        VALUES (@PackageId, @DayNumber, @Title, @Description);
+        SELECT @NewId = SCOPE_IDENTITY();';
+    EXEC sp_executesql @sql,
+        N'@PackageId INT, @DayNumber INT, @Title NVARCHAR(200), @Description NVARCHAR(MAX), @NewId INT OUTPUT',
+        @PackageId, @DayNumber, @Title, @Description, @NewId OUTPUT;
 END
 GO
 
--- ============================================================
--- SUPPLIER PROCEDURES
--- ============================================================
-
-CREATE OR ALTER PROCEDURE sp_Supplier_GetById
-    @DatabaseName NVARCHAR(100),
-    @Id           INT
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'SELECT * FROM [' + @DatabaseName + N'].dbo.Suppliers WHERE Id=@Id AND IsDeleted=0';
-    EXEC sp_executesql @sql, N'@Id INT', @Id;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Supplier_GetAll
-    @DatabaseName NVARCHAR(100)
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'SELECT * FROM [' + @DatabaseName + N'].dbo.Suppliers WHERE IsDeleted=0 ORDER BY Name';
-    EXEC sp_executesql @sql;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Supplier_GetByCategory
-    @DatabaseName NVARCHAR(100),
-    @Category     NVARCHAR(100)
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'SELECT * FROM [' + @DatabaseName + N'].dbo.Suppliers WHERE Category=@Category AND IsDeleted=0 ORDER BY Name';
-    EXEC sp_executesql @sql, N'@Category NVARCHAR(100)', @Category;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Supplier_Insert
+CREATE OR ALTER PROCEDURE sp_PackageDaySightseeing_Insert
     @DatabaseName   NVARCHAR(100),
-    @SupplierCode   NVARCHAR(20),
-    @Name           NVARCHAR(150),
-    @Category       NVARCHAR(100),
-    @ContactPerson  NVARCHAR(150) = NULL,
-    @Email          NVARCHAR(150) = NULL,
-    @Phone          NVARCHAR(30),
-    @AlternatePhone NVARCHAR(30)  = NULL,
-    @Address        NVARCHAR(300) = NULL,
-    @City           NVARCHAR(100) = NULL,
-    @Country        NVARCHAR(100) = NULL,
-    @Website        NVARCHAR(300) = NULL,
-    @TaxNumber      NVARCHAR(100) = NULL,
-    @BankDetails    NVARCHAR(MAX) = NULL,
-    @IsActive       BIT           = 1,
-    @Notes          NVARCHAR(MAX) = NULL,
-    @CreditLimit    DECIMAL(12,2) = NULL,
-    @CreditDays     INT           = NULL,
-    @CreatedAt      DATETIME      = NULL,
-    @CreatedBy      INT           = NULL,
-    @NewId          INT OUTPUT
+    @PackageDayId   INT,
+    @SightseeingId  INT
 AS BEGIN
     SET NOCOUNT ON;
-    SET @CreatedAt = ISNULL(@CreatedAt, GETUTCDATE());
-
     DECLARE @sql NVARCHAR(MAX) = N'
-        INSERT INTO [' + @DatabaseName + N'].dbo.Suppliers
-            (SupplierCode,Name,Category,ContactPerson,Email,Phone,AlternatePhone,Address,
-             City,Country,Website,TaxNumber,BankDetails,IsActive,Notes,CreditLimit,CreditDays,
-             CreatedAt,CreatedBy,IsDeleted)
-        VALUES
-            (@SupplierCode,@Name,@Category,@ContactPerson,@Email,@Phone,@AlternatePhone,@Address,
-             @City,@Country,@Website,@TaxNumber,@BankDetails,@IsActive,@Notes,@CreditLimit,@CreditDays,
-             @CreatedAt,@CreatedBy,0)';
-
+        INSERT INTO [' + @DatabaseName + N'].dbo.PackageDaySightseeings (PackageDayId, SightseeingId)
+        VALUES (@PackageDayId, @SightseeingId)';
     EXEC sp_executesql @sql,
-        N'@SupplierCode NVARCHAR(20),@Name NVARCHAR(150),@Category NVARCHAR(100),
-          @ContactPerson NVARCHAR(150),@Email NVARCHAR(150),@Phone NVARCHAR(30),
-          @AlternatePhone NVARCHAR(30),@Address NVARCHAR(300),@City NVARCHAR(100),
-          @Country NVARCHAR(100),@Website NVARCHAR(300),@TaxNumber NVARCHAR(100),
-          @BankDetails NVARCHAR(MAX),@IsActive BIT,@Notes NVARCHAR(MAX),
-          @CreditLimit DECIMAL(12,2),@CreditDays INT,@CreatedAt DATETIME,@CreatedBy INT',
-        @SupplierCode,@Name,@Category,@ContactPerson,@Email,@Phone,@AlternatePhone,@Address,
-        @City,@Country,@Website,@TaxNumber,@BankDetails,@IsActive,@Notes,@CreditLimit,@CreditDays,
-        @CreatedAt,@CreatedBy;
-
-    DECLARE @idSql NVARCHAR(MAX) = N'SELECT @NewId = MAX(Id) FROM [' + @DatabaseName + N'].dbo.Suppliers';
-    EXEC sp_executesql @idSql, N'@NewId INT OUTPUT', @NewId OUTPUT;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Supplier_Update
-    @DatabaseName   NVARCHAR(100),
-    @Id             INT,
-    @Name           NVARCHAR(150),
-    @Category       NVARCHAR(100),
-    @ContactPerson  NVARCHAR(150) = NULL,
-    @Email          NVARCHAR(150) = NULL,
-    @Phone          NVARCHAR(30),
-    @AlternatePhone NVARCHAR(30)  = NULL,
-    @Address        NVARCHAR(300) = NULL,
-    @City           NVARCHAR(100) = NULL,
-    @Country        NVARCHAR(100) = NULL,
-    @Website        NVARCHAR(300) = NULL,
-    @TaxNumber      NVARCHAR(100) = NULL,
-    @BankDetails    NVARCHAR(MAX) = NULL,
-    @IsActive       BIT,
-    @Notes          NVARCHAR(MAX) = NULL,
-    @CreditLimit    DECIMAL(12,2) = NULL,
-    @CreditDays     INT           = NULL,
-    @UpdatedAt      DATETIME      = NULL,
-    @UpdatedBy      INT           = NULL
-AS BEGIN
-    SET NOCOUNT ON;
-    SET @UpdatedAt = ISNULL(@UpdatedAt, GETUTCDATE());
-
-    DECLARE @sql NVARCHAR(MAX) = N'
-        UPDATE [' + @DatabaseName + N'].dbo.Suppliers SET
-            Name=@Name,Category=@Category,ContactPerson=@ContactPerson,Email=@Email,Phone=@Phone,
-            AlternatePhone=@AlternatePhone,Address=@Address,City=@City,Country=@Country,
-            Website=@Website,TaxNumber=@TaxNumber,BankDetails=@BankDetails,IsActive=@IsActive,
-            Notes=@Notes,CreditLimit=@CreditLimit,CreditDays=@CreditDays,
-            UpdatedAt=@UpdatedAt,UpdatedBy=@UpdatedBy
-        WHERE Id=@Id';
-
-    EXEC sp_executesql @sql,
-        N'@Id INT,@Name NVARCHAR(150),@Category NVARCHAR(100),@ContactPerson NVARCHAR(150),
-          @Email NVARCHAR(150),@Phone NVARCHAR(30),@AlternatePhone NVARCHAR(30),
-          @Address NVARCHAR(300),@City NVARCHAR(100),@Country NVARCHAR(100),
-          @Website NVARCHAR(300),@TaxNumber NVARCHAR(100),@BankDetails NVARCHAR(MAX),
-          @IsActive BIT,@Notes NVARCHAR(MAX),@CreditLimit DECIMAL(12,2),@CreditDays INT,
-          @UpdatedAt DATETIME,@UpdatedBy INT',
-        @Id,@Name,@Category,@ContactPerson,@Email,@Phone,@AlternatePhone,@Address,
-        @City,@Country,@Website,@TaxNumber,@BankDetails,@IsActive,@Notes,
-        @CreditLimit,@CreditDays,@UpdatedAt,@UpdatedBy;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Supplier_Delete
-    @DatabaseName NVARCHAR(100),
-    @Id           INT
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'UPDATE [' + @DatabaseName + N'].dbo.Suppliers SET IsDeleted=1,UpdatedAt=GETUTCDATE() WHERE Id=@Id';
-    EXEC sp_executesql @sql, N'@Id INT', @Id;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Supplier_GenerateCode
-    @DatabaseName NVARCHAR(100)
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @count INT;
-    DECLARE @sql NVARCHAR(MAX) = N'SELECT @count = COUNT(1) FROM [' + @DatabaseName + N'].dbo.Suppliers';
-    EXEC sp_executesql @sql, N'@count INT OUTPUT', @count OUTPUT;
-    SELECT 'SUP' + RIGHT('00000' + CAST(@count + 1 AS VARCHAR), 5);
-END
-GO
-
--- ============================================================
--- DASHBOARD PROCEDURES
--- ============================================================
-
-CREATE OR ALTER PROCEDURE sp_Dashboard_GetStats
-    @DatabaseName NVARCHAR(100)
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'
-        SELECT
-            (SELECT COUNT(1) FROM [' + @DatabaseName + N'].dbo.Customers   WHERE IsDeleted=0) AS TotalCustomers,
-            (SELECT COUNT(1) FROM [' + @DatabaseName + N'].dbo.Bookings     WHERE IsDeleted=0) AS TotalBookings,
-            (SELECT COUNT(1) FROM [' + @DatabaseName + N'].dbo.Bookings     WHERE IsDeleted=0 AND Status IN (1,2)) AS ActiveBookings,
-            (SELECT ISNULL(SUM(TotalAmount),0) FROM [' + @DatabaseName + N'].dbo.Bookings WHERE IsDeleted=0 AND Status!=3) AS TotalRevenue,
-            (SELECT ISNULL(SUM(TotalAmount),0) FROM [' + @DatabaseName + N'].dbo.Bookings
-                WHERE IsDeleted=0 AND Status!=3
-                AND MONTH(CreatedAt)=MONTH(GETDATE()) AND YEAR(CreatedAt)=YEAR(GETDATE())) AS MonthlyRevenue,
-            (SELECT COUNT(1) FROM [' + @DatabaseName + N'].dbo.TourPackages WHERE IsDeleted=0 AND Status=0) AS TotalPackages,
-            (SELECT COUNT(1) FROM [' + @DatabaseName + N'].dbo.Employees    WHERE IsDeleted=0 AND Status=0) AS TotalEmployees,
-            (SELECT COUNT(1) FROM [' + @DatabaseName + N'].dbo.VisaApplications WHERE IsDeleted=0 AND Status IN (1,2)) AS PendingVisas,
-            (SELECT COUNT(1) FROM [' + @DatabaseName + N'].dbo.LeaveRequests WHERE IsDeleted=0 AND Status=0) AS PendingLeaves,
-            (SELECT ISNULL(SUM(TotalAmount-PaidAmount),0) FROM [' + @DatabaseName + N'].dbo.Invoices WHERE IsDeleted=0 AND Status!=2) AS OutstandingAmount';
-    EXEC sp_executesql @sql;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Dashboard_GetMonthlyRevenue
-    @DatabaseName NVARCHAR(100),
-    @Year         INT
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'
-        WITH Months AS (SELECT n AS MonthNum FROM (VALUES(1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12)) v(n))
-        SELECT m.MonthNum AS Month,
-               DATENAME(MONTH, DATEFROMPARTS(@Year, m.MonthNum, 1)) AS MonthName,
-               ISNULL(SUM(b.TotalAmount), 0) AS Revenue,
-               COUNT(b.Id) AS BookingCount
-        FROM Months m
-        LEFT JOIN [' + @DatabaseName + N'].dbo.Bookings b
-            ON MONTH(b.CreatedAt)=m.MonthNum AND YEAR(b.CreatedAt)=@Year
-            AND b.IsDeleted=0 AND b.Status!=3
-        GROUP BY m.MonthNum
-        ORDER BY m.MonthNum';
-    EXEC sp_executesql @sql, N'@Year INT', @Year;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Dashboard_GetBookingStatusChart
-    @DatabaseName NVARCHAR(100)
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'
-        SELECT
-            CASE Status WHEN 0 THEN ''Inquiry'' WHEN 1 THEN ''Confirmed'' WHEN 2 THEN ''Pending''
-                        WHEN 3 THEN ''Cancelled'' WHEN 4 THEN ''Completed'' WHEN 5 THEN ''Refunded'' END AS Status,
-            COUNT(1) AS Count,
-            CASE Status WHEN 0 THEN ''#6c757d'' WHEN 1 THEN ''#198754'' WHEN 2 THEN ''#ffc107''
-                        WHEN 3 THEN ''#dc3545'' WHEN 4 THEN ''#0d6efd'' WHEN 5 THEN ''#6f42c1'' END AS Color
-        FROM [' + @DatabaseName + N'].dbo.Bookings WHERE IsDeleted=0 GROUP BY Status';
-    EXEC sp_executesql @sql;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Dashboard_GetRecentBookings
-    @DatabaseName NVARCHAR(100),
-    @TopCount     INT = 10
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'
-        SELECT TOP (@TopCount)
-            b.Id, b.BookingReference,
-            c.Name AS CustomerName,
-            b.Destination, b.TravelDate, b.TotalAmount,
-            CASE b.Status WHEN 0 THEN ''Inquiry'' WHEN 1 THEN ''Confirmed'' WHEN 2 THEN ''Pending''
-                          WHEN 3 THEN ''Cancelled'' WHEN 4 THEN ''Completed'' WHEN 5 THEN ''Refunded'' END AS Status,
-            CASE b.PaymentStatus WHEN 0 THEN ''Unpaid'' WHEN 1 THEN ''Partial'' WHEN 2 THEN ''Paid''
-                                 WHEN 3 THEN ''Refunded'' WHEN 4 THEN ''Overdue'' END AS PaymentStatus
-        FROM [' + @DatabaseName + N'].dbo.Bookings b
-        INNER JOIN [' + @DatabaseName + N'].dbo.Customers c ON b.CustomerId=c.Id
-        WHERE b.IsDeleted=0 ORDER BY b.CreatedAt DESC';
-    EXEC sp_executesql @sql, N'@TopCount INT', @TopCount;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Dashboard_GetTopPackages
-    @DatabaseName NVARCHAR(100),
-    @TopCount     INT = 5
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'
-        SELECT TOP (@TopCount)
-            p.Id, p.PackageCode, p.Name, p.Destination,
-            COUNT(b.Id) AS BookingCount,
-            ISNULL(SUM(b.TotalAmount), 0) AS TotalRevenue
-        FROM [' + @DatabaseName + N'].dbo.TourPackages p
-        LEFT JOIN [' + @DatabaseName + N'].dbo.Bookings b ON p.Id=b.PackageId AND b.IsDeleted=0
-        WHERE p.IsDeleted=0
-        GROUP BY p.Id, p.PackageCode, p.Name, p.Destination
-        ORDER BY BookingCount DESC';
-    EXEC sp_executesql @sql, N'@TopCount INT', @TopCount;
+        N'@PackageDayId INT, @SightseeingId INT',
+        @PackageDayId, @SightseeingId;
 END
 GO
