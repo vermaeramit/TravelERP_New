@@ -5,8 +5,11 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TravelERP.Core.Entities.Master;
 using TravelERP.Core.Interfaces;
+using TravelERP.Infrastructure.Data;
 using TravelERP.Shared.DTOs;
 using TravelERP.Web.Services;
+using Dapper;
+using System.Data;
 
 namespace TravelERP.Web.Controllers;
 
@@ -16,13 +19,15 @@ public class AuthController : Controller
     private readonly IUserRepository _users;
     private readonly ICompanyRepository _companies;
     private readonly TenantDbProvisioningService _provisioner;
+    private readonly DbConnectionFactory _dbFactory;
 
     public AuthController(IUserRepository users, ICompanyRepository companies,
-        TenantDbProvisioningService provisioner)
+        TenantDbProvisioningService provisioner, DbConnectionFactory dbFactory)
     {
         _users = users;
         _companies = companies;
         _provisioner = provisioner;
+        _dbFactory = dbFactory;
     }
 
     [HttpGet("/login")]
@@ -117,11 +122,12 @@ public class AuthController : Controller
             CreatedAt = DateTime.UtcNow
         };
 
-        await _users.InsertAsync(adminUser);
+        var adminUserId = await _users.InsertAsync(adminUser);
 
         try
         {
-            await _provisioner.ProvisionAsync(dbName);
+            var superAdminRoleId = await _provisioner.ProvisionAsync(dbName);
+            await _users.SetTenantRoleAsync(adminUserId, superAdminRoleId);
         }
         catch (Exception ex)
         {
@@ -156,6 +162,9 @@ public class AuthController : Controller
 
     private async Task SignInAsync(MasterUser user, Company company, bool rememberMe)
     {
+        var isSuperAdmin = user.Role == TravelERP.Shared.Enums.UserRole.SuperAdmin
+                        || user.Role == TravelERP.Shared.Enums.UserRole.CompanyAdmin;
+
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
@@ -169,6 +178,37 @@ public class AuthController : Controller
             new("Currency", company.Currency),
             new("CurrencySymbol", company.CurrencySymbol),
         };
+
+        if (isSuperAdmin)
+        {
+            claims.Add(new Claim("IsSuperAdmin", "true"));
+        }
+        else if (user.TenantRoleId.HasValue)
+        {
+            claims.Add(new Claim("TenantRoleId", user.TenantRoleId.Value.ToString()));
+            // Load role — check if IsSystem (tenant SuperAdmin role)
+            using var conn = _dbFactory.CreateTenantConnection(company.DatabaseName);
+            var isSystem = await conn.ExecuteScalarAsync<bool>(
+                "SELECT IsSystem FROM Roles WHERE Id = @Id", new { Id = user.TenantRoleId.Value });
+            if (isSystem)
+            {
+                claims.Add(new Claim("IsSuperAdmin", "true"));
+            }
+            else
+            {
+                var perms = await conn.QueryAsync<(string Module, bool CanView, bool CanAdd, bool CanEdit, bool CanDelete)>(
+                    @"SELECT Module, CanView, CanAdd, CanEdit, CanDelete
+                      FROM RolePermissions WHERE RoleId = @Id",
+                    new { Id = user.TenantRoleId.Value });
+                foreach (var p in perms)
+                {
+                    if (p.CanView)   claims.Add(new Claim("Perm", $"{p.Module}.View"));
+                    if (p.CanAdd)    claims.Add(new Claim("Perm", $"{p.Module}.Add"));
+                    if (p.CanEdit)   claims.Add(new Claim("Perm", $"{p.Module}.Edit"));
+                    if (p.CanDelete) claims.Add(new Claim("Perm", $"{p.Module}.Delete"));
+                }
+            }
+        }
 
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         var principal = new ClaimsPrincipal(identity);

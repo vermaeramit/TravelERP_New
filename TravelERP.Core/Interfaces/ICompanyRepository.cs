@@ -9,6 +9,7 @@ public interface ICompanyRepository
     Task<IEnumerable<Company>> GetAllAsync();
     Task<int> InsertAsync(Company company);
     Task<bool> UpdateAsync(Company company);
+    Task<bool> UpdateNumberSeriesAsync(int companyId, string leadPrefix, string packagePrefix, int? updatedBy);
     Task<bool> ExistsAsync(string slug);
     Task<string> GenerateDbNameAsync();
 }

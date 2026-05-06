@@ -23,4 +23,6 @@ public class Company : BaseEntity
     public string TimeZone { get; set; } = "UTC";
     public string Currency { get; set; } = "INR";
     public string CurrencySymbol { get; set; } = "₹";
+    public string LeadPrefix { get; set; } = "LD";
+    public string PackagePrefix { get; set; } = "PKG";
 }

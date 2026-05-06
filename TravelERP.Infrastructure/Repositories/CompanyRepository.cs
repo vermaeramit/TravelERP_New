@@ -72,6 +72,21 @@ public class CompanyRepository : ICompanyRepository
             "sp_Company_Update", company, commandType: CommandType.StoredProcedure) > 0;
     }
 
+    public async Task<bool> UpdateNumberSeriesAsync(int companyId, string leadPrefix, string packagePrefix, int? updatedBy)
+    {
+        using var conn = _factory.CreateMasterConnection();
+        return await conn.ExecuteAsync(
+            "sp_Company_UpdateNumberSeries",
+            new
+            {
+                Id            = companyId,
+                LeadPrefix    = string.IsNullOrWhiteSpace(leadPrefix)    ? "LD"  : leadPrefix.Trim().ToUpperInvariant(),
+                PackagePrefix = string.IsNullOrWhiteSpace(packagePrefix) ? "PKG" : packagePrefix.Trim().ToUpperInvariant(),
+                UpdatedBy     = updatedBy
+            },
+            commandType: CommandType.StoredProcedure) > 0;
+    }
+
     public async Task<bool> ExistsAsync(string slug)
     {
         using var conn = _factory.CreateMasterConnection();

@@ -76,4 +76,12 @@ public class UserRepository : IUserRepository
             "sp_User_ChangePassword", new { Id = userId, PasswordHash = passwordHash },
             commandType: CommandType.StoredProcedure) > 0;
     }
+
+    public async Task SetTenantRoleAsync(int userId, int tenantRoleId)
+    {
+        using var conn = _factory.CreateMasterConnection();
+        await conn.ExecuteAsync(
+            "sp_User_SetTenantRole", new { Id = userId, TenantRoleId = tenantRoleId },
+            commandType: CommandType.StoredProcedure);
+    }
 }

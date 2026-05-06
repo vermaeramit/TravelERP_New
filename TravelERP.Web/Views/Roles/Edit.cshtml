@@ -1,0 +1,98 @@
+@model TravelERP.Core.Entities.Tenant.Role
+@{ ViewData["Title"] = $"Edit Role — {Model.RoleName}"; }
+
+<form asp-action="Edit" asp-controller="Roles" method="post">
+    @Html.AntiForgeryToken()
+    <input asp-for="Id" type="hidden" />
+    <input asp-for="IsSystem" type="hidden" />
+
+    <div class="card shadow-sm mb-3">
+        <div class="card-header bg-transparent border-0">
+            <h6 class="mb-0 fw-bold"><i class="bi bi-shield-lock text-primary me-2"></i>Role Details</h6>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label asp-for="RoleName" class="form-label small fw-semibold">Role Name</label>
+                    <input asp-for="RoleName" class="form-control" />
+                    <span asp-validation-for="RoleName" class="text-danger small"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Description" class="form-label small fw-semibold">Description</label>
+                    <input asp-for="Description" class="form-control" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-3">
+        <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center">
+            <h6 class="mb-0 fw-bold"><i class="bi bi-toggles text-primary me-2"></i>Module Permissions</h6>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-xs btn-outline-success" id="checkAll">Check All</button>
+                <button type="button" class="btn btn-xs btn-outline-danger" id="uncheckAll">Uncheck All</button>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-bordered mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width:220px">Module</th>
+                            <th class="text-center">View</th>
+                            <th class="text-center">Add</th>
+                            <th class="text-center">Edit</th>
+                            <th class="text-center">Delete</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var module in (string[])ViewBag.Modules)
+                        {
+                            var perm = Model.Permissions.FirstOrDefault(p => p.Module == module);
+                            <tr>
+                                <td class="fw-semibold small ps-3">@module</td>
+                                <td class="text-center">
+                                    <input type="checkbox" name="perms[@module]" value="true"
+                                           class="form-check-input perm-check"
+                                           @(perm?.CanView == true ? "checked" : "") />
+                                </td>
+                                <td class="text-center">
+                                    <input type="checkbox" name="perms[@module]" value="true"
+                                           class="form-check-input perm-check"
+                                           @(perm?.CanAdd == true ? "checked" : "") />
+                                </td>
+                                <td class="text-center">
+                                    <input type="checkbox" name="perms[@module]" value="true"
+                                           class="form-check-input perm-check"
+                                           @(perm?.CanEdit == true ? "checked" : "") />
+                                </td>
+                                <td class="text-center">
+                                    <input type="checkbox" name="perms[@module]" value="true"
+                                           class="form-check-input perm-check"
+                                           @(perm?.CanDelete == true ? "checked" : "") />
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 justify-content-end">
+        <a href="/Roles" class="btn btn-outline-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary px-4">
+            <i class="bi bi-check-lg me-1"></i>Save Permissions
+        </button>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        document.getElementById('checkAll').addEventListener('click', () =>
+            document.querySelectorAll('.perm-check').forEach(c => c.checked = true));
+        document.getElementById('uncheckAll').addEventListener('click', () =>
+            document.querySelectorAll('.perm-check').forEach(c => c.checked = false));
+    </script>
+}

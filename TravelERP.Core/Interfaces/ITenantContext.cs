@@ -11,4 +11,10 @@ public interface ITenantContext
     string UserFullName { get; }
     string UserEmail { get; }
     string UserRole { get; }
+    int? TenantRoleId { get; }
+    bool IsSuperAdmin { get; }
+    bool CanView(string module);
+    bool CanAdd(string module);
+    bool CanEdit(string module);
+    bool CanDelete(string module);
 }

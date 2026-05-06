@@ -11,4 +11,5 @@ public interface IUserRepository
     Task<bool> UpdateAsync(MasterUser user);
     Task<bool> UpdateLastLoginAsync(int userId);
     Task<bool> ChangePasswordAsync(int userId, string passwordHash);
+    Task SetTenantRoleAsync(int userId, int tenantRoleId);
 }

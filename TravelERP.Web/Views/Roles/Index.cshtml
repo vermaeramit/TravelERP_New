@@ -1,0 +1,71 @@
+@model IEnumerable<TravelERP.Core.Entities.Tenant.Role>
+@inject TravelERP.Core.Interfaces.ITenantContext Tenant
+@{ ViewData["Title"] = "Roles & Permissions"; }
+
+<div class="card shadow-sm">
+    <div class="card-header bg-transparent border-0 section-header">
+        <h5><i class="bi bi-shield-lock-fill text-primary me-2"></i>Roles & Permissions</h5>
+        @if (Tenant.CanAdd("Roles"))
+        {
+            <a href="/Roles/Create" class="btn btn-primary btn-sm">
+                <i class="bi bi-plus-lg me-1"></i>New Role
+            </a>
+        }
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            @foreach (var role in Model)
+            {
+                <div class="col-md-6 col-xl-4">
+                    <div class="card border h-100 @(role.IsSystem ? "border-primary" : "")">
+                        <div class="card-header d-flex justify-content-between align-items-center bg-transparent py-2">
+                            <div>
+                                <span class="fw-bold">@role.RoleName</span>
+                                @if (role.IsSystem)
+                                {
+                                    <span class="badge bg-primary ms-2 small">SuperAdmin</span>
+                                }
+                            </div>
+                            <div class="d-flex gap-1">
+                                @if (!role.IsSystem && Tenant.CanEdit("Roles"))
+                                {
+                                    <a href="/Roles/Edit/@role.Id" class="btn btn-sm btn-outline-primary" title="Edit">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                }
+                                @if (!role.IsSystem && Tenant.CanDelete("Roles"))
+                                {
+                                    <form method="post" action="/Roles/Delete/@role.Id" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <button class="btn btn-sm btn-outline-danger btn-confirm-delete" title="Deactivate">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                }
+                            </div>
+                        </div>
+                        <div class="card-body p-2">
+                            @if (role.IsSystem)
+                            {
+                                <div class="text-center py-3 text-muted small">
+                                    <i class="bi bi-infinity fs-4 d-block mb-1 text-primary"></i>
+                                    Full access to everything — non-editable
+                                </div>
+                            }
+                            else
+                            {
+                                <a href="/Roles/Edit/@role.Id" class="text-decoration-none text-muted small">
+                                    <i class="bi bi-pencil-square me-1"></i>Click to view/edit permissions
+                                </a>
+                            }
+                            @if (!string.IsNullOrEmpty(role.Description))
+                            {
+                                <p class="small text-muted mt-1 mb-0">@role.Description</p>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>

@@ -12,4 +12,5 @@ public class MasterUser : BaseEntity
     public bool IsActive { get; set; } = true;
     public DateTime? LastLoginAt { get; set; }
     public string? ProfileImageUrl { get; set; }
+    public int? TenantRoleId { get; set; }
 }
