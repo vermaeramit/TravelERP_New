@@ -1,0 +1,621 @@
+@using TravelERP.Core.Entities.Tenant
+@model TravelERP.Core.Entities.Tenant.Lead
+@inject TravelERP.Core.Interfaces.ITenantContext Tenant
+@{
+    ViewData["Title"] = $"Lead {Model.LeadNumber}";
+    var statuses = ViewBag.Statuses as IEnumerable<TravelERP.Core.Entities.Tenant.LeadStatus> ?? [];
+    var assignedToName = ViewBag.AssignedToName as string;
+    var activities = ViewBag.Activities as List<LeadActivity> ?? new();
+    var authorMap  = ViewBag.AuthorMap  as Dictionary<int, string> ?? new();
+    var templates  = ViewBag.Templates  as IEnumerable<ActivityTemplate> ?? Enumerable.Empty<ActivityTemplate>();
+    var canEdit    = Tenant.CanEdit(TravelERP.Core.Constants.AppModules.Leads);
+
+    string Relative(DateTime dt) {
+        var diff = DateTime.UtcNow - dt;
+        if (diff.TotalSeconds < 60) return "just now";
+        if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes}m ago";
+        if (diff.TotalHours   < 24) return $"{(int)diff.TotalHours}h ago";
+        if (diff.TotalDays    < 7)  return $"{(int)diff.TotalDays}d ago";
+        return dt.ToLocalTime().ToString("dd MMM yyyy");
+    }
+}
+
+@section Styles {
+    <style>
+        .info-row { padding: .5rem 0; border-bottom: 1px solid var(--bs-border-color); }
+        .info-row:last-child { border-bottom: 0; }
+        .info-label { font-size: .75rem; text-transform: uppercase; letter-spacing: .5px;
+                      color: var(--bs-secondary-color); font-weight: 600; }
+        .info-value { font-size: .95rem; }
+        .pax-pill { background: var(--bs-light); border-radius: 999px;
+                    padding: .25rem .75rem; font-size: .85rem; display: inline-flex;
+                    align-items: center; gap: .35rem; }
+        .pax-pill .num { font-weight: 700; color: var(--bs-primary); }
+        .status-option {
+            display: flex; align-items: center; gap: .75rem;
+            padding: .75rem 1rem;
+            border: 1px solid var(--bs-border-color);
+            border-radius: .5rem;
+            background: #fff;
+            cursor: pointer;
+            width: 100%;
+            transition: transform .1s, box-shadow .15s;
+        }
+        .status-option:hover { transform: translateX(3px); box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+        .status-option.current { border-color: var(--bs-primary); background: rgba(13,110,253,.05); }
+
+        /* ── Activity timeline ── */
+        .act-tabs { display:flex; flex-wrap:wrap; gap:.4rem; }
+        .act-tab {
+            border:1px solid var(--bs-border-color); background:#fff;
+            border-radius:999px; padding:.3rem .9rem; font-size:.8rem; font-weight:600;
+            cursor:pointer; display:inline-flex; align-items:center; gap:.4rem;
+            transition: all .15s;
+        }
+        .act-tab:hover { background: var(--bs-light); }
+        .act-tab.active { background: var(--bs-primary); border-color: var(--bs-primary); color:#fff; }
+
+        .timeline { position: relative; padding-left: 3.25rem; }
+        .timeline::before {
+            content:''; position:absolute; left: 1.125rem; top: 0; bottom: 0;
+            width: 2px; background: var(--bs-border-color);
+        }
+        .timeline-item { position: relative; padding-bottom: 1.25rem; }
+        .timeline-icon {
+            position: absolute; left: -3.25rem; top: .15rem;
+            width: 2.25rem; height: 2.25rem; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: .95rem;
+            box-shadow: 0 0 0 4px var(--bs-body-bg);
+        }
+        .timeline-card {
+            background: #fff; border: 1px solid var(--bs-border-color); border-radius: .5rem;
+            padding: .75rem 1rem;
+        }
+        .timeline-card.scheduled { border-color: var(--bs-danger); background: rgba(220,53,69,.04); }
+        .timeline-card.status-change { background: var(--bs-light); padding: .5rem 1rem; }
+        .type-chip {
+            display:inline-flex; align-items:center; gap:.3rem;
+            padding:.2rem .55rem; border-radius:999px;
+            font-size:.72rem; font-weight:700; letter-spacing:.3px;
+            text-transform: uppercase;
+        }
+        .timeline-subject { font-weight: 600; font-size: .95rem; margin-top: .2rem; }
+        .timeline-notes { font-size: .9rem; margin-top: .15rem; margin-bottom: .35rem;
+                          white-space: pre-wrap; }
+        .timeline-meta { font-size: .75rem; color: var(--bs-secondary-color); }
+        .timeline-meta i { opacity: .8; }
+        .timeline-meta .meta-sep { opacity: .35; margin: 0 .35rem; }
+        .timeline-actions { opacity: 0; transition: opacity .15s; }
+        .timeline-item:hover .timeline-actions { opacity: 1; }
+    </style>
+}
+
+<!-- HEADER STRIP -->
+<div class="card shadow-sm mb-3">
+    <div class="card-body py-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div class="d-flex align-items-center flex-wrap gap-2">
+                <a href="/Leads" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+                <span class="badge bg-light text-dark font-monospace fs-6">@Model.LeadNumber</span>
+                <button type="button" class="btn btn-sm p-0 border-0"
+                        data-bs-toggle="modal" data-bs-target="#statusModal"
+                        @(Tenant.CanEdit(TravelERP.Core.Constants.AppModules.Leads) ? "" : "disabled")>
+                    <span class="badge bg-@(Model.StatusColor ?? "secondary") fs-6">@(Model.StatusName ?? "—")</span>
+                </button>
+                <span class="text-muted small ms-2">
+                    Created @Model.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")
+                </span>
+            </div>
+            <div class="d-flex gap-2">
+                @if (!string.IsNullOrEmpty(Model.Mobile))
+                {
+                    <a href="tel:@Model.Mobile" class="btn btn-sm btn-outline-success">
+                        <i class="bi bi-telephone me-1"></i>Call
+                    </a>
+                }
+                @if (!string.IsNullOrEmpty(Model.Email))
+                {
+                    <a href="mailto:@Model.Email" class="btn btn-sm btn-outline-info">
+                        <i class="bi bi-envelope me-1"></i>Email
+                    </a>
+                }
+                @if (Tenant.CanAdd(TravelERP.Core.Constants.AppModules.Packages))
+                {
+                    <a href="/Packages/Create?leadId=@Model.Id" class="btn btn-sm btn-success">
+                        <i class="bi bi-suitcase-lg me-1"></i>Create Package
+                    </a>
+                }
+                @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.Leads))
+                {
+                    <a href="/Leads/Edit/@Model.Id" class="btn btn-sm btn-primary">
+                        <i class="bi bi-pencil me-1"></i>Edit
+                    </a>
+                }
+                @if (Tenant.CanDelete(TravelERP.Core.Constants.AppModules.Leads))
+                {
+                    <form asp-action="Delete" method="post" class="d-inline" onsubmit="return confirm('Deactivate this lead?');">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@Model.Id" />
+                        <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                    </form>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <!-- LEFT: Lead Details -->
+    <div class="col-lg-8">
+        <!-- Contact Card -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-transparent border-0">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-person-vcard text-primary me-2"></i>Contact</h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-2">
+                    <div class="col-md-6 info-row">
+                        <div class="info-label">Name</div>
+                        <div class="info-value fw-semibold">@Model.Name</div>
+                    </div>
+                    <div class="col-md-3 info-row">
+                        <div class="info-label">Mobile</div>
+                        <div class="info-value">
+                            @if (!string.IsNullOrEmpty(Model.Mobile))
+                            {
+                                <a href="tel:@Model.Mobile" class="text-decoration-none">
+                                    <i class="bi bi-telephone-fill text-success me-1"></i>@Model.Mobile
+                                </a>
+                            }
+                            else { <span class="text-muted">—</span> }
+                        </div>
+                    </div>
+                    <div class="col-md-3 info-row">
+                        <div class="info-label">Email</div>
+                        <div class="info-value">
+                            @if (!string.IsNullOrEmpty(Model.Email))
+                            {
+                                <a href="mailto:@Model.Email" class="text-decoration-none">
+                                    <i class="bi bi-envelope-fill text-info me-1"></i>@Model.Email
+                                </a>
+                            }
+                            else { <span class="text-muted">—</span> }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trip Details Card -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-transparent border-0">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-geo-alt-fill text-primary me-2"></i>Trip Details</h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-2">
+                    <div class="col-md-4 info-row">
+                        <div class="info-label">Destination</div>
+                        <div class="info-value fw-semibold">@(Model.DestinationName ?? "—")</div>
+                    </div>
+                    <div class="col-md-4 info-row">
+                        <div class="info-label">Traveling Date</div>
+                        <div class="info-value">@(Model.TravelingDate?.ToString("dd MMM yyyy") ?? "—")</div>
+                    </div>
+                    <div class="col-md-4 info-row">
+                        <div class="info-label">Duration</div>
+                        <div class="info-value">@(Model.Days.HasValue ? $"{Model.Days} days" : "—")</div>
+                    </div>
+                    <div class="col-md-6 info-row">
+                        <div class="info-label">Leaving From</div>
+                        <div class="info-value">@(Model.LeavingFrom ?? "—")</div>
+                    </div>
+                    <div class="col-md-6 info-row">
+                        <div class="info-label">Hotel Recommended</div>
+                        <div class="info-value">@(Model.HotelRecommended ?? "—")</div>
+                    </div>
+                    <div class="col-12 info-row">
+                        <div class="info-label">Travelers</div>
+                        <div class="info-value mt-2 d-flex flex-wrap gap-2">
+                            <span class="pax-pill"><span class="num">@Model.Adults</span> Adults</span>
+                            <span class="pax-pill"><span class="num">@Model.Children</span> Children</span>
+                            <span class="pax-pill"><span class="num">@Model.Infants</span> Infants</span>
+                            <span class="pax-pill bg-primary text-white">
+                                <i class="bi bi-people-fill"></i>
+                                <strong>Total: @Model.TotalPax</strong>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Remark Card -->
+        @if (!string.IsNullOrWhiteSpace(Model.Remark))
+        {
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-transparent border-0">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-chat-square-text text-primary me-2"></i>Remark</h6>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0">@Model.Remark</p>
+                </div>
+            </div>
+        }
+
+        <!-- Activity Timeline -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center">
+                <h6 class="mb-0 fw-bold">
+                    <i class="bi bi-activity text-primary me-2"></i>Activity &amp; Follow-ups
+                    <span class="badge bg-light text-dark ms-1">@activities.Count</span>
+                </h6>
+                @if (canEdit)
+                {
+                    <button type="button" class="btn btn-sm btn-primary"
+                            data-bs-toggle="modal" data-bs-target="#activityModal">
+                        <i class="bi bi-plus-lg me-1"></i>Add Activity
+                    </button>
+                }
+            </div>
+
+            <div class="card-body">
+                @if (!activities.Any())
+                {
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-clock-history fs-1 d-block mb-2 opacity-50"></i>
+                        <p class="mb-0 small">No activity yet. Click <strong>+ Add Activity</strong> to log your first call, email, or note.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="timeline">
+                        @foreach (var a in activities)
+                        {
+                            var (icon, color) = ActivityTypes.Style(a.ActivityType);
+                            var authorName = authorMap.TryGetValue(a.CreatedByUserId, out var n) ? n : null;
+                            var isStatusChange = a.ActivityType == ActivityTypes.StatusChange;
+                            var cardClass = "timeline-card";
+                            if (a.IsScheduledFollowUp) cardClass += " scheduled";
+                            if (isStatusChange) cardClass += " status-change";
+
+                            <div class="timeline-item">
+                                <div class="timeline-icon bg-@color">
+                                    <i class="bi @icon"></i>
+                                </div>
+                                <div class="@cardClass">
+                                    <div class="d-flex justify-content-between align-items-start gap-2">
+                                        <div class="flex-grow-1 min-width-0">
+                                            <!-- Type chip + flags -->
+                                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                                <span class="type-chip bg-@(color)-subtle text-@color">
+                                                    <i class="bi @icon"></i>@a.ActivityType
+                                                </span>
+                                                @if (a.IsScheduledFollowUp)
+                                                {
+                                                    <span class="badge bg-danger-subtle text-danger">
+                                                        <i class="bi bi-bell me-1"></i>Pending
+                                                    </span>
+                                                }
+                                            </div>
+
+                                            @if (!string.IsNullOrEmpty(a.Subject))
+                                            {
+                                                <div class="timeline-subject">@a.Subject</div>
+                                            }
+                                            @if (!string.IsNullOrEmpty(a.Notes))
+                                            {
+                                                <div class="timeline-notes">@a.Notes</div>
+                                            }
+
+                                            <!-- Meta line -->
+                                            <div class="timeline-meta">
+                                                @if (a.IsScheduledFollowUp)
+                                                {
+                                                    <span class="text-danger fw-semibold">
+                                                        <i class="bi bi-calendar-event me-1"></i>Due @a.NextFollowUpAt!.Value.ToLocalTime().ToString("dd MMM yyyy HH:mm")
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span>
+                                                        <i class="bi bi-clock me-1"></i>@a.ActivityAt.ToLocalTime().ToString("dd MMM yyyy · HH:mm")
+                                                    </span>
+                                                }
+                                                @if (!string.IsNullOrEmpty(authorName))
+                                                {
+                                                    <span class="meta-sep">·</span>
+                                                    <span><i class="bi bi-person-circle me-1"></i>@authorName</span>
+                                                }
+                                                <span class="meta-sep">·</span>
+                                                <span title="@a.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm:ss")">
+                                                    logged @Relative(a.CreatedAt)
+                                                </span>
+                                                @if (a.NextFollowUpAt.HasValue && !a.IsScheduledFollowUp)
+                                                {
+                                                    <span class="meta-sep">·</span>
+                                                    <span class="text-muted">
+                                                        Next: @a.NextFollowUpAt.Value.ToLocalTime().ToString("dd MMM HH:mm")
+                                                    </span>
+                                                }
+                                            </div>
+                                        </div>
+
+                                        @if (canEdit && !isStatusChange)
+                                        {
+                                            <div class="timeline-actions d-flex gap-1 flex-shrink-0">
+                                                @if (a.IsScheduledFollowUp)
+                                                {
+                                                    <form asp-controller="LeadActivities" asp-action="Complete" method="post" class="m-0">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="id" value="@a.Id" />
+                                                        <input type="hidden" name="leadId" value="@Model.Id" />
+                                                        <button type="submit" class="btn btn-sm btn-outline-success py-0 px-2"
+                                                                title="Mark done"><i class="bi bi-check-lg"></i></button>
+                                                    </form>
+                                                }
+                                                <form asp-controller="LeadActivities" asp-action="Delete" method="post" class="m-0"
+                                                      onsubmit="return confirm('Remove this activity?');">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@a.Id" />
+                                                    <input type="hidden" name="leadId" value="@Model.Id" />
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2"
+                                                            title="Delete"><i class="bi bi-trash"></i></button>
+                                                </form>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- RIGHT: Sidebar -->
+    <div class="col-lg-4">
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-transparent border-0">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-info-circle text-primary me-2"></i>Lead Info</h6>
+            </div>
+            <div class="card-body">
+                <div class="info-row">
+                    <div class="info-label">Status</div>
+                    <div class="info-value mt-1">
+                        <span class="badge bg-@(Model.StatusColor ?? "secondary") fs-6">@(Model.StatusName ?? "—")</span>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Source</div>
+                    <div class="info-value">@(Model.SourceName ?? "—")</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Assigned To</div>
+                    <div class="info-value">
+                        @if (!string.IsNullOrEmpty(assignedToName))
+                        {
+                            <i class="bi bi-person-circle me-1"></i>@assignedToName
+                        }
+                        else { <span class="text-muted">Unassigned</span> }
+                    </div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Created</div>
+                    <div class="info-value small">@Model.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</div>
+                </div>
+                @if (Model.UpdatedAt.HasValue)
+                {
+                    <div class="info-row">
+                        <div class="info-label">Last Updated</div>
+                        <div class="info-value small">@Model.UpdatedAt.Value.ToLocalTime().ToString("dd MMM yyyy HH:mm")</div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Activity Modal -->
+@if (canEdit)
+{
+    <div class="modal fade" id="activityModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-plus-circle text-primary me-2"></i>Log Activity
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form asp-controller="LeadActivities" asp-action="Add" method="post">
+                    <div class="modal-body">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="leadId" value="@Model.Id" />
+
+                        <label class="form-label small fw-semibold mb-2">Type</label>
+                        <div class="act-tabs mb-3">
+                            @foreach (var t in ActivityTypes.UserSelectable)
+                            {
+                                var (icon, color) = ActivityTypes.Style(t);
+                                <label class="act-tab @(t == ActivityTypes.Note ? "active" : "")">
+                                    <input type="radio" name="activityType" value="@t" class="d-none act-radio" @(t == ActivityTypes.Note ? "checked" : "") />
+                                    <i class="bi @icon text-@color"></i>@t
+                                </label>
+                            }
+                        </div>
+
+                        @if (templates.Any())
+                        {
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold mb-1">
+                                    <i class="bi bi-lightning-fill text-warning me-1"></i>Quick template
+                                    <span class="text-muted fw-normal">— or just type your own below</span>
+                                </label>
+                                <select id="tmplPicker" class="form-select form-select-sm">
+                                    <option value="">— Pick a template —</option>
+                                    @foreach (var t in templates)
+                                    {
+                                        <option value="@t.Id"
+                                                data-type="@t.ActivityType"
+                                                data-subject="@t.Subject"
+                                                data-notes="@t.Notes">
+                                            @t.Name@(t.ActivityType != "All" ? $" ({t.ActivityType})" : "")
+                                        </option>
+                                    }
+                                </select>
+                            </div>
+                        }
+
+                        <div class="row g-3">
+                            <div class="col-md-12">
+                                <label class="form-label small fw-semibold mb-1">Subject</label>
+                                <input type="text" name="subject" id="actSubject" class="form-control form-control-sm"
+                                       placeholder="Short title (optional)" />
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label small fw-semibold mb-1">Notes</label>
+                                <textarea name="notes" id="actNotes" class="form-control form-control-sm" rows="3"
+                                          placeholder="What was discussed, next steps, agreed price, etc."></textarea>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold mb-1">Activity time</label>
+                                <input type="datetime-local" name="activityAt" class="form-control form-control-sm act-time"
+                                       value="@DateTime.Now.ToString("yyyy-MM-ddTHH:mm")" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold mb-1">Schedule next follow-up</label>
+                                <input type="datetime-local" name="nextFollowUpAt" class="form-control form-control-sm"
+                                       placeholder="Optional" />
+                                <small class="text-muted">Leave blank if no follow-up needed.</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0 pt-0">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-1"></i>Log Activity
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Change Status Modal -->
+<div class="modal fade" id="statusModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold"><i class="bi bi-flag-fill text-primary me-2"></i>Change Status</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-3">Pick a new status for this lead.</p>
+                <form asp-action="ChangeStatus" method="post" id="statusForm">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="@Model.Id" />
+                    <input type="hidden" name="statusId" id="statusNewId" />
+                    <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
+                    <div class="d-grid gap-2">
+                        @foreach (var s in statuses)
+                        {
+                            <button type="button" class="status-option @(s.Id == Model.StatusId ? "current" : "")" data-status-id="@s.Id">
+                                <span class="badge bg-@s.Color">@s.Name</span>
+                                @if (s.IsClosed) { <span class="text-muted small">(closed)</span> }
+                                @if (s.Id == Model.StatusId) { <i class="bi bi-check-circle-fill text-primary ms-auto"></i> }
+                            </button>
+                        }
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Status modal — click an option, submit form
+        const newIdEl = document.getElementById('statusNewId');
+        const form    = document.getElementById('statusForm');
+        document.querySelectorAll('.status-option').forEach(btn => {
+            btn.addEventListener('click', () => {
+                newIdEl.value = btn.dataset.statusId;
+                form.submit();
+            });
+        });
+
+        // ─── Activity Modal logic ───
+        const tmplPicker = document.getElementById('tmplPicker');
+        const subjectEl  = document.getElementById('actSubject');
+        const notesEl    = document.getElementById('actNotes');
+
+        function currentActivityType() {
+            const checked = document.querySelector('.act-radio:checked');
+            return checked ? checked.value : 'Note';
+        }
+
+        // Show only templates that match the current activity type (or "All")
+        function refreshTemplateOptions() {
+            if (!tmplPicker) return;
+            const type = currentActivityType();
+            tmplPicker.value = '';
+            Array.from(tmplPicker.options).forEach(o => {
+                if (!o.value) { o.hidden = false; return; }
+                const t = o.dataset.type;
+                o.hidden = !(t === 'All' || t === type);
+            });
+        }
+
+        // Type tab toggle — also re-filter the template dropdown
+        document.querySelectorAll('.act-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.act-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                const radio = tab.querySelector('.act-radio');
+                if (radio) radio.checked = true;
+                refreshTemplateOptions();
+            });
+        });
+
+        // Pick a template → fill subject + notes (and switch type if template specifies one)
+        if (tmplPicker) {
+            tmplPicker.addEventListener('change', () => {
+                const opt = tmplPicker.options[tmplPicker.selectedIndex];
+                if (!opt || !opt.value) return;
+                if (opt.dataset.subject) subjectEl.value = opt.dataset.subject;
+                if (opt.dataset.notes)   notesEl.value   = opt.dataset.notes;
+
+                // If template is bound to a specific type, switch the tab
+                const tType = opt.dataset.type;
+                if (tType && tType !== 'All') {
+                    const target = document.querySelector(`.act-radio[value="${tType}"]`);
+                    if (target) {
+                        target.checked = true;
+                        document.querySelectorAll('.act-tab').forEach(t => t.classList.remove('active'));
+                        target.closest('.act-tab')?.classList.add('active');
+                    }
+                }
+            });
+        }
+
+        // When the activity modal opens, reset time to now and clear fields
+        const actModal = document.getElementById('activityModal');
+        if (actModal) {
+            actModal.addEventListener('show.bs.modal', () => {
+                const timeEl = actModal.querySelector('.act-time');
+                if (timeEl) {
+                    const now = new Date();
+                    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+                    timeEl.value = now.toISOString().slice(0, 16);
+                }
+                if (tmplPicker) tmplPicker.value = '';
+                if (subjectEl) subjectEl.value = '';
+                if (notesEl)   notesEl.value   = '';
+                refreshTemplateOptions();
+            });
+        }
+    </script>
+}

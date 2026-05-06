@@ -1,0 +1,143 @@
+@model TravelERP.Core.Entities.Tenant.Lead
+@{
+    ViewData["Title"] = "Add Lead";
+    var statuses     = ViewBag.Statuses     as IEnumerable<TravelERP.Core.Entities.Tenant.LeadStatus>  ?? [];
+    var sources      = ViewBag.Sources      as IEnumerable<TravelERP.Core.Entities.Tenant.LeadSource>  ?? [];
+    var destinations = ViewBag.Destinations as IEnumerable<TravelERP.Core.Entities.Tenant.Destination> ?? [];
+    var users        = ViewBag.Users        as IEnumerable<TravelERP.Core.Entities.Master.MasterUser>  ?? [];
+}
+
+<form asp-action="Create" method="post">
+    @Html.AntiForgeryToken()
+
+    <!-- CONTACT -->
+    <div class="card shadow-sm mb-3">
+        <div class="card-header bg-transparent border-0">
+            <h6 class="mb-0 fw-bold"><i class="bi bi-person-vcard text-primary me-2"></i>Lead Contact</h6>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label asp-for="Name" class="form-label small fw-semibold">Name <span class="text-danger">*</span></label>
+                    <input asp-for="Name" class="form-control" autofocus />
+                    <span asp-validation-for="Name" class="text-danger small"></span>
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="Mobile" class="form-label small fw-semibold">Mobile</label>
+                    <input asp-for="Mobile" class="form-control" placeholder="+91 …" />
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="Email" class="form-label small fw-semibold">Email</label>
+                    <input asp-for="Email" type="email" class="form-control" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TRIP DETAILS -->
+    <div class="card shadow-sm mb-3">
+        <div class="card-header bg-transparent border-0">
+            <h6 class="mb-0 fw-bold"><i class="bi bi-geo-alt text-primary me-2"></i>Trip Details</h6>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label asp-for="DestinationId" class="form-label small fw-semibold">Destination</label>
+                    <select asp-for="DestinationId" class="form-select select2">
+                        <option value="">Select Destination</option>
+                        @foreach (var d in destinations)
+                        {
+                            <option value="@d.Id">@d.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="TravelingDate" class="form-label small fw-semibold">Traveling Date</label>
+                    <input asp-for="TravelingDate" type="date" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="LeavingFrom" class="form-label small fw-semibold">Leaving From</label>
+                    <input asp-for="LeavingFrom" class="form-control" placeholder="e.g. Mumbai" />
+                </div>
+                <div class="col-md-12">
+                    <label asp-for="HotelRecommended" class="form-label small fw-semibold">Hotel Recommended</label>
+                    <input asp-for="HotelRecommended" class="form-control" placeholder="Specific hotel preference (optional)" />
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="Adults" class="form-label small fw-semibold">Adults</label>
+                    <input asp-for="Adults" type="number" min="0" class="form-control" />
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="Children" class="form-label small fw-semibold">Children</label>
+                    <input asp-for="Children" type="number" min="0" class="form-control" />
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="Infants" class="form-label small fw-semibold">Infants</label>
+                    <input asp-for="Infants" type="number" min="0" class="form-control" />
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="Days" class="form-label small fw-semibold">No. of Days</label>
+                    <input asp-for="Days" type="number" min="0" class="form-control" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ASSIGNMENT -->
+    <div class="card shadow-sm mb-3">
+        <div class="card-header bg-transparent border-0">
+            <h6 class="mb-0 fw-bold"><i class="bi bi-person-gear text-primary me-2"></i>Assignment &amp; Source</h6>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label asp-for="StatusId" class="form-label small fw-semibold">Status</label>
+                    <select asp-for="StatusId" class="form-select select2">
+                        <option value="">— Default —</option>
+                        @foreach (var s in statuses)
+                        {
+                            <option value="@s.Id">@s.Name</option>
+                        }
+                    </select>
+                    <small class="text-muted">If left blank, the default status is auto-assigned.</small>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="SourceId" class="form-label small fw-semibold">Lead Source</label>
+                    <select asp-for="SourceId" class="form-select select2">
+                        <option value="">— Select —</option>
+                        @foreach (var s in sources)
+                        {
+                            <option value="@s.Id">@s.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="AssignedToUserId" class="form-label small fw-semibold">Assigned To</label>
+                    <select asp-for="AssignedToUserId" class="form-select select2">
+                        <option value="">— Unassigned —</option>
+                        @foreach (var u in users)
+                        {
+                            <option value="@u.Id">@u.FullName</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-12">
+                    <label asp-for="Remark" class="form-label small fw-semibold">Remark</label>
+                    <textarea asp-for="Remark" class="form-control" rows="3"></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 justify-content-end">
+        <a href="/Leads" class="btn btn-outline-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary px-4">
+            <i class="bi bi-check-lg me-1"></i>Save Lead
+        </button>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>$('.select2').select2({ theme: 'bootstrap-5', width: '100%' });</script>
+}

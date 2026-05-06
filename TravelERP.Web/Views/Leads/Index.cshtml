@@ -1,0 +1,401 @@
+@using TravelERP.Core.Common
+@using TravelERP.Core.Interfaces
+@model PagedResult<TravelERP.Core.Entities.Tenant.Lead>
+@inject TravelERP.Core.Interfaces.ITenantContext Tenant
+@{
+    ViewData["Title"] = "Leads";
+    var statuses     = ViewBag.Statuses     as IEnumerable<TravelERP.Core.Entities.Tenant.LeadStatus>  ?? [];
+    var sources      = ViewBag.Sources      as IEnumerable<TravelERP.Core.Entities.Tenant.LeadSource>  ?? [];
+    var destinations = ViewBag.Destinations as IEnumerable<TravelERP.Core.Entities.Tenant.Destination> ?? [];
+    var users        = ViewBag.Users        as IEnumerable<TravelERP.Core.Entities.Master.MasterUser>  ?? [];
+    var userMap      = ViewBag.AssignedToUserMap as Dictionary<int, string> ?? new();
+    var f            = (LeadFilter)ViewBag.Filter;
+
+    string PageUrl(int p) {
+        var qs = Context.Request.QueryString.Value ?? "";
+        var parts = (qs.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+            .Where(x => !x.StartsWith("page=", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        parts.Add($"page={p}");
+        return Context.Request.Path + "?" + string.Join("&", parts);
+    }
+}
+
+@section Styles {
+    <style>
+        .lead-card {
+            background:#fff; border:1px solid var(--bs-border-color); border-radius:.6rem;
+            transition: transform .12s, box-shadow .15s;
+        }
+        .lead-card:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,.06); }
+        .lead-card .lc-head {
+            display:flex; flex-wrap:wrap; align-items:center; gap:.5rem;
+            padding:.65rem 1rem; border-bottom:1px solid var(--bs-border-color); background:#fafbfc;
+            border-radius:.6rem .6rem 0 0;
+        }
+        .lead-card .lc-body { padding: .85rem 1rem; }
+        .lead-card .lc-foot {
+            padding: .5rem 1rem; border-top:1px dashed var(--bs-border-color);
+            font-size:.75rem; color: var(--bs-secondary-color);
+            display:flex; justify-content:space-between; align-items:center;
+        }
+        .lead-card .field-label {
+            font-size:.7rem; text-transform:uppercase; letter-spacing:.5px;
+            color: var(--bs-secondary-color); font-weight:600;
+        }
+        .lead-card .field-value { font-size:.9rem; font-weight:500; }
+        .lead-card .name-link { font-size:1.05rem; font-weight:700; text-decoration:none; color:#212529; }
+        .lead-card .name-link:hover { color: var(--bs-primary); }
+        .lead-card .lead-no { font-family: ui-monospace, SFMono-Regular, monospace;
+                              font-size:.78rem; color:var(--bs-secondary-color); }
+        .pax-pill { background: var(--bs-light); border-radius:999px;
+                    padding:.15rem .6rem; font-size:.75rem; }
+        .pax-pill .num { font-weight:700; color: var(--bs-primary); }
+        .status-pill { border:0; background:transparent; padding:0; cursor:pointer; }
+        .status-pill:disabled { cursor:not-allowed; opacity:.7; }
+        .status-pill .badge { font-size:.78rem; padding:5px 12px; }
+
+        .filter-bar { background:#fff; border:1px solid var(--bs-border-color); border-radius:.6rem; }
+        .filter-bar .form-control, .filter-bar .form-select { font-size:.85rem; }
+
+        .status-option {
+            display: flex; align-items: center; gap: .75rem; padding: .75rem 1rem;
+            border: 1px solid var(--bs-border-color); border-radius: .5rem;
+            background: #fff; cursor: pointer; width: 100%;
+            transition: transform .1s, box-shadow .15s;
+        }
+        .status-option:hover { transform: translateX(3px); box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+        .status-option.current { border-color: var(--bs-primary); background: rgba(13,110,253,.05); }
+    </style>
+}
+
+<!-- HEADER -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <p class="text-muted mb-0 small">
+            @if (Model.Total > 0)
+            {
+                <span>Showing <strong>@Model.FirstItemNumber</strong>–<strong>@Model.LastItemNumber</strong> of <strong>@Model.Total</strong> leads</span>
+            }
+            else
+            {
+                <span>No leads match your filters.</span>
+            }
+        </p>
+    </div>
+    @if (Tenant.CanAdd(TravelERP.Core.Constants.AppModules.Leads))
+    {
+        <a href="/Leads/Create" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Add Lead
+        </a>
+    }
+</div>
+
+<!-- FILTERS -->
+<div class="filter-bar p-3 mb-3 shadow-sm">
+    <form method="get" class="row g-2 align-items-end">
+        <div class="col-md-2">
+            <label class="form-label small fw-semibold mb-1">From</label>
+            <input type="date" name="dateFrom" class="form-control form-control-sm"
+                   value="@(f.DateFrom?.ToString("yyyy-MM-dd"))" />
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small fw-semibold mb-1">To</label>
+            <input type="date" name="dateTo" class="form-control form-control-sm"
+                   value="@(f.DateTo?.ToString("yyyy-MM-dd"))" />
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small fw-semibold mb-1">Destination</label>
+            <select name="destinationId" class="form-select form-select-sm">
+                <option value="">All</option>
+                @foreach (var d in destinations)
+                {
+                    <option value="@d.Id" selected="@(d.Id == f.DestinationId)">@d.Name</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small fw-semibold mb-1">Status</label>
+            <select name="statusId" class="form-select form-select-sm">
+                <option value="">All</option>
+                @foreach (var s in statuses)
+                {
+                    <option value="@s.Id" selected="@(s.Id == f.StatusId)">@s.Name</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small fw-semibold mb-1">Source</label>
+            <select name="sourceId" class="form-select form-select-sm">
+                <option value="">All</option>
+                @foreach (var s in sources)
+                {
+                    <option value="@s.Id" selected="@(s.Id == f.SourceId)">@s.Name</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small fw-semibold mb-1">Agent</label>
+            <select name="assignedTo" class="form-select form-select-sm">
+                <option value="">All</option>
+                @foreach (var u in users)
+                {
+                    <option value="@u.Id" selected="@(u.Id == f.AssignedTo)">@u.FullName</option>
+                }
+            </select>
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold mb-1">Search</label>
+            <input type="text" name="search" value="@f.Search" class="form-control form-control-sm"
+                   placeholder="Name, mobile, email or lead #" />
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small fw-semibold mb-1">Page Size</label>
+            <select name="pageSize" class="form-select form-select-sm">
+                @foreach (var n in new[] { 10, 25, 50, 100 })
+                {
+                    <option value="@n" selected="@(n == f.PageSize)">@n / page</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-3 d-flex align-items-center pt-3">
+            <div class="form-check">
+                <input type="checkbox" name="showClosed" value="true" class="form-check-input"
+                       id="showClosed" @(f.ShowClosed ? "checked" : "") />
+                <label for="showClosed" class="form-check-label small">Include closed</label>
+            </div>
+        </div>
+        <div class="col-md-3 d-flex gap-2 justify-content-end">
+            <a href="/Leads" class="btn btn-sm btn-outline-secondary">Reset</a>
+            <button type="submit" class="btn btn-sm btn-primary px-3">
+                <i class="bi bi-funnel me-1"></i>Apply
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- LEAD CARDS -->
+@if (!Model.Items.Any())
+{
+    <div class="card shadow-sm">
+        <div class="card-body text-center py-5 text-muted">
+            <i class="bi bi-funnel fs-1 d-block mb-2 opacity-50"></i>
+            <p class="mb-0">No leads found. <a href="/Leads">Clear filters</a> or <a href="/Leads/Create">add a new lead</a>.</p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="d-flex flex-column gap-2">
+        @foreach (var l in Model.Items)
+        {
+            var assignedName = l.AssignedToUserId.HasValue && userMap.TryGetValue(l.AssignedToUserId.Value, out var nm) ? nm : null;
+            <div class="lead-card shadow-sm">
+                <!-- Card header -->
+                <div class="lc-head">
+                    <button type="button" class="status-pill"
+                            data-lead-id="@l.Id" data-current-status="@l.StatusId"
+                            data-bs-toggle="modal" data-bs-target="#statusModal"
+                            @(Tenant.CanEdit(TravelERP.Core.Constants.AppModules.Leads) ? "" : "disabled")>
+                        <span class="badge bg-@(l.StatusColor ?? "secondary")">@(l.StatusName ?? "—")</span>
+                    </button>
+                    <a href="/Leads/Details/@l.Id" class="lead-no text-decoration-none">@l.LeadNumber</a>
+                    @if (!string.IsNullOrEmpty(l.SourceName))
+                    {
+                        <span class="badge bg-light text-dark border">@l.SourceName</span>
+                    }
+                    <div class="ms-auto d-flex align-items-center gap-2">
+                        @if (!string.IsNullOrEmpty(assignedName))
+                        {
+                            <span class="text-muted small"><i class="bi bi-person-circle me-1"></i>@assignedName</span>
+                        }
+                        @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.Leads))
+                        {
+                            <a href="/Leads/Edit/@l.Id" class="btn btn-sm btn-outline-primary py-0 px-2"
+                               title="Edit"><i class="bi bi-pencil"></i></a>
+                        }
+                        @if (Tenant.CanDelete(TravelERP.Core.Constants.AppModules.Leads))
+                        {
+                            <form asp-action="Delete" method="post" class="d-inline" onsubmit="return confirm('Deactivate this lead?');">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@l.Id" />
+                                <button class="btn btn-sm btn-outline-danger py-0 px-2" title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        }
+                    </div>
+                </div>
+
+                <!-- Card body -->
+                <div class="lc-body">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <div class="field-label mb-1">Name</div>
+                            <a href="/Leads/Details/@l.Id" class="name-link">@l.Name</a>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="field-label mb-1">Contact</div>
+                            <div class="field-value">
+                                @if (!string.IsNullOrEmpty(l.Mobile))
+                                {
+                                    <div><a href="tel:@l.Mobile" class="text-decoration-none">
+                                        <i class="bi bi-telephone-fill text-success me-1"></i>@l.Mobile
+                                    </a></div>
+                                }
+                                @if (!string.IsNullOrEmpty(l.Email))
+                                {
+                                    <div class="small text-truncate"><a href="mailto:@l.Email" class="text-decoration-none text-muted">
+                                        <i class="bi bi-envelope-fill text-info me-1"></i>@l.Email
+                                    </a></div>
+                                }
+                                @if (string.IsNullOrEmpty(l.Mobile) && string.IsNullOrEmpty(l.Email))
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="field-label mb-1">Destination</div>
+                            <div class="field-value">
+                                <i class="bi bi-geo-alt text-primary me-1"></i>@(l.DestinationName ?? "—")
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="field-label mb-1">Travel Date</div>
+                            <div class="field-value">
+                                @(l.TravelingDate?.ToString("dd MMM yyyy") ?? "—")
+                                @if (l.Days.HasValue) { <span class="text-muted small">· @l.Days d</span> }
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="field-label mb-1">Travelers</div>
+                            <div class="d-flex flex-wrap gap-1">
+                                <span class="pax-pill"><span class="num">@l.Adults</span>A</span>
+                                <span class="pax-pill"><span class="num">@l.Children</span>C</span>
+                                <span class="pax-pill"><span class="num">@l.Infants</span>I</span>
+                                <span class="pax-pill bg-primary text-white">Total <strong>@l.TotalPax</strong></span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="field-label mb-1">Leaving From</div>
+                            <div class="field-value">@(l.LeavingFrom ?? "—")</div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="field-label mb-1">Hotel Recommended</div>
+                            <div class="field-value text-truncate">@(l.HotelRecommended ?? "—")</div>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(l.Remark))
+                        {
+                            <div class="col-md-3">
+                                <div class="field-label mb-1">Remark</div>
+                                <div class="field-value text-truncate" title="@l.Remark">@l.Remark</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Card footer -->
+                <div class="lc-foot">
+                    <span><i class="bi bi-clock me-1"></i>Created @l.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</span>
+                    <a href="/Leads/Details/@l.Id" class="text-decoration-none">View Details <i class="bi bi-arrow-right"></i></a>
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- PAGINATION -->
+    @if (Model.TotalPages > 1)
+    {
+        <nav class="mt-3" aria-label="Lead pages">
+            <ul class="pagination pagination-sm justify-content-center mb-0">
+                <li class="page-item @(Model.HasPrevious ? "" : "disabled")">
+                    <a class="page-link" href="@PageUrl(Model.Page - 1)"><i class="bi bi-chevron-left"></i></a>
+                </li>
+                @{
+                    var start = Math.Max(1, Model.Page - 2);
+                    var end   = Math.Min(Model.TotalPages, start + 4);
+                    start = Math.Max(1, end - 4);
+                }
+                @if (start > 1)
+                {
+                    <li class="page-item"><a class="page-link" href="@PageUrl(1)">1</a></li>
+                    @if (start > 2) { <li class="page-item disabled"><span class="page-link">…</span></li> }
+                }
+                @for (int p = start; p <= end; p++)
+                {
+                    <li class="page-item @(p == Model.Page ? "active" : "")">
+                        <a class="page-link" href="@PageUrl(p)">@p</a>
+                    </li>
+                }
+                @if (end < Model.TotalPages)
+                {
+                    @if (end < Model.TotalPages - 1) { <li class="page-item disabled"><span class="page-link">…</span></li> }
+                    <li class="page-item"><a class="page-link" href="@PageUrl(Model.TotalPages)">@Model.TotalPages</a></li>
+                }
+                <li class="page-item @(Model.HasNext ? "" : "disabled")">
+                    <a class="page-link" href="@PageUrl(Model.Page + 1)"><i class="bi bi-chevron-right"></i></a>
+                </li>
+            </ul>
+        </nav>
+    }
+}
+
+<!-- Change Status Modal -->
+<div class="modal fade" id="statusModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold"><i class="bi bi-flag-fill text-primary me-2"></i>Change Status</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-3">Pick a new status for this lead.</p>
+                <form asp-action="ChangeStatus" method="post" id="statusForm">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" id="statusLeadId" />
+                    <input type="hidden" name="statusId" id="statusNewId" />
+                    <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
+                    <div class="d-grid gap-2">
+                        @foreach (var s in statuses)
+                        {
+                            <button type="button" class="status-option" data-status-id="@s.Id">
+                                <span class="badge bg-@s.Color">@s.Name</span>
+                                @if (s.IsClosed) { <span class="text-muted small">(closed)</span> }
+                                <i class="bi bi-check-circle-fill text-primary ms-auto current-mark d-none"></i>
+                            </button>
+                        }
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const modal     = document.getElementById('statusModal');
+        const leadIdEl  = document.getElementById('statusLeadId');
+        const newIdEl   = document.getElementById('statusNewId');
+        const form      = document.getElementById('statusForm');
+
+        modal.addEventListener('show.bs.modal', e => {
+            const trigger = e.relatedTarget;
+            leadIdEl.value = trigger.dataset.leadId;
+            const current = trigger.dataset.currentStatus;
+            modal.querySelectorAll('.status-option').forEach(btn => {
+                const isCurrent = btn.dataset.statusId === current;
+                btn.classList.toggle('current', isCurrent);
+                btn.querySelector('.current-mark').classList.toggle('d-none', !isCurrent);
+            });
+        });
+
+        modal.querySelectorAll('.status-option').forEach(btn => {
+            btn.addEventListener('click', () => {
+                newIdEl.value = btn.dataset.statusId;
+                form.submit();
+            });
+        });
+    </script>
+}
