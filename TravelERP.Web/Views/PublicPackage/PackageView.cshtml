@@ -1,0 +1,572 @@
+@using TravelERP.Core.Entities.Master
+@using TravelERP.Core.Entities.Tenant
+@using TravelERP.Web.Services
+@model Package
+@{
+    Layout = "_PublicLayout";
+    ViewData["Title"] = Model.Title;
+
+    var company       = ViewBag.Company       as Company;
+    var agent         = ViewBag.Agent         as PublicPackageService.AgentInfo;
+    var greetingHtml  = ViewBag.GreetingHtml  as string;
+    var whyItems      = ViewBag.WhyBookWithUs as IReadOnlyList<PublicPackageService.WhyItem> ?? new List<PublicPackageService.WhyItem>();
+    var bankAccounts  = ViewBag.BankAccounts  as IReadOnlyList<BankAccount> ?? new List<BankAccount>();
+
+    string FormatStars(byte? cat)
+    {
+        if (!cat.HasValue || cat.Value < 1) return "";
+        var n = Math.Min((int)cat.Value, 5);
+        return new string('★', n);
+    }
+}
+
+@section Styles {
+    <style>
+        :root { --brand-soft: #eff6ff; }
+
+        /* ─────────── Hero with destination banner ─────────── */
+        .hero-banner {
+            position: relative;
+            min-height: 320px;
+            background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);
+            color: #fff;
+            overflow: hidden;
+        }
+        .hero-banner::after {
+            content: ''; position: absolute; inset: 0;
+            background: linear-gradient(180deg, rgba(0,0,0,.15) 0%, rgba(0,0,0,.55) 100%);
+        }
+        .hero-banner.has-img { background-size: cover; background-position: center; }
+        .hero-content {
+            position: relative; z-index: 2;
+            max-width: 1100px; margin: 0 auto;
+            padding: 3rem 1.5rem 2rem;
+        }
+        .hero-content .pkg-title { font-size: 2rem; font-weight: 800; margin-top: .5rem; }
+        .hero-content .pkg-meta  { opacity: .92; font-size: .95rem; margin-top: .35rem; }
+        .hero-content .pkg-num   {
+            font-family: ui-monospace, SFMono-Regular, monospace;
+            font-size: .8rem; opacity: .9;
+            background: rgba(255,255,255,.18);
+            padding: 4px 12px; border-radius: 999px;
+            display: inline-block; margin-top: 1rem;
+        }
+
+        /* ─────────── Hero logo ─────────── */
+        .hero-logo {
+            width: 80px; height: 80px;
+            background: #fff; border-radius: .65rem;
+            padding: .35rem;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,.18);
+            flex-shrink: 0;
+        }
+        .hero-logo img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+        /* ─────────── Agent strip on header ─────────── */
+        .agent-strip {
+            display: flex; align-items: center; gap: .75rem;
+            background: rgba(255,255,255,.16);
+            padding: .5rem .85rem;
+            border-radius: 999px;
+            font-size: .85rem;
+            backdrop-filter: blur(6px);
+        }
+        .agent-strip .ag-avatar {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: rgba(255,255,255,.25);
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: .85rem;
+            overflow: hidden;
+        }
+        .agent-strip .ag-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .agent-strip .ag-name { font-weight: 700; line-height: 1.1; }
+        .agent-strip .ag-role { font-size: .68rem; opacity: .85; text-transform: uppercase; letter-spacing: .8px; }
+        .agent-strip a { color: #fff; text-decoration: none; }
+
+        /* ─────────── Greeting card ─────────── */
+        .greet-card {
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-left: 4px solid var(--brand);
+            border-radius: .75rem;
+            padding: 1.25rem 1.5rem;
+            margin-top: -2rem; position: relative; z-index: 3;
+            box-shadow: 0 4px 16px rgba(0,0,0,.06);
+        }
+        .greet-card .greet-body { color: #374151; line-height: 1.65; }
+        .greet-card .greet-body p:last-child { margin-bottom: 0; }
+
+        /* ─────────── Trip summary grid ─────────── */
+        .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
+        .info-grid .info-cell {
+            background: #fff; border: 1px solid #e5e7eb; border-radius: .5rem; padding: .85rem;
+        }
+        .info-grid .info-label {
+            font-size: .68rem; text-transform: uppercase; letter-spacing: .8px;
+            color: #6b7280; font-weight: 700; margin-bottom: .15rem;
+        }
+        .info-grid .info-value { font-size: .95rem; font-weight: 600; color: #1f2937; }
+        .pax-pills { display: flex; gap: .35rem; flex-wrap: wrap; }
+        .pax-pills .pill {
+            background: #fff; border: 1px solid #e5e7eb; border-radius: 999px;
+            padding: 2px 10px; font-size: .8rem;
+        }
+        .pax-pills .pill strong { color: var(--brand); margin-right: .15rem; }
+
+        /* ─────────── Option cards ─────────── */
+        .opt-card {
+            border: 2px solid #e5e7eb; border-radius: .85rem; padding: 1.25rem; height: 100%;
+            background: #fff;
+        }
+        .opt-card.recommended { border-color: var(--brand); background: var(--brand-soft); }
+        .opt-card .opt-name {
+            font-size: 1.05rem; font-weight: 700; color: var(--brand); margin-bottom: .25rem;
+        }
+        .opt-card .price { font-size: 1.6rem; font-weight: 800; color: #198754; line-height: 1; }
+        .opt-card .price-mode {
+            font-size: .68rem; text-transform: uppercase; letter-spacing: .8px;
+            color: #6b7280; font-weight: 700; margin-bottom: .25rem;
+        }
+        .opt-card .breakdown {
+            font-size: .8rem; color: #6b7280; margin-top: .35rem;
+            padding-top: .5rem; border-top: 1px dashed #e5e7eb;
+        }
+        .opt-card .hotel-row {
+            padding: .55rem 0; border-bottom: 1px dashed #e5e7eb; font-size: .85rem;
+            display: flex; gap: .65rem; align-items: flex-start;
+        }
+        .opt-card .hotel-row:last-child { border-bottom: 0; }
+        .opt-card .hr-img {
+            width: 64px; height: 52px; flex-shrink: 0;
+            border-radius: .4rem;
+            background: #e5e7eb center/cover no-repeat;
+            display: flex; align-items: center; justify-content: center;
+            color: #9ca3af; font-size: 1.1rem;
+        }
+        .opt-card .hr-body { flex: 1 1 auto; min-width: 0; }
+        .opt-card .hr-stars {
+            color: #f59e0b; font-size: .7rem; letter-spacing: 1px; margin-left: .25rem;
+        }
+
+        /* ─────────── Day cards ─────────── */
+        .day-card {
+            background: #fff; border: 1px solid #e5e7eb; border-radius: .75rem;
+            padding: 1rem 1.25rem; margin-bottom: .85rem;
+            display: flex; gap: 1rem;
+        }
+        .day-num {
+            background: var(--brand); color: #fff; font-weight: 700;
+            border-radius: 50%; width: 2.5rem; height: 2.5rem; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            font-size: .85rem; line-height: 1;
+        }
+        .day-num small { font-size: .55rem; opacity: .85; display: block; }
+        .day-content { flex: 1 1 auto; min-width: 0; }
+        .day-content h6 { margin: 0 0 .35rem; font-weight: 700; }
+        .day-content .day-desc { font-size: .9rem; color: #4b5563; }
+        .day-sights { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .65rem; }
+        .day-sights .sight {
+            background: var(--brand-soft); color: #0d6efd; font-size: .75rem; font-weight: 500;
+            padding: 3px 10px; border-radius: 999px;
+        }
+        .day-images {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: .5rem; margin-top: .75rem;
+        }
+        .day-images .img-tile {
+            position: relative; aspect-ratio: 4/3; border-radius: .5rem; overflow: hidden;
+            background: #f3f4f6 center/cover no-repeat;
+        }
+
+        /* ─────────── Bank cards ─────────── */
+        .bank-card {
+            background: #fff; border: 1px solid #e5e7eb; border-radius: .75rem;
+            padding: 1rem 1.25rem; margin-bottom: .75rem;
+            display: flex; align-items: flex-start; gap: 1rem;
+        }
+        .bank-card.is-default { border-color: var(--brand); background: var(--brand-soft); }
+        .bank-card .bc-icon {
+            width: 44px; height: 44px; border-radius: .5rem;
+            background: var(--brand); color: #fff;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem; flex-shrink: 0;
+        }
+        .bank-card .bc-name { font-weight: 700; color: #111827; }
+        .bank-card .bc-meta { display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; margin-top: .25rem; font-size: .85rem; color: #4b5563; }
+        .bank-card .bc-meta strong { color: #111827; font-family: ui-monospace, monospace; }
+        .bank-card .bc-default {
+            background: var(--brand); color: #fff; font-size: .65rem;
+            padding: 1px 8px; border-radius: 999px; margin-left: .5rem;
+            text-transform: uppercase; letter-spacing: .8px; font-weight: 700;
+        }
+
+        /* ─────────── Why book grid ─────────── */
+        .why-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: .75rem;
+        }
+        .why-tile {
+            background: #fff; border: 1px solid #e5e7eb; border-radius: .75rem;
+            padding: 1rem .85rem; text-align: center;
+        }
+        .why-tile .why-ic {
+            width: 50px; height: 50px; border-radius: 50%;
+            background: var(--brand-soft); color: var(--brand);
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto .5rem; font-size: 1.3rem;
+        }
+        .why-tile .why-tt { font-size: .85rem; font-weight: 600; color: #1f2937; }
+
+        /* ─────────── Pagination: keep cards/tiles intact across PDF page breaks ─────────── */
+        /* These rules apply on screen too, but only have effect when paginating
+           (browser print + Puppeteer PDF rendering). Living outside the print
+           media query so they apply when the PDF is rendered with screen media. */
+        .greet-card,
+        .opt-card,
+        .day-card,
+        .bank-card,
+        .why-tile,
+        .pub-card,
+        .opt-card .hotel-row {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+        .section-title {
+            break-after: avoid;
+            page-break-after: avoid;
+        }
+
+        @@media print {
+            .hero-banner { min-height: auto !important; padding: 0 !important; }
+        }
+    </style>
+}
+
+@functions {
+    string IconClass(string raw) =>
+        string.IsNullOrWhiteSpace(raw) ? "bi-star" : (raw.StartsWith("bi-") ? raw : "bi-" + raw);
+}
+
+<!-- ──────────── HERO ──────────── -->
+@{
+    var bannerUrl = Model.DestinationBannerUrl;
+    var hasBanner = !string.IsNullOrWhiteSpace(bannerUrl);
+    var heroStyle = hasBanner ? $"background-image: linear-gradient(180deg, rgba(13,110,253,.55) 0%, rgba(0,0,0,.6) 100%), url('{bannerUrl}');" : "";
+}
+<header class="hero-banner @(hasBanner ? "has-img" : "")" style="@heroStyle">
+    <div class="hero-content">
+        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+            <div class="d-flex align-items-center gap-3">
+                @if (!string.IsNullOrEmpty(company?.LogoUrl))
+                {
+                    <div class="hero-logo">
+                        <img src="@company.LogoUrl" alt="@company.Name" />
+                    </div>
+                }
+                <div>
+                    <div style="font-size: 1.25rem; font-weight: 700;">@(company?.Name)</div>
+                    @if (!string.IsNullOrEmpty(company?.Phone) || !string.IsNullOrEmpty(company?.Email))
+                    {
+                        <div style="font-size: .85rem; opacity: .85;">
+                            @if (!string.IsNullOrEmpty(company?.Phone)) { <span><i class="bi bi-telephone me-1"></i>@company.Phone</span> }
+                            @if (!string.IsNullOrEmpty(company?.Email)) { <span class="ms-3"><i class="bi bi-envelope me-1"></i>@company.Email</span> }
+                        </div>
+                    }
+                </div>
+            </div>
+
+            @if (agent != null && !string.IsNullOrEmpty(agent.FullName))
+            {
+                <div class="agent-strip">
+                    <div class="ag-avatar">
+                        @if (!string.IsNullOrEmpty(agent.ImageUrl))
+                        {
+                            <img src="@agent.ImageUrl" alt="agent" />
+                        }
+                        else
+                        {
+                            @(string.Concat(agent.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(x => x[0])).ToUpperInvariant())
+                        }
+                    </div>
+                    <div>
+                        <div class="ag-name">@agent.FullName</div>
+                        <div class="ag-role">Your Travel Consultant</div>
+                        @if (!string.IsNullOrEmpty(agent.Mobile))
+                        {
+                            <div style="font-size: .8rem; margin-top: 2px;">
+                                <a href="tel:@agent.Mobile"><i class="bi bi-telephone-fill me-1"></i>@agent.Mobile</a>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+
+        <h1 class="pkg-title mt-3">@Model.Title</h1>
+        <div class="pkg-meta">
+            @if (!string.IsNullOrEmpty(Model.DestinationName))
+            {
+                <span><i class="bi bi-geo-alt-fill me-1"></i>@Model.DestinationName</span>
+            }
+            @if (Model.StartDate.HasValue)
+            {
+                <span class="ms-3"><i class="bi bi-calendar3 me-1"></i>@Model.StartDate.Value.ToString("dd MMM yyyy")</span>
+            }
+            @if (Model.Days.HasValue)
+            {
+                <span class="ms-3"><i class="bi bi-clock me-1"></i>@Model.Days days / @(Model.Nights ?? Model.Days - 1) nights</span>
+            }
+            <span class="ms-3"><i class="bi bi-people-fill me-1"></i>@Model.TotalPax travelers</span>
+        </div>
+        <span class="pkg-num">Quote #@Model.PackageNumber</span>
+    </div>
+</header>
+
+<div class="pub-content">
+
+    <!-- ──────────── GREETING ──────────── -->
+    @if (!string.IsNullOrWhiteSpace(greetingHtml))
+    {
+        <div class="greet-card">
+            <div class="greet-body">@Html.Raw(greetingHtml)</div>
+        </div>
+    }
+
+    <!-- ──────────── TRIP SUMMARY ──────────── -->
+    <div class="section-title">Trip Summary</div>
+    <div class="info-grid">
+        <div class="info-cell">
+            <div class="info-label">Customer</div>
+            <div class="info-value">@Model.CustomerName</div>
+        </div>
+        <div class="info-cell">
+            <div class="info-label">Destination</div>
+            <div class="info-value">@(Model.DestinationName ?? "—")</div>
+        </div>
+        <div class="info-cell">
+            <div class="info-label">Travel Dates</div>
+            <div class="info-value">
+                @(Model.StartDate?.ToString("dd MMM yyyy") ?? "—")
+                @if (Model.Days.HasValue) { <span class="text-muted small ms-1">(@Model.Days days)</span> }
+            </div>
+        </div>
+        <div class="info-cell">
+            <div class="info-label">Travelers</div>
+            <div class="info-value">
+                <div class="pax-pills mt-1">
+                    <span class="pill"><strong>@Model.Adults</strong> Adults</span>
+                    <span class="pill"><strong>@Model.Children</strong> Children</span>
+                    <span class="pill"><strong>@Model.Infants</strong> Infants</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ──────────── PRICE OPTIONS ──────────── -->
+    <div class="section-title">
+        Choose your option
+        <span class="text-muted fw-normal" style="text-transform: none; letter-spacing: 0;">
+            — @(Model.PriceMode == "PerPax" ? "prices per person" : "all-inclusive total")
+        </span>
+    </div>
+    <div class="row g-3">
+        @foreach (var o in Model.Options)
+        {
+            <div class="col-md-@(Model.Options.Count >= 3 ? 4 : 6)">
+                <div class="opt-card @(o.IsRecommended ? "recommended" : "")">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="opt-name">@o.OptionName</div>
+                        @if (o.IsRecommended)
+                        {
+                            <span class="badge" style="background:var(--brand);"><i class="bi bi-star-fill me-1"></i>Recommended</span>
+                        }
+                    </div>
+
+                    <div class="price-mode">@(Model.PriceMode == "PerPax" ? "Per Pax" : "Total Price")</div>
+                    <div class="price">@Model.Currency @o.FinalPrice.ToString("N0")</div>
+
+                    @if (o.LandPrice > 0 || o.FlightPrice > 0)
+                    {
+                        <div class="breakdown">
+                            <div>Land: @Model.Currency @o.LandPrice.ToString("N0")</div>
+                            <div>Flight: @Model.Currency @o.FlightPrice.ToString("N0")</div>
+                        </div>
+                    }
+
+                    @if (o.Hotels.Any())
+                    {
+                        <div class="info-label mt-3 mb-1" style="font-size:.7rem;letter-spacing:.6px;text-transform:uppercase;color:#6b7280;font-weight:700">
+                            <i class="bi bi-building me-1"></i>Hotels
+                        </div>
+                        @foreach (var h in o.Hotels)
+                        {
+                            var stars = FormatStars(h.HotelCategory);
+                            <div class="hotel-row">
+                                @if (!string.IsNullOrEmpty(h.HotelImageUrl))
+                                {
+                                    <div class="hr-img" style="background-image: url('@h.HotelImageUrl');"></div>
+                                }
+                                else
+                                {
+                                    <div class="hr-img"><i class="bi bi-building"></i></div>
+                                }
+                                <div class="hr-body">
+                                    <div class="d-flex justify-content-between gap-2">
+                                        <div>
+                                            <strong>@(h.HotelName ?? "—")</strong>
+                                            @if (stars.Length > 0) { <span class="hr-stars">@stars</span> }
+                                        </div>
+                                        <span class="text-muted small flex-shrink-0">@h.Nights N</span>
+                                    </div>
+                                    <div class="text-muted small">
+                                        @(h.RoomTypeName ?? "—")
+                                        @if (!string.IsNullOrEmpty(h.MealPlanCode))
+                                        {
+                                            <span class="ms-1 badge bg-light text-dark border">@h.MealPlanCode</span>
+                                        }
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(h.OtherText))
+                                    {
+                                        <div class="text-muted fst-italic small">@h.OtherText</div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(o.Notes))
+                    {
+                        <p class="small text-muted mt-3 mb-0">@o.Notes</p>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- ──────────── DAY-WISE ITINERARY ──────────── -->
+    @if (Model.ItineraryDays.Any())
+    {
+        <div class="section-title">Day-by-Day Itinerary</div>
+        <div>
+            @foreach (var day in Model.ItineraryDays.OrderBy(d => d.DayNumber))
+            {
+                <div class="day-card">
+                    <div class="day-num">
+                        @day.DayNumber<small>DAY</small>
+                    </div>
+                    <div class="day-content">
+                        <h6>@day.Title</h6>
+                        @if (!string.IsNullOrWhiteSpace(day.Description))
+                        {
+                            <div class="day-desc">@Html.Raw(day.Description)</div>
+                        }
+                        @if (day.SightseeingNames.Any())
+                        {
+                            <div class="day-sights">
+                                @foreach (var s in day.SightseeingNames)
+                                {
+                                    <span class="sight"><i class="bi bi-geo-alt me-1"></i>@s</span>
+                                }
+                            </div>
+                        }
+                        @if (day.SightseeingImages.Any())
+                        {
+                            <div class="day-images">
+                                @foreach (var img in day.SightseeingImages)
+                                {
+                                    <div class="img-tile" style="background-image: url('@img');"></div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <!-- ──────────── INCLUSIONS / EXCLUSIONS ──────────── -->
+    @if (!string.IsNullOrWhiteSpace(Model.Inclusions) || !string.IsNullOrWhiteSpace(Model.Exclusions))
+    {
+        <div class="section-title">Inclusions &amp; Exclusions</div>
+        <div class="row g-3">
+            @if (!string.IsNullOrWhiteSpace(Model.Inclusions))
+            {
+                <div class="col-md-6">
+                    <div class="pub-card h-100">
+                        <h6 class="fw-bold text-success"><i class="bi bi-check-square-fill me-2"></i>What's Included</h6>
+                        <div>@Html.Raw(Model.Inclusions)</div>
+                    </div>
+                </div>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.Exclusions))
+            {
+                <div class="col-md-6">
+                    <div class="pub-card h-100">
+                        <h6 class="fw-bold text-danger"><i class="bi bi-x-square-fill me-2"></i>Not Included</h6>
+                        <div>@Html.Raw(Model.Exclusions)</div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <!-- ──────────── FLIGHT DETAILS ──────────── -->
+    @if (!string.IsNullOrWhiteSpace(Model.FlightDetails))
+    {
+        <div class="section-title">Flight &amp; Transport</div>
+        <div class="pub-card">
+            <h6 class="fw-bold"><i class="bi bi-airplane-fill text-primary me-2"></i>Flight / Transport Details</h6>
+            <div>@Html.Raw(Model.FlightDetails)</div>
+        </div>
+    }
+
+    <!-- ──────────── TERMS &amp; CONDITIONS (from Destination) ──────────── -->
+    @if (!string.IsNullOrWhiteSpace(Model.DestinationTerms))
+    {
+        <div class="section-title">Terms &amp; Conditions</div>
+        <div class="pub-card">
+            <div>@Html.Raw(Model.DestinationTerms)</div>
+        </div>
+    }
+
+    <!-- ──────────── PAYMENT — bank accounts ──────────── -->
+    @if (bankAccounts.Any())
+    {
+        <div class="section-title">Payment Details</div>
+        @foreach (var b in bankAccounts)
+        {
+            <div class="bank-card @(b.IsDefault ? "is-default" : "")">
+                <div class="bc-icon"><i class="bi bi-bank2"></i></div>
+                <div class="flex-grow-1">
+                    <div>
+                        <span class="bc-name">@b.BankName</span>
+                        @if (b.IsDefault) { <span class="bc-default">Preferred</span> }
+                    </div>
+                    <div class="bc-meta">
+                        <span><span class="text-muted">A/c Holder:</span> <strong>@b.HolderName</strong></span>
+                        <span><span class="text-muted">A/c No:</span> <strong>@b.AccountNumber</strong></span>
+                        @if (!string.IsNullOrEmpty(b.IfscCode)) { <span><span class="text-muted">IFSC:</span> <strong>@b.IfscCode</strong></span> }
+                        @if (!string.IsNullOrEmpty(b.Branch))   { <span><span class="text-muted">Branch:</span> @b.Branch</span> }
+                        @if (!string.IsNullOrEmpty(b.UpiId))    { <span><span class="text-muted">UPI:</span> <strong>@b.UpiId</strong></span> }
+                    </div>
+                </div>
+            </div>
+        }
+    }
+
+    <!-- ──────────── WHY BOOK WITH US ──────────── -->
+    @if (whyItems.Any())
+    {
+        <div class="section-title">Why Book With Us</div>
+        <div class="why-grid">
+            @foreach (var w in whyItems)
+            {
+                <div class="why-tile">
+                    <div class="why-ic"><i class="bi @IconClass(w.Icon)"></i></div>
+                    <div class="why-tt">@w.Title</div>
+                </div>
+            }
+        </div>
+    }
+</div>

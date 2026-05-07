@@ -1,9 +1,20 @@
+@inject TravelERP.Core.Interfaces.ICompanyRepository _companyRepo
+@inject TravelERP.Core.Interfaces.ITenantContext _tenantCtx
+@{
+    // One lightweight PK lookup per page so the sidebar logo + title reflect the
+    // current company branding without requiring a fresh login.
+    var _branding = User.Identity?.IsAuthenticated == true
+        ? await _companyRepo.GetByIdAsync(_tenantCtx.CompanyId)
+        : null;
+    var _brandLogo = _branding?.LogoUrl;
+    var _brandName = _branding?.Name ?? User.FindFirst("CompanyName")?.Value ?? "TravelERP";
+}
 <!DOCTYPE html>
 <html lang="en" data-bs-theme="light">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>@ViewData["Title"] - @User.FindFirst("CompanyName")?.Value</title>
+    <title>@ViewData["Title"] - @_brandName</title>
 
     <!-- AdminLTE 4 -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@4.0.0-beta3/dist/css/adminlte.min.css" />
@@ -32,6 +43,9 @@
                     <a class="nav-link" data-lte-toggle="sidebar" href="#" role="button">
                         <i class="bi bi-list fs-4"></i>
                     </a>
+                </li>
+                <li class="nav-item d-flex align-items-center">
+                    <h5 class="page-title mb-0 fw-bold ms-1">@ViewData["Title"]</h5>
                 </li>
             </ul>
             <ul class="navbar-nav ms-auto">
@@ -80,9 +94,17 @@
     <!-- SIDEBAR -->
     <aside class="app-sidebar shadow" data-bs-theme="dark">
         <div class="sidebar-brand">
-            <a href="/Dashboard" class="brand-link text-decoration-none">
-                <i class="bi bi-airplane-fill text-primary fs-4 me-2"></i>
-                <span class="brand-text fw-bold fs-5 text-primary">TravelERP</span>
+            <a href="/Dashboard" class="brand-link text-decoration-none d-flex align-items-center">
+                @if (!string.IsNullOrEmpty(_brandLogo))
+                {
+                    <img src="@_brandLogo" alt="@_brandName" class="sidebar-logo" />
+                    <span class="brand-text fw-bold fs-6 text-light text-truncate">@_brandName</span>
+                }
+                else
+                {
+                    <i class="bi bi-airplane-fill text-primary fs-4 me-2"></i>
+                    <span class="brand-text fw-bold fs-5 text-primary">@_brandName</span>
+                }
             </a>
         </div>
         <div class="sidebar-wrapper">
@@ -96,7 +118,7 @@
                         </a>
                     </li>
 
-                    @if (CanSee("Leads") || CanSee("Customers") || CanSee("Bookings") || CanSee("Packages") || CanSee("Suppliers") || CanSee("Visa"))
+                    @if (CanSee("Leads") || CanSee("Bookings"))
                     {
                         <li class="nav-header">OPERATIONS</li>
                     }
@@ -116,48 +138,7 @@
                             </a>
                         </li>
                     }
-                    @if (CanSee("Customers"))
-                    {
-                        <li class="nav-item">
-                            <a href="/Customers" class="nav-link @NavActive("Customers")">
-                                <i class="nav-icon bi bi-people-fill"></i><p>Customers</p>
-                            </a>
-                        </li>
-                    }
-                    @if (CanSee("Packages"))
-                    {
-                        <li class="nav-item">
-                            <a href="/Packages" class="nav-link @NavActive("Packages")">
-                                <i class="nav-icon bi bi-map-fill"></i><p>Tour Packages</p>
-                            </a>
-                        </li>
-                    }
-                    @if (CanSee("Suppliers"))
-                    {
-                        <li class="nav-item">
-                            <a href="/Suppliers" class="nav-link @NavActive("Suppliers")">
-                                <i class="nav-icon bi bi-building"></i><p>Suppliers</p>
-                            </a>
-                        </li>
-                    }
-                    @if (CanSee("Visa"))
-                    {
-                        <li class="nav-item">
-                            <a href="/Visa" class="nav-link @NavActive("Visa")">
-                                <i class="nav-icon bi bi-passport"></i><p>Visa &amp; Documents</p>
-                            </a>
-                        </li>
-                    }
-
-                    @if (CanSee("Finance"))
-                    {
-                        <li class="nav-header">FINANCE</li>
-                        <li class="nav-item">
-                            <a href="/Finance/Invoices" class="nav-link @NavActive("Finance")">
-                                <i class="nav-icon bi bi-receipt"></i><p>Invoices &amp; Payments</p>
-                            </a>
-                        </li>
-                    }
+                    @* Tour Packages are managed per-lead from /Leads/Details — no top-level link *@
 
                     @if (CanSee("HR"))
                     {
@@ -311,6 +292,9 @@
                                 @if (User.HasClaim("IsSuperAdmin", "true"))
                                 {
                                     <li class="nav-item">
+                                        <a href="/Company/QuoteBranding" class="nav-link"><i class="nav-icon bi bi-stars"></i><p>Quote Branding</p></a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="/Company/NumberSeries" class="nav-link"><i class="nav-icon bi bi-hash"></i><p>Number Series</p></a>
                                     </li>
                                 }
@@ -325,18 +309,6 @@
 
     <!-- MAIN CONTENT -->
     <main class="app-main">
-        <div class="app-content-header">
-            <div class="container-fluid">
-                <div class="row mb-2 align-items-center">
-                    <div class="col-sm-6">
-                        <h3 class="mb-0 fw-bold">@ViewData["Title"]</h3>
-                    </div>
-                    <div class="col-sm-6">
-                        @await Html.PartialAsync("_Breadcrumb")
-                    </div>
-                </div>
-            </div>
-        </div>
         <div class="app-content">
             <div class="container-fluid">
                 @if (TempData["Success"] != null)

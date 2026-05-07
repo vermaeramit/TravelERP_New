@@ -174,6 +174,7 @@ public class AuthController : Controller
             new("FullName", user.FullName),
             new("CompanyId", company.Id.ToString()),
             new("CompanyName", company.Name),
+            new("CompanySlug", company.Slug),
             new("DatabaseName", company.DatabaseName),
             new("Currency", company.Currency),
             new("CurrencySymbol", company.CurrencySymbol),

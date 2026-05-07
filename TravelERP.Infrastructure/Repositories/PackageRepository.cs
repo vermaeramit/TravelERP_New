@@ -43,6 +43,15 @@ public class PackageRepository : IPackageRepository
         };
     }
 
+    public async Task<IEnumerable<Package>> GetByLeadAsync(int leadId)
+    {
+        using var conn = _factory.CreateMasterConnection();
+        return await conn.QueryAsync<Package>(
+            "sp_Package_GetByLead",
+            new { DatabaseName = _tenant.DatabaseName, LeadId = leadId },
+            commandType: CommandType.StoredProcedure);
+    }
+
     public async Task<Package?> GetByIdAsync(int id)
     {
         using var conn = _factory.CreateMasterConnection();

@@ -10,4 +10,5 @@ public class PackageDay
 
     public List<int> SightseeingIds { get; set; } = [];
     public List<string> SightseeingNames { get; set; } = [];   // populated on read for display
+    public List<string> SightseeingImages { get; set; } = [];  // populated on read for display
 }

@@ -25,4 +25,10 @@ public class Company : BaseEntity
     public string CurrencySymbol { get; set; } = "₹";
     public string LeadPrefix { get; set; } = "LD";
     public string PackagePrefix { get; set; } = "PKG";
+    public string BookingPrefix { get; set; } = "BK";
+    public string InvoicePrefix { get; set; } = "INV";
+
+    // Public quote branding
+    public string? GreetingParagraph { get; set; }
+    public string? WhyBookWithUs { get; set; }   // JSON: [{"icon":"bi-headset","title":"24/7 Support"}, …]
 }

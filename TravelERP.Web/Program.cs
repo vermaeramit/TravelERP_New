@@ -15,6 +15,8 @@ builder.Services.AddSingleton(new DbConnectionFactory(masterConnStr));
 
 builder.Services.AddScoped<ITenantContext, TenantContext>();
 builder.Services.AddScoped<TenantDbProvisioningService>();
+builder.Services.AddScoped<PublicPackageService>();
+builder.Services.AddSingleton<PdfService>();
 
 // Master repositories
 builder.Services.AddScoped<ICompanyRepository, CompanyRepository>();
@@ -39,6 +41,7 @@ builder.Services.AddScoped<ILeadRepository, LeadRepository>();
 builder.Services.AddScoped<ILeadActivityRepository, LeadActivityRepository>();
 builder.Services.AddScoped<IActivityTemplateRepository, ActivityTemplateRepository>();
 builder.Services.AddScoped<IPackageRepository, PackageRepository>();
+builder.Services.AddScoped<IBookingRepository, BookingRepository>();
 
 // Cookie authentication
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)

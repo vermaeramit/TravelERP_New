@@ -8,6 +8,7 @@
     var roomTypes    = ViewBag.RoomTypes    as IEnumerable<RoomType>        ?? [];
     var mealPlans    = ViewBag.MealPlans    as IEnumerable<MealPlan>        ?? [];
     var sightseeings = ViewBag.Sightseeings as IEnumerable<Sightseeing>     ?? [];
+    var itineraries  = ViewBag.Itineraries  as IEnumerable<Itinerary>       ?? [];
 }
 
 @section Styles {
@@ -265,6 +266,7 @@
         roomTypes = roomTypes.Select(r => new { id = r.Id, name = r.Name }),
         mealPlans = mealPlans.Select(m => new { id = m.Id, code = m.Code, name = m.Name }),
         sightseeings = sightseeings.Select(s => new { id = s.Id, name = s.Name, destinationId = s.DestinationId }),
+        itineraries  = itineraries.Select(i  => new { id = i.Id, title = i.Title, description = i.Description ?? "", destinationId = i.DestinationId }),
         days = Model.ItineraryDays.OrderBy(d => d.DayNumber).Select(d => new
         {
             title          = d.Title,
@@ -313,6 +315,7 @@
         const roomTypes    = initial.roomTypes;
         const mealPlans    = initial.mealPlans;
         const allSights    = initial.sightseeings || [];
+        const allItins     = initial.itineraries  || [];
         let   options      = (initial.options && initial.options.length)
             ? initial.options.map(o => ({ ...o, hotels: (o.hotels || []).map(h => ({ ...h })) }))
             : [{ name: 'Option 1', land: 0, flight: 0, final: 0, recommended: true, notes: null, hotels: [] }];
@@ -540,10 +543,24 @@
             return destId ? allSights.filter(s => s.destinationId === destId) : allSights;
         }
 
+        function destinationItineraries() {
+            const destId = Number(document.querySelector('select[name="DestinationId"]').value || 0);
+            return destId ? allItins.filter(i => i.destinationId === destId) : allItins;
+        }
+
+        function escapeHtml(s) {
+            return String(s || '').replace(/[&<>"']/g, c =>
+                ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+        }
+
         function renderDayCard(d, idx) {
             const sights = destinationSightseeings();
             const sightOpts = sights.map(s =>
                 `<option value="${s.id}" ${(d.sightseeingIds || []).includes(s.id) ? 'selected' : ''}>${s.name}</option>`
+            ).join('');
+            const itins = destinationItineraries();
+            const itinOpts = itins.map(i =>
+                `<option value="${i.id}">${escapeHtml(i.title)}</option>`
             ).join('');
             return `
                 <div class="card shadow-sm mb-3 day-card" data-day="${idx}">
@@ -560,6 +577,25 @@
                         </button>
                     </div>
                     <div class="card-body">
+                        ${itins.length > 0 ? `
+                        <label class="form-label small fw-semibold mb-1">
+                            <i class="bi bi-magic text-primary me-1"></i>Pick from Itinerary master
+                            <span class="text-muted fw-normal">— auto-fills title &amp; description</span>
+                        </label>
+                        <div class="d-flex gap-2 mb-3">
+                            <select class="form-select form-select-sm d-itin">
+                                <option value="">— Choose a saved itinerary —</option>
+                                ${itinOpts}
+                            </select>
+                            <button type="button" class="btn btn-sm btn-outline-primary d-itin-apply" disabled>
+                                <i class="bi bi-arrow-down-square me-1"></i>Apply
+                            </button>
+                        </div>` : `
+                        <div class="alert alert-light border small mb-3 py-2">
+                            <i class="bi bi-info-circle text-muted me-1"></i>
+                            No saved itineraries for this destination yet — add some in <strong>Itineraries master</strong> to reuse them here.
+                        </div>`}
+
                         <label class="form-label small fw-semibold mb-1">Description</label>
                         <div class="quill-host"><div class="d-desc"></div></div>
 
@@ -622,6 +658,37 @@
                     days.splice(idx, 1);
                     renderDays();
                 });
+
+                // Itinerary template picker
+                const itinSel   = card.querySelector('.d-itin');
+                const itinApply = card.querySelector('.d-itin-apply');
+                if (itinSel && itinApply) {
+                    itinSel.addEventListener('change', () => {
+                        itinApply.disabled = !itinSel.value;
+                    });
+                    itinApply.addEventListener('click', () => {
+                        const id = Number(itinSel.value || 0);
+                        if (!id) return;
+                        const tpl = allItins.find(i => i.id === id);
+                        if (!tpl) return;
+
+                        const titleEl = card.querySelector('.d-title');
+                        const fillTitle = !titleEl.value.trim()
+                            || confirm('Replace the current title and description for Day ' + (idx + 1) + '?');
+                        if (!fillTitle) return;
+
+                        titleEl.value = tpl.title || '';
+                        if (dayQuills[idx]) {
+                            dayQuills[idx].setText('');   // clear
+                            if (tpl.description) {
+                                dayQuills[idx].clipboard.dangerouslyPasteHTML(tpl.description);
+                            }
+                        }
+                        // Reset picker so it can be reused/visually cleared
+                        itinSel.value = '';
+                        itinApply.disabled = true;
+                    });
+                }
             });
         }
 

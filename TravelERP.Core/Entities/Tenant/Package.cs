@@ -4,6 +4,7 @@ public class Package
 {
     public int Id { get; set; }
     public string PackageNumber { get; set; } = string.Empty;
+    public string? ShareToken { get; set; }
     public int? LeadId { get; set; }
     public string Title { get; set; } = string.Empty;
     public int? DestinationId { get; set; }
@@ -30,6 +31,8 @@ public class Package
 
     // Joined / aggregated
     public string? DestinationName { get; set; }
+    public string? DestinationBannerUrl { get; set; }
+    public string? DestinationTerms { get; set; }
     public int OptionCount { get; set; }
     public decimal? MinPrice { get; set; }
     public decimal? MaxPrice { get; set; }

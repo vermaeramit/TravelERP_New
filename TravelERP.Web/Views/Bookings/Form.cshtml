@@ -1,0 +1,314 @@
+@using TravelERP.Core.Entities.Tenant
+@model Booking
+@{
+    var isEdit = Model.Id > 0;
+    ViewData["Title"] ??= isEdit ? $"Edit — {Model.BookingNumber}" : "Create Booking";
+    var destinations = ViewBag.Destinations as IEnumerable<Destination> ?? [];
+    var paymentModes  = new[] { "Cash", "UPI", "NEFT", "RTGS", "Card", "Cheque", "Other" };
+    var paymentStatuses = new[] { "Pending", "Received", "Refunded" };
+    var bookingStatuses = new[] { "Confirmed", "Completed", "Cancelled" };
+}
+
+@section Styles {
+    <style>
+        .install-row {
+            background: #f8f9fa; border: 1px solid var(--bs-border-color);
+            border-radius: .5rem; padding: .85rem; margin-bottom: .65rem;
+        }
+        .install-row.received { background: #f0f9f4; border-color: #bbe6cb; }
+        .install-row.refunded { background: #fef3f3; border-color: #f2c2c2; }
+        .install-grid {
+            display: grid;
+            grid-template-columns: 70px 130px 130px 130px 140px 140px 1fr 40px;
+            gap: .5rem;
+            align-items: center;
+        }
+        @@media (max-width: 992px) {
+            .install-grid { grid-template-columns: repeat(3, 1fr) 40px; }
+            .install-grid > * { grid-column: span 1; }
+            .install-grid .remark-cell { grid-column: span 3; }
+        }
+        .install-head {
+            font-size: .68rem; text-transform: uppercase; letter-spacing: .5px;
+            color: #6b7280; font-weight: 700; margin-bottom: 2px;
+        }
+    </style>
+}
+
+<form asp-action="@(isEdit ? "Edit" : "Create")" method="post" id="bookingForm">
+    @Html.AntiForgeryToken()
+    @if (isEdit) { <input type="hidden" asp-for="Id" /> }
+
+    @* Linkage — preserved on POST so a booking created from a package option
+       keeps its LeadId / PackageId / OptionName instead of resetting to null. *@
+    <input type="hidden" asp-for="LeadId" />
+    <input type="hidden" asp-for="PackageId" />
+    <input type="hidden" asp-for="PackageOptionId" />
+    <input type="hidden" asp-for="OptionName" />
+
+    @if (Model.PackageId.HasValue || !string.IsNullOrEmpty(Model.OptionName))
+    {
+        <div class="alert alert-light border d-flex align-items-center mb-3">
+            <i class="bi bi-link-45deg text-primary me-2 fs-5"></i>
+            <div class="small">
+                @if (Model.PackageId.HasValue)
+                {
+                    <span>Booked from package <a href="/Packages/Details/@Model.PackageId" class="fw-bold">view package</a>.</span>
+                }
+                @if (!string.IsNullOrEmpty(Model.OptionName))
+                {
+                    <span class="ms-1">Selected option: <strong>@Model.OptionName</strong></span>
+                }
+                @if (isEdit && !string.IsNullOrEmpty(Model.BookingNumber))
+                {
+                    <span class="ms-2">Booking #<span class="font-monospace">@Model.BookingNumber</span></span>
+                    <span class="ms-2">Invoice #<span class="font-monospace">@Model.InvoiceNumber</span></span>
+                }
+            </div>
+        </div>
+    }
+
+    <!-- CUSTOMER -->
+    <div class="card shadow-sm mb-3">
+        <div class="card-header bg-transparent border-0">
+            <h6 class="mb-0 fw-bold"><i class="bi bi-person-vcard text-primary me-2"></i>Customer</h6>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <label asp-for="CustomerName" class="form-label small fw-semibold">Name <span class="text-danger">*</span></label>
+                    <input asp-for="CustomerName" class="form-control" required />
+                    <span asp-validation-for="CustomerName" class="text-danger small"></span>
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="CustomerMobile" class="form-label small fw-semibold">Mobile</label>
+                    <input asp-for="CustomerMobile" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="CustomerEmail" class="form-label small fw-semibold">Email</label>
+                    <input asp-for="CustomerEmail" type="email" class="form-control" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TRIP -->
+    <div class="card shadow-sm mb-3">
+        <div class="card-header bg-transparent border-0">
+            <h6 class="mb-0 fw-bold"><i class="bi bi-airplane-engines text-primary me-2"></i>Trip Details</h6>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label asp-for="DestinationId" class="form-label small fw-semibold">Destination</label>
+                    <select asp-for="DestinationId" class="form-select select2">
+                        <option value="">— Select destination —</option>
+                        @foreach (var d in destinations)
+                        {
+                            <option value="@d.Id" selected="@(Model.DestinationId == d.Id)">@d.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label asp-for="StartDate" class="form-label small fw-semibold">Start Date</label>
+                    <input asp-for="StartDate" type="date" class="form-control" />
+                </div>
+                <div class="col-md-2">
+                    <label asp-for="EndDate" class="form-label small fw-semibold">End Date</label>
+                    <input asp-for="EndDate" type="date" class="form-control" />
+                </div>
+                <div class="col-md-2">
+                    <label asp-for="Days" class="form-label small fw-semibold">Days</label>
+                    <input asp-for="Days" type="number" min="0" class="form-control" />
+                </div>
+                <div class="col-md-2">
+                    <label asp-for="Nights" class="form-label small fw-semibold">Nights</label>
+                    <input asp-for="Nights" type="number" min="0" class="form-control" />
+                </div>
+                <div class="col-md-2">
+                    <label asp-for="Adults" class="form-label small fw-semibold">Adults</label>
+                    <input asp-for="Adults" type="number" min="1" class="form-control" />
+                </div>
+                <div class="col-md-2">
+                    <label asp-for="Children" class="form-label small fw-semibold">Children</label>
+                    <input asp-for="Children" type="number" min="0" class="form-control" />
+                </div>
+                <div class="col-md-2">
+                    <label asp-for="Infants" class="form-label small fw-semibold">Infants</label>
+                    <input asp-for="Infants" type="number" min="0" class="form-control" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AMOUNT -->
+    <div class="card shadow-sm mb-3">
+        <div class="card-header bg-transparent border-0">
+            <h6 class="mb-0 fw-bold"><i class="bi bi-currency-rupee text-primary me-2"></i>Amount &amp; Status</h6>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label asp-for="Currency" class="form-label small fw-semibold">Currency</label>
+                    <input asp-for="Currency" class="form-control text-uppercase" maxlength="10" />
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="TotalAmount" class="form-label small fw-semibold">Total Amount <span class="text-danger">*</span></label>
+                    <input asp-for="TotalAmount" type="number" step="0.01" min="0" class="form-control fw-bold text-end" required />
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="Status" class="form-label small fw-semibold">Status</label>
+                    <select asp-for="Status" class="form-select">
+                        @foreach (var s in bookingStatuses)
+                        {
+                            <option value="@s" selected="@(Model.Status == s)">@s</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            <div class="row g-3 mt-1">
+                <div class="col-12">
+                    <label asp-for="Notes" class="form-label small fw-semibold">Notes</label>
+                    <textarea asp-for="Notes" class="form-control" rows="2" placeholder="Internal notes (not shown to customer)…"></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- INSTALLMENTS -->
+    <div class="card shadow-sm mb-3">
+        <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center">
+            <div>
+                <h6 class="mb-0 fw-bold"><i class="bi bi-cash-stack text-primary me-2"></i>Payment Plan</h6>
+                <small class="text-muted">Add one row per installment. Mark them <em>Received</em> as payments come in.</small>
+            </div>
+            <div class="d-flex gap-2 align-items-center">
+                <span class="small text-muted">Sum: <strong id="instSum" class="text-primary font-monospace">0.00</strong></span>
+                <button type="button" id="addInstallment" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-plus-lg me-1"></i>Add Installment
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="install-grid d-none d-lg-grid mb-2">
+                <div class="install-head">No.</div>
+                <div class="install-head">Mode</div>
+                <div class="install-head">Status</div>
+                <div class="install-head text-end">Amount</div>
+                <div class="install-head">Due Date</div>
+                <div class="install-head">Received Date</div>
+                <div class="install-head">Remark</div>
+                <div></div>
+            </div>
+            <div id="installmentList"></div>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 justify-content-end">
+        <a href="@(isEdit ? Url.Action("Details", new { id = Model.Id }) : Url.Action("Index"))" class="btn btn-outline-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary px-4">
+            <i class="bi bi-check-lg me-1"></i>@(isEdit ? "Save Changes" : "Create Booking")
+        </button>
+    </div>
+</form>
+
+<template id="installmentTemplate">
+    <div class="install-row">
+        <div class="install-grid">
+            <input type="number" name="InstNo" value="1" min="1" class="form-control form-control-sm inst-no" />
+            <select name="InstPaymentMode" class="form-select form-select-sm inst-mode">
+                <option value="">— Mode —</option>
+                @foreach (var m in paymentModes)
+                {
+                    <option value="@m">@m</option>
+                }
+            </select>
+            <select name="InstPaymentStatus" class="form-select form-select-sm inst-status">
+                @foreach (var s in paymentStatuses)
+                {
+                    <option value="@s">@s</option>
+                }
+            </select>
+            <input type="number" name="InstAmount" step="0.01" min="0" value="0" class="form-control form-control-sm text-end inst-amount" />
+            <input type="date" name="InstDueDate" class="form-control form-control-sm inst-due" />
+            <input type="date" name="InstReceivedDate" class="form-control form-control-sm inst-received" />
+            <input type="text" name="InstRemark" class="form-control form-control-sm remark-cell" placeholder="Remark…" maxlength="500" />
+            <button type="button" class="btn btn-sm btn-outline-danger inst-remove" title="Remove">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+    </div>
+</template>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        $('.select2').select2({ theme: 'bootstrap-5', width: '100%' });
+
+        const seed = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Installments.Select(i => new
+        {
+            no       = i.InstallmentNo,
+            mode     = i.PaymentMode ?? "",
+            status   = string.IsNullOrWhiteSpace(i.PaymentStatus) ? "Pending" : i.PaymentStatus,
+            amount   = i.Amount,
+            due      = i.DueDate?.ToString("yyyy-MM-dd") ?? "",
+            received = i.ReceivedDate?.ToString("yyyy-MM-dd") ?? "",
+            remark   = i.Remark ?? ""
+        })));
+
+        const list = document.getElementById('installmentList');
+        const tmpl = document.getElementById('installmentTemplate');
+        const sumEl = document.getElementById('instSum');
+
+        function applyStatusClass(row) {
+            const s = (row.querySelector('.inst-status').value || '').toLowerCase();
+            row.classList.toggle('received', s === 'received');
+            row.classList.toggle('refunded', s === 'refunded');
+        }
+
+        function renumber() {
+            list.querySelectorAll('.install-row').forEach((row, i) => {
+                const noInput = row.querySelector('.inst-no');
+                if (!noInput.value || Number(noInput.value) !== i + 1) noInput.value = i + 1;
+            });
+        }
+
+        function recomputeSum() {
+            let total = 0;
+            list.querySelectorAll('.inst-amount').forEach(el => total += Number(el.value || 0));
+            sumEl.textContent = total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function addRow(data) {
+            const node = tmpl.content.firstElementChild.cloneNode(true);
+            list.appendChild(node);
+            if (data) {
+                node.querySelector('.inst-no').value       = data.no || (list.children.length);
+                node.querySelector('.inst-mode').value     = data.mode || '';
+                node.querySelector('.inst-status').value   = data.status || 'Pending';
+                node.querySelector('.inst-amount').value   = data.amount || 0;
+                node.querySelector('.inst-due').value      = data.due || '';
+                node.querySelector('.inst-received').value = data.received || '';
+                node.querySelector('input[name="InstRemark"]').value = data.remark || '';
+            }
+            applyStatusClass(node);
+            node.querySelector('.inst-status').addEventListener('change', () => applyStatusClass(node));
+            node.querySelector('.inst-amount').addEventListener('input', recomputeSum);
+            node.querySelector('.inst-remove').addEventListener('click', () => {
+                node.remove();
+                renumber();
+                recomputeSum();
+            });
+            renumber();
+            recomputeSum();
+        }
+
+        if (Array.isArray(seed) && seed.length) {
+            seed.forEach(addRow);
+        } else {
+            addRow({ no: 1, status: 'Pending' });
+        }
+
+        document.getElementById('addInstallment').addEventListener('click', () => addRow());
+    </script>
+}

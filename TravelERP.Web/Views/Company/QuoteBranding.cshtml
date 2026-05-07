@@ -1,0 +1,337 @@
+@model TravelERP.Core.Entities.Master.Company
+@{ ViewData["Title"] = "Quote Branding"; }
+
+@section Styles {
+    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet" />
+    <style>
+        .quill-host { background: #fff; border-radius: 0 0 .375rem .375rem; }
+        .quill-host .ql-toolbar { border-radius: .375rem .375rem 0 0; }
+        .quill-host .ql-container { min-height: 160px; font-size: .9rem; }
+
+        .why-row {
+            display: grid;
+            grid-template-columns: 1.5rem 9rem 1fr auto;
+            gap: .5rem;
+            align-items: center;
+            padding: .55rem .75rem;
+            background: #f8fafc;
+            border: 1px solid var(--bs-border-color);
+            border-radius: .5rem;
+        }
+        .why-row + .why-row { margin-top: .5rem; }
+        .why-row .grip { color: #9ca3af; cursor: grab; text-align: center; }
+        .why-row .icon-pre {
+            display: inline-flex; align-items: center; gap: .35rem;
+            font-size: .9rem; color: var(--bs-primary);
+        }
+        .why-row .icon-pre i { font-size: 1.05rem; }
+
+        .icon-picker {
+            position: relative;
+        }
+        .icon-picker .icon-grid {
+            position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+            z-index: 50;
+            display: none;
+            background: #fff; border: 1px solid var(--bs-border-color);
+            border-radius: .5rem; padding: .5rem;
+            box-shadow: 0 6px 18px rgba(0,0,0,.08);
+            max-height: 250px; overflow-y: auto;
+            grid-template-columns: repeat(8, 1fr);
+            gap: .25rem;
+        }
+        .icon-picker.open .icon-grid { display: grid; }
+        .icon-picker .icon-grid button {
+            background: #f3f4f6; border: 0; border-radius: .35rem;
+            padding: .4rem 0; font-size: 1.05rem; cursor: pointer;
+            transition: background .1s;
+        }
+        .icon-picker .icon-grid button:hover { background: var(--bs-primary); color: #fff; }
+
+        .logo-preview-wrap {
+            width: 180px; height: 90px; border: 2px dashed #d1d5db; border-radius: .5rem;
+            background: #f9fafb; display: flex; align-items: center; justify-content: center;
+            overflow: hidden; flex-shrink: 0;
+        }
+        .logo-preview-wrap img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .logo-preview-wrap .logo-empty { color: #9ca3af; font-size: 1.6rem; }
+    </style>
+}
+
+<form asp-action="QuoteBranding" method="post" enctype="multipart/form-data" class="row g-3" id="brandingForm">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="greetingParagraph" id="greetingParagraph" />
+    <input type="hidden" name="whyBookWithUs" id="whyBookWithUs" />
+    <input type="hidden" name="removeLogo" id="removeLogo" value="false" />
+
+    <div class="col-lg-8">
+        <!-- Company Logo -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-transparent border-0">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-image text-primary me-2"></i>Company Logo</h6>
+                <small class="text-muted">Shown at the top of every public quote. PNG/JPG/WebP/SVG, max 2 MB. Recommended ~300×100 px.</small>
+            </div>
+            <div class="card-body p-3">
+                <div class="d-flex flex-wrap align-items-center gap-3">
+                    <div class="logo-preview-wrap" id="logoPreviewWrap">
+                        @if (!string.IsNullOrEmpty(Model?.LogoUrl))
+                        {
+                            <img id="logoPreview" src="@Model.LogoUrl" alt="logo" />
+                            <span class="logo-empty d-none"><i class="bi bi-image"></i></span>
+                        }
+                        else
+                        {
+                            <img id="logoPreview" src="" alt="logo" class="d-none" />
+                            <span class="logo-empty"><i class="bi bi-image"></i></span>
+                        }
+                    </div>
+                    <div class="flex-grow-1">
+                        <label for="logoFile" class="btn btn-outline-primary btn-sm mb-2">
+                            <i class="bi bi-upload me-1"></i>Choose file
+                        </label>
+                        <input type="file" name="logoFile" id="logoFile"
+                               accept=".jpg,.jpeg,.png,.webp,.svg" class="d-none" />
+                        <span class="ms-2 small text-muted" id="logoFileName">
+                            @(string.IsNullOrEmpty(Model?.LogoUrl) ? "No logo uploaded" : "Current logo on file — choose a new file to replace")
+                        </span>
+                        @if (!string.IsNullOrEmpty(Model?.LogoUrl))
+                        {
+                            <div class="mt-1">
+                                <button type="button" id="removeLogoBtn" class="btn btn-sm btn-link text-danger p-0">
+                                    <i class="bi bi-trash me-1"></i>Remove logo
+                                </button>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Greeting -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-transparent border-0">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-chat-quote text-primary me-2"></i>Greeting Paragraph</h6>
+                <small class="text-muted">Shown to the customer at the top of every shared quote, just below the header.</small>
+            </div>
+            <div class="card-body p-3">
+                <div class="quill-host"><div id="greetEditor"></div></div>
+            </div>
+        </div>
+
+        <!-- Why Book With Us -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-stars text-primary me-2"></i>Why Book With Us</h6>
+                    <small class="text-muted">Feature tiles shown near the bottom of every quote.</small>
+                </div>
+                <button type="button" id="addWhy" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-plus-lg me-1"></i>Add Feature
+                </button>
+            </div>
+            <div class="card-body p-3">
+                <div id="whyContainer"></div>
+                <p class="text-muted small mb-0 mt-2 empty-msg">No features yet — click "Add Feature" to start.</p>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2 justify-content-end">
+            <a href="/Dashboard" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary px-4">
+                <i class="bi bi-check-lg me-1"></i>Save Branding
+            </button>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card shadow-sm bg-light border-0">
+            <div class="card-body">
+                <h6 class="fw-bold mb-2"><i class="bi bi-info-circle text-primary me-2"></i>How it appears</h6>
+                <p class="text-muted small mb-2">
+                    Click <strong>Share with Customer</strong> on any package details page to copy the public URL.
+                    The shared quote shows your logo, agent contact, the greeting, package details, and the feature tiles below.
+                </p>
+                <p class="text-muted small mb-0">
+                    Tip — keep features to 6–8 tiles. They render in a clean icon grid on both web and PDF.
+                </p>
+            </div>
+        </div>
+    </div>
+</form>
+
+<template id="whyTemplate">
+    <div class="why-row">
+        <span class="grip"><i class="bi bi-grip-vertical"></i></span>
+        <div class="icon-picker">
+            <button type="button" class="icon-pre form-control form-control-sm bg-white text-start">
+                <i class="bi bi-star"></i><span class="icon-name flex-grow-1">bi-star</span>
+                <i class="bi bi-chevron-down small text-muted"></i>
+            </button>
+            <input type="hidden" class="icon-input" value="bi-star" />
+            <div class="icon-grid"></div>
+        </div>
+        <input type="text" class="form-control form-control-sm title-input" placeholder="Feature title (e.g. 24/7 Support)" maxlength="60" />
+        <button type="button" class="btn btn-sm btn-outline-danger remove-why" title="Remove">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    </div>
+</template>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+    <script>
+        // ──────────────── Greeting (Quill) ────────────────
+        const greetQuill = new Quill('#greetEditor', {
+            theme: 'snow',
+            placeholder: 'e.g. Dear Customer, thank you for considering us for your travel...',
+            modules: {
+                toolbar: [
+                    [{ header: [false, 1, 2, 3] }],
+                    ['bold', 'italic', 'underline'],
+                    [{ list: 'ordered' }, { list: 'bullet' }],
+                    ['link', 'clean']
+                ]
+            }
+        });
+        const initialGreeting = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.GreetingParagraph ?? ""));
+        if (initialGreeting) greetQuill.clipboard.dangerouslyPasteHTML(initialGreeting);
+
+        // ──────────────── Why book — repeater ────────────────
+        const ICONS = [
+            'bi-headset', 'bi-cash-coin', 'bi-tags', 'bi-sliders', 'bi-credit-card-2-back',
+            'bi-person-check', 'bi-shield-check', 'bi-shield-lock', 'bi-currency-rupee',
+            'bi-stars', 'bi-award', 'bi-trophy', 'bi-globe', 'bi-airplane', 'bi-suitcase',
+            'bi-geo-alt', 'bi-map', 'bi-compass', 'bi-clock-history', 'bi-calendar-check',
+            'bi-chat-dots', 'bi-telephone', 'bi-envelope', 'bi-handbag', 'bi-piggy-bank',
+            'bi-truck', 'bi-car-front', 'bi-people', 'bi-person-hearts', 'bi-emoji-smile',
+            'bi-lightning-charge', 'bi-percent'
+        ];
+
+        const container = document.getElementById('whyContainer');
+        const tmpl = document.getElementById('whyTemplate');
+        const addBtn = document.getElementById('addWhy');
+        const emptyMsg = document.querySelector('.empty-msg');
+
+        function refreshEmpty() {
+            emptyMsg.classList.toggle('d-none', container.children.length > 0);
+        }
+
+        function bindIconPicker(row, iconName) {
+            const picker = row.querySelector('.icon-picker');
+            const trigger = picker.querySelector('button.icon-pre');
+            const grid = picker.querySelector('.icon-grid');
+            const input = picker.querySelector('.icon-input');
+            const preIcon = trigger.querySelector('i');
+            const preName = trigger.querySelector('.icon-name');
+
+            grid.innerHTML = ICONS.map(i =>
+                `<button type="button" data-icon="${i}" title="${i}"><i class="bi ${i}"></i></button>`
+            ).join('');
+
+            function setIcon(name) {
+                input.value = name;
+                preIcon.className = 'bi ' + name;
+                preName.textContent = name;
+            }
+            setIcon(iconName || 'bi-star');
+
+            trigger.addEventListener('click', e => {
+                e.preventDefault();
+                document.querySelectorAll('.icon-picker.open').forEach(p => p !== picker && p.classList.remove('open'));
+                picker.classList.toggle('open');
+            });
+            grid.addEventListener('click', e => {
+                const btn = e.target.closest('button[data-icon]');
+                if (!btn) return;
+                setIcon(btn.dataset.icon);
+                picker.classList.remove('open');
+            });
+        }
+
+        function addRow(data) {
+            const node = tmpl.content.firstElementChild.cloneNode(true);
+            container.appendChild(node);
+            bindIconPicker(node, data?.icon);
+            node.querySelector('.title-input').value = data?.title ?? '';
+            node.querySelector('.remove-why').addEventListener('click', () => {
+                node.remove();
+                refreshEmpty();
+            });
+            refreshEmpty();
+        }
+
+        document.addEventListener('click', e => {
+            if (!e.target.closest('.icon-picker')) {
+                document.querySelectorAll('.icon-picker.open').forEach(p => p.classList.remove('open'));
+            }
+        });
+
+        addBtn.addEventListener('click', () => addRow());
+
+        // Seed from existing JSON
+        const seed = @Html.Raw(string.IsNullOrWhiteSpace(Model?.WhyBookWithUs) ? "[]" : Model.WhyBookWithUs);
+        if (Array.isArray(seed) && seed.length) {
+            seed.forEach(addRow);
+        } else {
+            // Default starter set on first visit
+            [
+                { icon: 'bi-headset',           title: '24/7 Support' },
+                { icon: 'bi-cash-coin',         title: 'Best Price' },
+                { icon: 'bi-sliders',           title: 'Customize Packages' },
+                { icon: 'bi-credit-card-2-back',title: 'Pay in Installment' },
+                { icon: 'bi-person-check',      title: 'Expert Guidance' },
+                { icon: 'bi-shield-check',      title: 'Safe & Secure' },
+                { icon: 'bi-tags',              title: 'No Hidden Charges' }
+            ].forEach(addRow);
+        }
+        refreshEmpty();
+
+        // ──────────────── Logo upload ────────────────
+        const logoFile = document.getElementById('logoFile');
+        const logoPreview = document.getElementById('logoPreview');
+        const logoEmpty = document.querySelector('.logo-empty');
+        const logoFileName = document.getElementById('logoFileName');
+        const removeLogoFlag = document.getElementById('removeLogo');
+        const removeLogoBtn = document.getElementById('removeLogoBtn');
+
+        logoFile.addEventListener('change', e => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            removeLogoFlag.value = 'false';
+            logoPreview.src = URL.createObjectURL(f);
+            logoPreview.classList.remove('d-none');
+            if (logoEmpty) logoEmpty.classList.add('d-none');
+            logoFileName.textContent = f.name;
+        });
+
+        if (removeLogoBtn) {
+            removeLogoBtn.addEventListener('click', () => {
+                if (!confirm('Remove the current logo?')) return;
+                removeLogoFlag.value = 'true';
+                logoFile.value = '';
+                logoPreview.src = '';
+                logoPreview.classList.add('d-none');
+                if (logoEmpty) logoEmpty.classList.remove('d-none');
+                logoFileName.textContent = 'Logo will be removed when you save';
+                removeLogoBtn.disabled = true;
+                removeLogoBtn.classList.add('text-muted');
+            });
+        }
+
+        // ──────────────── Submit ────────────────
+        document.getElementById('brandingForm').addEventListener('submit', e => {
+            // Greeting — empty Quill produces "<p><br></p>", normalize to ""
+            const html = greetQuill.root.innerHTML.trim();
+            document.getElementById('greetingParagraph').value =
+                (html === '<p><br></p>' ? '' : html);
+
+            // Why-book features
+            const items = [...container.querySelectorAll('.why-row')].map(row => ({
+                icon: row.querySelector('.icon-input').value || 'bi-star',
+                title: row.querySelector('.title-input').value.trim()
+            })).filter(x => x.title.length > 0);
+            document.getElementById('whyBookWithUs').value = JSON.stringify(items);
+        });
+    </script>
+}

@@ -16,6 +16,8 @@ public class PackagesController : Controller
     private readonly IRoomTypeRepository _roomTypes;
     private readonly IMealPlanRepository _mealPlans;
     private readonly ISightseeingRepository _sightseeings;
+    private readonly IItineraryRepository _itineraries;
+    private readonly ICompanyRepository _companies;
     private readonly ITenantContext _tenant;
 
     public PackagesController(
@@ -26,6 +28,8 @@ public class PackagesController : Controller
         IRoomTypeRepository roomTypes,
         IMealPlanRepository mealPlans,
         ISightseeingRepository sightseeings,
+        IItineraryRepository itineraries,
+        ICompanyRepository companies,
         ITenantContext tenant)
     {
         _repo = repo;
@@ -35,6 +39,8 @@ public class PackagesController : Controller
         _roomTypes = roomTypes;
         _mealPlans = mealPlans;
         _sightseeings = sightseeings;
+        _itineraries = itineraries;
+        _companies = companies;
         _tenant = tenant;
     }
 
@@ -138,12 +144,25 @@ public class PackagesController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> Details(int id)
+    public async Task<IActionResult> Details(int id, [FromServices] IBookingRepository bookings)
     {
         if (!_tenant.CanView(AppModules.Packages)) return Forbid();
         var pkg = await _repo.GetByIdAsync(id);
         if (pkg == null) return NotFound();
         ViewData["Title"] = $"Package {pkg.PackageNumber}";
+
+        var company = await _companies.GetByIdAsync(_tenant.CompanyId);
+        ViewBag.CompanySlug = company?.Slug ?? "";
+
+        // Enforce single-booking-per-lead/package rule. If an active booking already
+        // exists for this package (or its lead), surface it so the view can swap
+        // "Convert to Booking" → "View Booking" link.
+        if (pkg.LeadId.HasValue)
+        {
+            var leadBookings = (await bookings.GetByLeadAsync(pkg.LeadId.Value)).ToList();
+            ViewBag.ExistingBooking = leadBookings.FirstOrDefault(b => b.PackageId == pkg.Id)
+                                   ?? leadBookings.FirstOrDefault();
+        }
         return View(pkg);
     }
 
@@ -186,6 +205,7 @@ public class PackagesController : Controller
         ViewBag.RoomTypes    = await _roomTypes.GetAllAsync();
         ViewBag.MealPlans    = await _mealPlans.GetAllAsync();
         ViewBag.Sightseeings = await _sightseeings.GetAllAsync();
+        ViewBag.Itineraries  = await _itineraries.GetAllAsync();
     }
 
     // ───────────────────── form view-model ─────────────────────

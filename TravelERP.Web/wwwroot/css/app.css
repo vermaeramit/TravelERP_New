@@ -62,7 +62,7 @@ body { min-height: 100vh; }
     display: flex;
     flex-direction: column;
 }
-.app-main .app-content { flex: 1 0 auto; }
+.app-main .app-content { flex: 1 0 auto; padding-top: 10px; }
 
 .app-footer {
     flex-shrink: 0;
@@ -90,12 +90,32 @@ body { min-height: 100vh; }
     border-top-color: rgba(255,255,255,0.08);
 }
 
+/* Page title in top navbar (replaces the old .app-content-header strip) */
+.app-header .page-title {
+    font-size: 1.1rem;
+    color: #1f2937;
+    letter-spacing: -.2px;
+    padding-left: .5rem;
+    border-left: 3px solid var(--erp-primary);
+    line-height: 1.1;
+}
+
 /* Sidebar brand */
 .sidebar-brand {
     padding: 1rem 1.2rem;
     background-color: #161b27 !important;
     border-bottom: 1px solid rgba(255,255,255,0.08);
 }
+.sidebar-brand .sidebar-logo {
+    width: 38px; height: 38px;
+    object-fit: contain;
+    background: #fff;
+    border-radius: .4rem;
+    padding: 3px;
+    margin-right: .6rem;
+    flex-shrink: 0;
+}
+.sidebar-brand .brand-text { line-height: 1.2; max-width: 160px; }
 
 /* ── Section headers (MAIN / OPERATIONS / FINANCE …) ── */
 .app-sidebar .nav-header {

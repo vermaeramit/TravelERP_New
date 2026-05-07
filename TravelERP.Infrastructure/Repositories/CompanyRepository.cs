@@ -72,7 +72,7 @@ public class CompanyRepository : ICompanyRepository
             "sp_Company_Update", company, commandType: CommandType.StoredProcedure) > 0;
     }
 
-    public async Task<bool> UpdateNumberSeriesAsync(int companyId, string leadPrefix, string packagePrefix, int? updatedBy)
+    public async Task<bool> UpdateNumberSeriesAsync(int companyId, string leadPrefix, string packagePrefix, string bookingPrefix, string invoicePrefix, int? updatedBy)
     {
         using var conn = _factory.CreateMasterConnection();
         return await conn.ExecuteAsync(
@@ -82,7 +82,26 @@ public class CompanyRepository : ICompanyRepository
                 Id            = companyId,
                 LeadPrefix    = string.IsNullOrWhiteSpace(leadPrefix)    ? "LD"  : leadPrefix.Trim().ToUpperInvariant(),
                 PackagePrefix = string.IsNullOrWhiteSpace(packagePrefix) ? "PKG" : packagePrefix.Trim().ToUpperInvariant(),
+                BookingPrefix = string.IsNullOrWhiteSpace(bookingPrefix) ? "BK"  : bookingPrefix.Trim().ToUpperInvariant(),
+                InvoicePrefix = string.IsNullOrWhiteSpace(invoicePrefix) ? "INV" : invoicePrefix.Trim().ToUpperInvariant(),
                 UpdatedBy     = updatedBy
+            },
+            commandType: CommandType.StoredProcedure) > 0;
+    }
+
+    public async Task<bool> UpdateQuoteBrandingAsync(int companyId, string? greetingParagraph, string? whyBookWithUs, string? logoUrl, bool updateLogo, int? updatedBy)
+    {
+        using var conn = _factory.CreateMasterConnection();
+        return await conn.ExecuteAsync(
+            "sp_Company_UpdateQuoteBranding",
+            new
+            {
+                Id                = companyId,
+                GreetingParagraph = string.IsNullOrWhiteSpace(greetingParagraph) ? null : greetingParagraph,
+                WhyBookWithUs     = string.IsNullOrWhiteSpace(whyBookWithUs)     ? null : whyBookWithUs,
+                LogoUrl           = string.IsNullOrWhiteSpace(logoUrl) ? null : logoUrl,
+                UpdateLogo        = updateLogo,
+                UpdatedBy         = updatedBy
             },
             commandType: CommandType.StoredProcedure) > 0;
     }

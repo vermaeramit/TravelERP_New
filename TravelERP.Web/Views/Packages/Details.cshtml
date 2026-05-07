@@ -37,6 +37,13 @@
                 }
             </div>
             <div class="d-flex gap-2">
+                @if (!string.IsNullOrEmpty(Model.ShareToken))
+                {
+                    <button type="button" class="btn btn-sm btn-success"
+                            data-bs-toggle="modal" data-bs-target="#shareModal">
+                        <i class="bi bi-share me-1"></i>Share with Customer
+                    </button>
+                }
                 @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.Packages))
                 {
                     <a href="/Packages/Edit/@Model.Id" class="btn btn-sm btn-primary">
@@ -184,6 +191,44 @@
                             <div class="info-label mt-3 mb-1">Notes</div>
                             <div class="small">@o.Notes</div>
                         }
+
+                        @{
+                            var existingBooking = ViewBag.ExistingBooking as TravelERP.Core.Entities.Tenant.Booking;
+                            var thisOptionBooked = existingBooking != null
+                                                   && existingBooking.PackageId == Model.Id
+                                                   && existingBooking.PackageOptionId == o.Id;
+                            var leadAlreadyBooked = existingBooking != null
+                                                    && (existingBooking.PackageId != Model.Id
+                                                        || existingBooking.PackageOptionId != o.Id);
+                        }
+                        @if (existingBooking == null && Tenant.CanAdd(TravelERP.Core.Constants.AppModules.Bookings))
+                        {
+                            <div class="mt-3 pt-3 border-top">
+                                <a href="/Bookings/Create?packageId=@Model.Id&optionId=@o.Id"
+                                   class="btn btn-success btn-sm w-100">
+                                    <i class="bi bi-journal-check me-1"></i>Convert to Booking
+                                </a>
+                            </div>
+                        }
+                        else if (thisOptionBooked)
+                        {
+                            <div class="mt-3 pt-3 border-top">
+                                <a href="/Bookings/Details/@existingBooking!.Id"
+                                   class="btn btn-success btn-sm w-100">
+                                    <i class="bi bi-check-circle-fill me-1"></i>Booked — @existingBooking.BookingNumber
+                                </a>
+                            </div>
+                        }
+                        else if (leadAlreadyBooked)
+                        {
+                            <div class="mt-3 pt-3 border-top">
+                                <a href="/Bookings/Details/@existingBooking!.Id"
+                                   class="btn btn-outline-secondary btn-sm w-100"
+                                   title="This lead already has a booking on a different option/package">
+                                    <i class="bi bi-info-circle me-1"></i>Lead booked on @existingBooking.OptionName — view
+                                </a>
+                            </div>
+                        }
                     </div>
                 </div>
             }
@@ -226,3 +271,85 @@
         }
     </div>
 </div>
+
+@if (!string.IsNullOrEmpty(Model.ShareToken))
+{
+    var slug = ViewBag.CompanySlug as string ?? "";
+    var publicPath = $"/p/{slug}/{Model.ShareToken}";
+    var shareUrl = $"{Context.Request.Scheme}://{Context.Request.Host}{publicPath}";
+    var emailSubject = Uri.EscapeDataString($"Travel Quote — {Model.Title}");
+    var emailBody = Uri.EscapeDataString($"Hello {Model.CustomerName},\n\nPlease find your travel quote here:\n{shareUrl}\n\nLet us know if you have any questions.\n");
+    var emailHref = $"mailto:{Model.CustomerEmail}?subject={emailSubject}&body={emailBody}";
+    var waMobile = (Model.CustomerMobile ?? "").Replace(" ", "").Replace("+", "");
+    var waText = Uri.EscapeDataString($"Hi {Model.CustomerName}, here's your travel quote: {shareUrl}");
+    var waHref = $"https://wa.me/{waMobile}?text={waText}";
+
+    <!-- Share Modal -->
+    <div class="modal fade" id="shareModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-share-fill text-primary me-2"></i>Share with Customer
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">
+                        Share this link with the customer. It opens a clean,
+                        customer-facing view of the quote — no login needed.
+                        Customer can view in browser or click <strong>Print / Save as PDF</strong>.
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Customer link</label>
+                        <div class="input-group">
+                            <input type="text" id="shareUrl" class="form-control font-monospace small"
+                                   value="@shareUrl" readonly />
+                            <button type="button" class="btn btn-outline-primary" id="copyBtn">
+                                <i class="bi bi-clipboard me-1"></i>Copy
+                            </button>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <a href="@publicPath" target="_blank" class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-box-arrow-up-right me-1"></i>Preview as customer
+                        </a>
+                        @if (!string.IsNullOrEmpty(Model.CustomerEmail))
+                        {
+                            <a href="@emailHref" class="btn btn-sm btn-outline-info">
+                                <i class="bi bi-envelope me-1"></i>Email customer
+                            </a>
+                        }
+                        @if (!string.IsNullOrEmpty(Model.CustomerMobile))
+                        {
+                            <a href="@waHref" target="_blank" class="btn btn-sm btn-outline-success">
+                                <i class="bi bi-whatsapp me-1"></i>WhatsApp
+                            </a>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script>
+        const copyBtn = document.getElementById('copyBtn');
+        const urlEl   = document.getElementById('shareUrl');
+        if (copyBtn && urlEl) {
+            copyBtn.addEventListener('click', () => {
+                urlEl.select();
+                navigator.clipboard.writeText(urlEl.value).then(() => {
+                    const orig = copyBtn.innerHTML;
+                    copyBtn.innerHTML = '<i class="bi bi-check2 me-1"></i>Copied!';
+                    copyBtn.classList.replace('btn-outline-primary', 'btn-success');
+                    setTimeout(() => {
+                        copyBtn.innerHTML = orig;
+                        copyBtn.classList.replace('btn-success', 'btn-outline-primary');
+                    }, 1500);
+                });
+            });
+        }
+    </script>
+}

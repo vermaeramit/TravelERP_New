@@ -8,7 +8,12 @@
     var activities = ViewBag.Activities as List<LeadActivity> ?? new();
     var authorMap  = ViewBag.AuthorMap  as Dictionary<int, string> ?? new();
     var templates  = ViewBag.Templates  as IEnumerable<ActivityTemplate> ?? Enumerable.Empty<ActivityTemplate>();
+    var allPackages = (ViewBag.Packages as IEnumerable<Package> ?? Enumerable.Empty<Package>()).ToList();
+    var packages    = allPackages.Take(2).ToList();          // only the 2 most recent are relevant
+    var hiddenPkgs  = Math.Max(0, allPackages.Count - 2);
+    var bookings    = (ViewBag.Bookings as IEnumerable<Booking> ?? Enumerable.Empty<Booking>()).ToList();
     var canEdit    = Tenant.CanEdit(TravelERP.Core.Constants.AppModules.Leads);
+    var canAddPkg  = Tenant.CanAdd(TravelERP.Core.Constants.AppModules.Packages);
 
     string Relative(DateTime dt) {
         var diff = DateTime.UtcNow - dt;
@@ -88,6 +93,9 @@
         .timeline-meta .meta-sep { opacity: .35; margin: 0 .35rem; }
         .timeline-actions { opacity: 0; transition: opacity .15s; }
         .timeline-item:hover .timeline-actions { opacity: 1; }
+
+        .lead-pkg-card { transition: transform .1s, box-shadow .15s; cursor: pointer; }
+        .lead-pkg-card:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(0,0,0,.07); border-color: var(--bs-primary) !important; }
     </style>
 }
 
@@ -239,6 +247,135 @@
                 </div>
                 <div class="card-body">
                     <p class="mb-0">@Model.Remark</p>
+                </div>
+            </div>
+        }
+
+        <!-- Packages (latest 2 only) -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center">
+                <h6 class="mb-0 fw-bold">
+                    <i class="bi bi-suitcase-lg text-primary me-2"></i>Tour Packages
+                    <span class="badge bg-light text-dark ms-1">@allPackages.Count</span>
+                    @if (hiddenPkgs > 0)
+                    {
+                        <small class="text-muted fw-normal ms-2">— showing 2 most recent</small>
+                    }
+                </h6>
+                @if (canAddPkg)
+                {
+                    <a href="/Packages/Create?leadId=@Model.Id" class="btn btn-sm btn-success">
+                        <i class="bi bi-plus-lg me-1"></i>Create Package
+                    </a>
+                }
+            </div>
+            <div class="card-body">
+                @if (!packages.Any())
+                {
+                    <div class="text-center text-muted py-3">
+                        <i class="bi bi-suitcase-lg fs-1 d-block mb-2 opacity-50"></i>
+                        <p class="mb-0 small">No packages quoted yet. Click <strong>Create Package</strong> to build the first quote.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="row g-2">
+                        @foreach (var p in packages)
+                        {
+                            <div class="col-md-6">
+                                <a href="/Packages/Details/@p.Id" class="text-decoration-none">
+                                    <div class="border rounded p-3 h-100 lead-pkg-card">
+                                        <div class="d-flex justify-content-between align-items-start mb-1">
+                                            <span class="font-monospace small text-muted">@p.PackageNumber</span>
+                                            <span class="badge bg-light text-dark border">
+                                                <i class="bi bi-list-stars me-1"></i>@p.OptionCount
+                                            </span>
+                                        </div>
+                                        <div class="fw-bold text-body mb-1">@p.Title</div>
+                                        <div class="small text-muted mb-2">
+                                            @if (!string.IsNullOrEmpty(p.DestinationName))
+                                            {
+                                                <span><i class="bi bi-geo-alt me-1"></i>@p.DestinationName</span>
+                                            }
+                                            @if (p.StartDate.HasValue)
+                                            {
+                                                <span class="ms-2"><i class="bi bi-calendar3 me-1"></i>@p.StartDate.Value.ToString("dd MMM yyyy")</span>
+                                            }
+                                        </div>
+                                        @if (p.MinPrice.HasValue)
+                                        {
+                                            <div class="fw-bold text-success">
+                                                @if (p.MinPrice == p.MaxPrice)
+                                                {
+                                                    @($"{p.Currency} {p.MinPrice:N0}")
+                                                }
+                                                else
+                                                {
+                                                    @($"{p.Currency} {p.MinPrice:N0} – {p.MaxPrice:N0}")
+                                                }
+                                            </div>
+                                        }
+                                        <div class="text-muted small mt-1">
+                                            <i class="bi bi-clock me-1"></i>@p.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                        }
+                    </div>
+                    @if (hiddenPkgs > 0)
+                    {
+                        <p class="text-muted small text-center mb-0 mt-3">
+                            <i class="bi bi-archive me-1"></i>
+                            @hiddenPkgs older package@(hiddenPkgs == 1 ? "" : "s") hidden — older quotes are no longer relevant.
+                        </p>
+                    }
+                }
+            </div>
+        </div>
+
+        <!-- Bookings (confirmed sales for this lead) -->
+        @if (bookings.Any())
+        {
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold">
+                        <i class="bi bi-journal-check text-success me-2"></i>Bookings
+                        <span class="badge bg-success-subtle text-success ms-1">@bookings.Count</span>
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        @foreach (var b in bookings)
+                        {
+                            <div class="col-md-6">
+                                <a href="/Bookings/Details/@b.Id" class="text-decoration-none">
+                                    <div class="border rounded p-3 h-100 lead-pkg-card">
+                                        <div class="d-flex justify-content-between align-items-start mb-1">
+                                            <span class="font-monospace small text-muted">@b.BookingNumber</span>
+                                            <span class="badge @(b.Status == "Cancelled" ? "bg-danger-subtle text-danger" : b.Status == "Completed" ? "bg-primary-subtle text-primary" : "bg-success-subtle text-success")">@b.Status</span>
+                                        </div>
+                                        <div class="fw-bold text-body mb-1">@(b.OptionName ?? "Travel Booking")</div>
+                                        <div class="small text-muted mb-2">
+                                            @if (!string.IsNullOrEmpty(b.DestinationName)) { <span><i class="bi bi-geo-alt me-1"></i>@b.DestinationName</span> }
+                                            @if (b.StartDate.HasValue) { <span class="ms-2"><i class="bi bi-calendar3 me-1"></i>@b.StartDate.Value.ToString("dd MMM yyyy")</span> }
+                                        </div>
+                                        <div class="d-flex justify-content-between">
+                                            <span class="fw-bold text-success">@b.Currency @b.TotalAmount.ToString("N0")</span>
+                                            @if (b.BalanceAmount > 0)
+                                            {
+                                                <span class="small text-danger">balance @b.Currency @b.BalanceAmount.ToString("N0")</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="small text-success"><i class="bi bi-check-circle-fill me-1"></i>fully paid</span>
+                                            }
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                        }
+                    </div>
                 </div>
             </div>
         }

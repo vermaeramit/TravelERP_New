@@ -13,6 +13,8 @@ public class PackageOptionHotel
 
     // Joined
     public string? HotelName { get; set; }
+    public string? HotelImageUrl { get; set; }
+    public byte? HotelCategory { get; set; }
     public string? RoomTypeName { get; set; }
     public string? MealPlanCode { get; set; }
     public string? MealPlanName { get; set; }

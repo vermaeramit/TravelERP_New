@@ -429,6 +429,7 @@ BEGIN
     CREATE TABLE Packages (
         Id              INT IDENTITY(1,1) PRIMARY KEY,
         PackageNumber   NVARCHAR(40)   NOT NULL,            -- e.g. PKG-2026-0001
+        ShareToken      NVARCHAR(64)   NULL,                -- random token for public web view
         LeadId          INT            NULL,                -- nullable: standalone or from-lead
         Title           NVARCHAR(200)  NOT NULL,
         DestinationId   INT            NULL,
@@ -458,6 +459,19 @@ BEGIN
     );
     CREATE INDEX IX_Packages_Lead    ON Packages(LeadId);
     CREATE INDEX IX_Packages_Created ON Packages(CreatedAt DESC);
+END
+GO
+
+-- Add ShareToken to existing Packages tables (idempotent)
+IF COL_LENGTH('Packages','ShareToken') IS NULL
+BEGIN
+    ALTER TABLE Packages ADD ShareToken NVARCHAR(64) NULL;
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='UQ_Packages_ShareToken' AND object_id = OBJECT_ID('Packages'))
+BEGIN
+    CREATE UNIQUE INDEX UQ_Packages_ShareToken
+        ON Packages(ShareToken) WHERE ShareToken IS NOT NULL;
 END
 GO
 
@@ -537,5 +551,77 @@ BEGIN
         CONSTRAINT FK_PDS_Sightseeing FOREIGN KEY (SightseeingId) REFERENCES Sightseeings(Id)
     );
     CREATE INDEX IX_PDS_Day ON PackageDaySightseeings(PackageDayId);
+END
+GO
+
+-- ============================================================
+-- BOOKINGS  — confirmed sale, links back to a chosen Package Option
+-- ============================================================
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'Bookings') AND type = 'U')
+BEGIN
+    CREATE TABLE Bookings (
+        Id              INT IDENTITY(1,1) PRIMARY KEY,
+        BookingNumber   NVARCHAR(40)   NOT NULL,                        -- e.g. BK-2026-0001
+        InvoiceNumber   NVARCHAR(40)   NOT NULL,                        -- e.g. INV-2026-0001 (issued at booking time)
+        LeadId          INT            NULL,
+        PackageId       INT            NULL,
+        PackageOptionId INT            NULL,
+        OptionName      NVARCHAR(150)  NULL,                            -- denormalized snapshot of which option was sold
+        CustomerName    NVARCHAR(150)  NOT NULL,
+        CustomerMobile  NVARCHAR(30)   NULL,
+        CustomerEmail   NVARCHAR(150)  NULL,
+        Adults          INT            NOT NULL DEFAULT 1,
+        Children        INT            NOT NULL DEFAULT 0,
+        Infants         INT            NOT NULL DEFAULT 0,
+        StartDate       DATE           NULL,
+        EndDate         DATE           NULL,
+        Days            INT            NULL,
+        Nights          INT            NULL,
+        DestinationId   INT            NULL,
+        TotalAmount     DECIMAL(18,2)  NOT NULL DEFAULT 0,              -- locked-in price at booking time
+        Currency        NVARCHAR(10)   NOT NULL DEFAULT 'INR',
+        Status          NVARCHAR(20)   NOT NULL DEFAULT 'Confirmed',    -- Confirmed / Cancelled / Completed
+        Notes           NVARCHAR(MAX)  NULL,
+        IsActive        BIT            NOT NULL DEFAULT 1,
+        CreatedAt       DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
+        CreatedBy       INT            NOT NULL DEFAULT 0,
+        UpdatedAt       DATETIME2      NULL,
+        UpdatedBy       INT            NULL,
+        CONSTRAINT FK_Bookings_Lead          FOREIGN KEY (LeadId)          REFERENCES Leads(Id),
+        CONSTRAINT FK_Bookings_Package       FOREIGN KEY (PackageId)       REFERENCES Packages(Id),
+        CONSTRAINT FK_Bookings_PackageOption FOREIGN KEY (PackageOptionId) REFERENCES PackageOptions(Id),
+        CONSTRAINT FK_Bookings_Destination   FOREIGN KEY (DestinationId)   REFERENCES Destinations(Id),
+        CONSTRAINT UQ_Bookings_BookingNumber UNIQUE (BookingNumber),
+        CONSTRAINT UQ_Bookings_InvoiceNumber UNIQUE (InvoiceNumber)
+    );
+    CREATE INDEX IX_Bookings_Lead    ON Bookings(LeadId);
+    CREATE INDEX IX_Bookings_Package ON Bookings(PackageId);
+    CREATE INDEX IX_Bookings_Created ON Bookings(CreatedAt DESC);
+END
+GO
+
+-- ============================================================
+-- BOOKING INSTALLMENTS  — payment plan rows
+-- ============================================================
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'BookingInstallments') AND type = 'U')
+BEGIN
+    CREATE TABLE BookingInstallments (
+        Id              INT IDENTITY(1,1) PRIMARY KEY,
+        BookingId       INT            NOT NULL,
+        InstallmentNo   INT            NOT NULL,
+        Amount          DECIMAL(18,2)  NOT NULL DEFAULT 0,
+        PaymentMode     NVARCHAR(50)   NULL,            -- Cash / UPI / NEFT / RTGS / Card / Cheque / Other
+        PaymentStatus   NVARCHAR(20)   NOT NULL DEFAULT 'Pending',  -- Pending / Received / Refunded
+        DueDate         DATE           NULL,
+        ReceivedDate    DATE           NULL,
+        Remark          NVARCHAR(500)  NULL,
+        CreatedAt       DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
+        CreatedBy       INT            NOT NULL DEFAULT 0,
+        UpdatedAt       DATETIME2      NULL,
+        UpdatedBy       INT            NULL,
+        CONSTRAINT FK_BookingInstallments_Booking FOREIGN KEY (BookingId)
+            REFERENCES Bookings(Id) ON DELETE CASCADE
+    );
+    CREATE INDEX IX_BookingInstallments_Booking ON BookingInstallments(BookingId);
 END
 GO

@@ -1,0 +1,123 @@
+@using TravelERP.Core.Entities.Master
+@{
+    var company = ViewBag.Company as Company;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>@ViewData["Title"] — @(company?.Name ?? "Travel Quote")</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" />
+
+    <style>
+        :root { --brand: #0d6efd; }
+        body { background: #f5f7fa; color: #1f2937; font-family: system-ui, -apple-system, sans-serif; }
+
+        .pub-header {
+            background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);
+            color: #fff; padding: 2rem 0;
+        }
+        .pub-header .brand-name { font-size: 1.4rem; font-weight: 700; letter-spacing: -.3px; }
+        .pub-header .pkg-title  { font-size: 1.85rem; font-weight: 700; margin-top: .35rem; }
+        .pub-header .pkg-meta   { opacity: .85; font-size: .95rem; margin-top: .25rem; }
+        .pub-header .pkg-num    { font-family: ui-monospace, SFMono-Regular, monospace;
+                                  font-size: .8rem; opacity: .75;
+                                  background: rgba(255,255,255,.15);
+                                  padding: 3px 10px; border-radius: 999px;
+                                  display: inline-block; }
+
+        .pub-toolbar {
+            position: sticky; top: 0; z-index: 100;
+            background: #fff; border-bottom: 1px solid #e5e7eb;
+            padding: .65rem 0; box-shadow: 0 1px 3px rgba(0,0,0,.04);
+        }
+
+        .pub-content { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
+        .section-title {
+            font-size: .8rem; text-transform: uppercase; letter-spacing: 1px;
+            color: var(--bs-secondary-color); font-weight: 700;
+            margin: 2rem 0 .85rem;
+        }
+
+        .pub-card {
+            background: #fff; border: 1px solid #e5e7eb; border-radius: .75rem;
+            padding: 1.25rem; margin-bottom: 1rem;
+        }
+
+        .pub-footer {
+            text-align: center; padding: 2.5rem 1rem 1.5rem;
+            color: var(--bs-secondary-color); font-size: .85rem;
+        }
+        .pub-footer .company-line { font-weight: 600; color: #1f2937; margin-bottom: .25rem; }
+
+        @@media print {
+            body { background: #fff !important; }
+            .no-print, .pub-toolbar { display: none !important; }
+            .pub-header { background: #fff !important; color: #1f2937 !important;
+                          border-bottom: 3px solid var(--brand);
+                          padding: 1.25rem 0 !important; }
+            .pub-header .pkg-num { background: #f0f0f0 !important; color: #333 !important; }
+            .pub-card { break-inside: avoid; box-shadow: none !important; border-color: #d1d5db; }
+            .opt-card { break-inside: avoid; }
+            a { text-decoration: none !important; color: inherit !important; }
+        }
+    </style>
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+<body>
+    @* Toolbar visible only to authenticated agents previewing the quote — *@
+    @* customers landing on the public link don't see it.                  *@
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <div class="pub-toolbar no-print">
+            <div class="pub-content py-0 d-flex justify-content-between align-items-center">
+                <span class="text-muted small"><i class="bi bi-shield-check text-success me-1"></i>Quote shared by @(company?.Name ?? "")</span>
+                <div class="d-flex gap-2">
+                    <a id="pdfDownloadBtn" href="@(Context.Request.Path)/pdf"
+                       class="btn btn-sm btn-primary">
+                        <i class="bi bi-file-earmark-pdf-fill me-1"></i>
+                        <span class="lbl">Download PDF</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+        <script>
+            // Show a tiny "preparing…" spinner while Chromium renders the PDF (~1–3 s).
+            (function () {
+                const btn = document.getElementById('pdfDownloadBtn');
+                if (!btn) return;
+                btn.addEventListener('click', () => {
+                    const lbl = btn.querySelector('.lbl');
+                    lbl.textContent = 'Preparing PDF…';
+                    btn.classList.add('disabled');
+                    setTimeout(() => {
+                        lbl.textContent = 'Download PDF';
+                        btn.classList.remove('disabled');
+                    }, 8000);
+                });
+            })();
+        </script>
+    }
+
+    @RenderBody()
+
+    <footer class="pub-footer">
+        @if (company != null)
+        {
+            <div class="company-line">@company.Name</div>
+            @if (!string.IsNullOrEmpty(company.Email) || !string.IsNullOrEmpty(company.Phone))
+            {
+                <div>
+                    @if (!string.IsNullOrEmpty(company.Email)) { <span><i class="bi bi-envelope me-1"></i>@company.Email</span> }
+                    @if (!string.IsNullOrEmpty(company.Phone)) { <span class="ms-3"><i class="bi bi-telephone me-1"></i>@company.Phone</span> }
+                </div>
+            }
+        }
+        <div class="mt-2 text-muted" style="font-size:.75rem">This quote is generated by TravelERP and is valid only when shared by the issuing agent.</div>
+    </footer>
+</body>
+</html>

@@ -6,6 +6,13 @@
 USE TravelERP_Master;
 GO
 
+-- Required for procedures that touch tables with filtered indexes
+-- (e.g. UQ_Packages_ShareToken) — these settings get baked into each
+-- procedure at CREATE time, so every CREATE OR ALTER below inherits them.
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
+GO
+
 -- ============================================================
 -- CLIENT DB NAME GENERATOR
 -- ============================================================
@@ -118,16 +125,39 @@ AS BEGIN
 END
 GO
 
+CREATE OR ALTER PROCEDURE sp_Company_UpdateQuoteBranding
+    @Id                INT,
+    @GreetingParagraph NVARCHAR(MAX) = NULL,
+    @WhyBookWithUs     NVARCHAR(MAX) = NULL,
+    @LogoUrl           NVARCHAR(500) = NULL,
+    @UpdateLogo        BIT           = 0,    -- only overwrite LogoUrl when true
+    @UpdatedBy         INT           = NULL
+AS BEGIN
+    SET NOCOUNT ON;
+    UPDATE Companies SET
+        GreetingParagraph = @GreetingParagraph,
+        WhyBookWithUs     = @WhyBookWithUs,
+        LogoUrl           = CASE WHEN @UpdateLogo = 1 THEN @LogoUrl ELSE LogoUrl END,
+        UpdatedAt         = GETUTCDATE(),
+        UpdatedBy         = @UpdatedBy
+    WHERE Id = @Id;
+END
+GO
+
 CREATE OR ALTER PROCEDURE sp_Company_UpdateNumberSeries
     @Id            INT,
     @LeadPrefix    NVARCHAR(20),
     @PackagePrefix NVARCHAR(20),
+    @BookingPrefix NVARCHAR(20) = 'BK',
+    @InvoicePrefix NVARCHAR(20) = 'INV',
     @UpdatedBy     INT = NULL
 AS BEGIN
     SET NOCOUNT ON;
     UPDATE Companies SET
         LeadPrefix    = @LeadPrefix,
         PackagePrefix = @PackagePrefix,
+        BookingPrefix = @BookingPrefix,
+        InvoicePrefix = @InvoicePrefix,
         UpdatedAt     = GETUTCDATE(),
         UpdatedBy     = @UpdatedBy
     WHERE Id = @Id;
@@ -1829,6 +1859,25 @@ AS BEGIN
 END
 GO
 
+CREATE OR ALTER PROCEDURE sp_Package_GetByLead
+    @DatabaseName NVARCHAR(100),
+    @LeadId       INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT p.*,
+               d.Name AS DestinationName,
+               (SELECT COUNT(1) FROM [' + @DatabaseName + N'].dbo.PackageOptions o WHERE o.PackageId = p.Id) AS OptionCount,
+               (SELECT MIN(o.FinalPrice) FROM [' + @DatabaseName + N'].dbo.PackageOptions o WHERE o.PackageId = p.Id) AS MinPrice,
+               (SELECT MAX(o.FinalPrice) FROM [' + @DatabaseName + N'].dbo.PackageOptions o WHERE o.PackageId = p.Id) AS MaxPrice
+        FROM [' + @DatabaseName + N'].dbo.Packages p
+        LEFT JOIN [' + @DatabaseName + N'].dbo.Destinations d ON p.DestinationId = d.Id
+        WHERE p.IsActive = 1 AND p.LeadId = @LeadId
+        ORDER BY p.CreatedAt DESC';
+    EXEC sp_executesql @sql, N'@LeadId INT', @LeadId;
+END
+GO
+
 CREATE OR ALTER PROCEDURE sp_Package_GetById
     @DatabaseName NVARCHAR(100),
     @Id           INT
@@ -1904,22 +1953,156 @@ AS BEGIN
     SET @PackageNumber = @Prefix + N'-' + CAST(@year AS NVARCHAR(4)) + N'-' +
                          RIGHT(N'0000' + CAST((@count + 1) AS NVARCHAR(10)), 4);
 
+    -- 32-char random hex token (collision-resistant, URL-safe)
+    DECLARE @ShareToken NVARCHAR(64) = LOWER(REPLACE(CAST(NEWID() AS NVARCHAR(40)), '-', ''));
+
     DECLARE @sql NVARCHAR(MAX) = N'
         INSERT INTO [' + @DatabaseName + N'].dbo.Packages
-            (PackageNumber, LeadId, Title, DestinationId, CustomerName, CustomerMobile, CustomerEmail,
+            (PackageNumber, ShareToken, LeadId, Title, DestinationId, CustomerName, CustomerMobile, CustomerEmail,
              Adults, Children, Infants, Days, Nights, StartDate, PriceMode, Currency,
              FlightDetails, Inclusions, Exclusions, Notes,
              IsActive, CreatedAt, CreatedBy)
-        VALUES (@PackageNumber, @LeadId, @Title, @DestinationId, @CustomerName, @CustomerMobile, @CustomerEmail,
+        VALUES (@PackageNumber, @ShareToken, @LeadId, @Title, @DestinationId, @CustomerName, @CustomerMobile, @CustomerEmail,
             @Adults, @Children, @Infants, @Days, @Nights, @StartDate, @PriceMode, @Currency,
             @FlightDetails, @Inclusions, @Exclusions, @Notes,
             1, GETUTCDATE(), @CreatedBy);
         SELECT @NewId = SCOPE_IDENTITY();';
     EXEC sp_executesql @sql,
-        N'@PackageNumber NVARCHAR(40), @LeadId INT, @Title NVARCHAR(200), @DestinationId INT, @CustomerName NVARCHAR(150), @CustomerMobile NVARCHAR(30), @CustomerEmail NVARCHAR(150), @Adults INT, @Children INT, @Infants INT, @Days INT, @Nights INT, @StartDate DATE, @PriceMode NVARCHAR(20), @Currency NVARCHAR(10), @FlightDetails NVARCHAR(MAX), @Inclusions NVARCHAR(MAX), @Exclusions NVARCHAR(MAX), @Notes NVARCHAR(MAX), @CreatedBy INT, @NewId INT OUTPUT',
-        @PackageNumber, @LeadId, @Title, @DestinationId, @CustomerName, @CustomerMobile, @CustomerEmail,
+        N'@PackageNumber NVARCHAR(40), @ShareToken NVARCHAR(64), @LeadId INT, @Title NVARCHAR(200), @DestinationId INT, @CustomerName NVARCHAR(150), @CustomerMobile NVARCHAR(30), @CustomerEmail NVARCHAR(150), @Adults INT, @Children INT, @Infants INT, @Days INT, @Nights INT, @StartDate DATE, @PriceMode NVARCHAR(20), @Currency NVARCHAR(10), @FlightDetails NVARCHAR(MAX), @Inclusions NVARCHAR(MAX), @Exclusions NVARCHAR(MAX), @Notes NVARCHAR(MAX), @CreatedBy INT, @NewId INT OUTPUT',
+        @PackageNumber, @ShareToken, @LeadId, @Title, @DestinationId, @CustomerName, @CustomerMobile, @CustomerEmail,
         @Adults, @Children, @Infants, @Days, @Nights, @StartDate, @PriceMode, @Currency,
         @FlightDetails, @Inclusions, @Exclusions, @Notes, @CreatedBy, @NewId OUTPUT;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Package_GetByShareToken
+    @DatabaseName NVARCHAR(100),
+    @Token        NVARCHAR(64)
+AS BEGIN
+    SET NOCOUNT ON;
+
+    -- Resolve package id + creator (agent) up front so we can return the agent
+    -- name/phone alongside other context. CreatedBy points at MasterUsers in the
+    -- master DB; the Mobile lives in the tenant DB Employees table linked by UserId.
+    DECLARE @id INT, @createdBy INT;
+    DECLARE @findSql NVARCHAR(MAX) = N'
+        SELECT @id = Id, @createdBy = CreatedBy
+        FROM [' + @DatabaseName + N'].dbo.Packages
+        WHERE ShareToken = @Token AND IsActive = 1;';
+    EXEC sp_executesql @findSql,
+        N'@Token NVARCHAR(64), @id INT OUTPUT, @createdBy INT OUTPUT',
+        @Token, @id OUTPUT, @createdBy OUTPUT;
+
+    IF @id IS NULL
+    BEGIN
+        -- Empty result sets matching the success shape so the reader doesn't crash.
+        DECLARE @emptySql NVARCHAR(MAX) = N'
+            SELECT TOP 0 *,
+                   CAST(NULL AS NVARCHAR(200)) AS DestinationName,
+                   CAST(NULL AS NVARCHAR(500)) AS DestinationBannerUrl,
+                   CAST(NULL AS NVARCHAR(MAX)) AS DestinationTerms
+            FROM [' + @DatabaseName + N'].dbo.Packages;
+
+            SELECT TOP 0 * FROM [' + @DatabaseName + N'].dbo.PackageOptions;
+
+            SELECT TOP 0 *,
+                   CAST(NULL AS NVARCHAR(200)) AS HotelName,
+                   CAST(NULL AS NVARCHAR(500)) AS HotelImageUrl,
+                   CAST(NULL AS TINYINT)       AS HotelCategory,
+                   CAST(NULL AS NVARCHAR(100)) AS RoomTypeName,
+                   CAST(NULL AS NVARCHAR(10))  AS MealPlanCode,
+                   CAST(NULL AS NVARCHAR(100)) AS MealPlanName
+            FROM [' + @DatabaseName + N'].dbo.PackageOptionHotels;
+
+            SELECT TOP 0 * FROM [' + @DatabaseName + N'].dbo.PackageDays;
+
+            SELECT TOP 0 Id, PackageDayId, SightseeingId,
+                   CAST(NULL AS NVARCHAR(200)) AS SightseeingName,
+                   CAST(NULL AS NVARCHAR(500)) AS SightseeingImageUrl
+            FROM [' + @DatabaseName + N'].dbo.PackageDaySightseeings;
+
+            SELECT TOP 0 * FROM [' + @DatabaseName + N'].dbo.BankAccounts;';
+        EXEC sp_executesql @emptySql;
+
+        -- Empty agent + empty company.
+        SELECT TOP 0
+               CAST(NULL AS NVARCHAR(150)) AS FullName,
+               CAST(NULL AS NVARCHAR(150)) AS Email,
+               CAST(NULL AS NVARCHAR(30))  AS Mobile,
+               CAST(NULL AS NVARCHAR(500)) AS ImageUrl;
+        SELECT TOP 0
+               CAST(NULL AS NVARCHAR(MAX)) AS GreetingParagraph,
+               CAST(NULL AS NVARCHAR(MAX)) AS WhyBookWithUs;
+        RETURN;
+    END
+
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT p.*, d.Name AS DestinationName,
+               d.ImageUrl     AS DestinationBannerUrl,
+               d.PackageTerms AS DestinationTerms
+        FROM [' + @DatabaseName + N'].dbo.Packages p
+        LEFT JOIN [' + @DatabaseName + N'].dbo.Destinations d ON p.DestinationId = d.Id
+        WHERE p.Id = @id;
+
+        SELECT * FROM [' + @DatabaseName + N'].dbo.PackageOptions
+        WHERE PackageId = @id ORDER BY DisplayOrder, Id;
+
+        SELECT h.*,
+               ho.Name     AS HotelName,
+               ho.ImageUrl AS HotelImageUrl,
+               ho.Category AS HotelCategory,
+               rt.Name     AS RoomTypeName,
+               mp.Code     AS MealPlanCode,
+               mp.Name     AS MealPlanName
+        FROM [' + @DatabaseName + N'].dbo.PackageOptionHotels h
+        INNER JOIN [' + @DatabaseName + N'].dbo.PackageOptions o ON h.PackageOptionId = o.Id
+        LEFT JOIN  [' + @DatabaseName + N'].dbo.Hotels    ho ON h.HotelId    = ho.Id
+        LEFT JOIN  [' + @DatabaseName + N'].dbo.RoomTypes rt ON h.RoomTypeId = rt.Id
+        LEFT JOIN  [' + @DatabaseName + N'].dbo.MealPlans mp ON h.MealPlanId = mp.Id
+        WHERE o.PackageId = @id
+        ORDER BY h.PackageOptionId, h.DisplayOrder, h.Id;
+
+        SELECT * FROM [' + @DatabaseName + N'].dbo.PackageDays
+        WHERE PackageId = @id ORDER BY DayNumber, Id;
+
+        SELECT pds.Id, pds.PackageDayId, pds.SightseeingId,
+               s.Name     AS SightseeingName,
+               s.ImageUrl AS SightseeingImageUrl
+        FROM [' + @DatabaseName + N'].dbo.PackageDaySightseeings pds
+        INNER JOIN [' + @DatabaseName + N'].dbo.PackageDays pd ON pds.PackageDayId = pd.Id
+        LEFT JOIN  [' + @DatabaseName + N'].dbo.Sightseeings s ON pds.SightseeingId = s.Id
+        WHERE pd.PackageId = @id
+        ORDER BY pds.PackageDayId, pds.Id;
+
+        SELECT * FROM [' + @DatabaseName + N'].dbo.BankAccounts
+        WHERE IsActive = 1
+        ORDER BY IsDefault DESC, Id;';
+    EXEC sp_executesql @sql, N'@id INT', @id;
+
+    -- Agent (creator) — name from MasterUsers + phone from Employees in tenant DB.
+    DECLARE @agentSql NVARCHAR(MAX) = N'
+        SELECT mu.FullName, mu.Email, e.Mobile, mu.ProfileImageUrl AS ImageUrl
+        FROM dbo.MasterUsers mu
+        LEFT JOIN [' + @DatabaseName + N'].dbo.Employees e ON e.UserId = mu.Id
+        WHERE mu.Id = @createdBy;';
+    EXEC sp_executesql @agentSql, N'@createdBy INT', @createdBy;
+
+    -- Company branding (greeting + why-book-with-us JSON).
+    SELECT GreetingParagraph, WhyBookWithUs
+    FROM dbo.Companies
+    WHERE DatabaseName = @DatabaseName;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Package_BackfillShareTokens
+    @DatabaseName NVARCHAR(100)
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        UPDATE [' + @DatabaseName + N'].dbo.Packages
+        SET ShareToken = LOWER(REPLACE(CAST(NEWID() AS NVARCHAR(40)), ''-'', ''''))
+        WHERE ShareToken IS NULL;';
+    EXEC sp_executesql @sql;
 END
 GO
 
@@ -2081,5 +2264,488 @@ AS BEGIN
     EXEC sp_executesql @sql,
         N'@PackageDayId INT, @SightseeingId INT',
         @PackageDayId, @SightseeingId;
+END
+GO
+
+-- ============================================================
+-- BOOKINGS  (cross-DB; numbering = {Prefix}-{YYYY}-{NNNN} per tenant per year)
+-- ============================================================
+
+CREATE OR ALTER PROCEDURE sp_Booking_GetAll
+    @DatabaseName NVARCHAR(100),
+    @Search       NVARCHAR(150) = NULL,
+    @Status       NVARCHAR(20)  = NULL,
+    @Page         INT           = 1,
+    @PageSize     INT           = 20
+AS BEGIN
+    SET NOCOUNT ON;
+    IF @Page < 1 SET @Page = 1;
+    IF @PageSize < 1 SET @PageSize = 20;
+    IF @PageSize > 200 SET @PageSize = 200;
+
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT b.*,
+               d.Name          AS DestinationName,
+               l.LeadNumber    AS LeadNumber,
+               p.PackageNumber AS PackageNumber,
+               (SELECT COUNT(1)              FROM [' + @DatabaseName + N'].dbo.BookingInstallments i WHERE i.BookingId = b.Id) AS InstallmentCount,
+               (SELECT ISNULL(SUM(Amount),0) FROM [' + @DatabaseName + N'].dbo.BookingInstallments i WHERE i.BookingId = b.Id AND i.PaymentStatus = ''Received'') AS PaidAmount,
+               COUNT(*) OVER() AS TotalCount
+        FROM [' + @DatabaseName + N'].dbo.Bookings b
+        LEFT JOIN [' + @DatabaseName + N'].dbo.Destinations d ON b.DestinationId = d.Id
+        LEFT JOIN [' + @DatabaseName + N'].dbo.Leads        l ON b.LeadId        = l.Id
+        LEFT JOIN [' + @DatabaseName + N'].dbo.Packages     p ON b.PackageId     = p.Id
+        WHERE b.IsActive = 1
+          AND (@Status IS NULL OR b.Status = @Status)
+          AND (@Search IS NULL OR
+               b.BookingNumber LIKE ''%'' + @Search + ''%'' OR
+               b.InvoiceNumber LIKE ''%'' + @Search + ''%'' OR
+               l.LeadNumber    LIKE ''%'' + @Search + ''%'' OR
+               b.CustomerName  LIKE ''%'' + @Search + ''%'' OR
+               b.CustomerMobile LIKE ''%'' + @Search + ''%'')
+        ORDER BY b.CreatedAt DESC
+        OFFSET ((@Page - 1) * @PageSize) ROWS
+        FETCH NEXT @PageSize ROWS ONLY';
+    EXEC sp_executesql @sql,
+        N'@Search NVARCHAR(150), @Status NVARCHAR(20), @Page INT, @PageSize INT',
+        @Search, @Status, @Page, @PageSize;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Booking_GetByLead
+    @DatabaseName NVARCHAR(100),
+    @LeadId       INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT b.*,
+               d.Name          AS DestinationName,
+               l.LeadNumber    AS LeadNumber,
+               p.PackageNumber AS PackageNumber,
+               (SELECT ISNULL(SUM(Amount),0) FROM [' + @DatabaseName + N'].dbo.BookingInstallments i WHERE i.BookingId = b.Id AND i.PaymentStatus = ''Received'') AS PaidAmount
+        FROM [' + @DatabaseName + N'].dbo.Bookings b
+        LEFT JOIN [' + @DatabaseName + N'].dbo.Destinations d ON b.DestinationId = d.Id
+        LEFT JOIN [' + @DatabaseName + N'].dbo.Leads        l ON b.LeadId        = l.Id
+        LEFT JOIN [' + @DatabaseName + N'].dbo.Packages     p ON b.PackageId     = p.Id
+        WHERE b.LeadId = @LeadId AND b.IsActive = 1
+        ORDER BY b.CreatedAt DESC';
+    EXEC sp_executesql @sql, N'@LeadId INT', @LeadId;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Booking_GetById
+    @DatabaseName NVARCHAR(100),
+    @Id           INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        SELECT b.*,
+               d.Name          AS DestinationName,
+               d.PackageTerms  AS DestinationTerms,
+               l.LeadNumber    AS LeadNumber,
+               p.PackageNumber AS PackageNumber
+        FROM [' + @DatabaseName + N'].dbo.Bookings b
+        LEFT JOIN [' + @DatabaseName + N'].dbo.Destinations d ON b.DestinationId = d.Id
+        LEFT JOIN [' + @DatabaseName + N'].dbo.Leads        l ON b.LeadId        = l.Id
+        LEFT JOIN [' + @DatabaseName + N'].dbo.Packages     p ON b.PackageId     = p.Id
+        WHERE b.Id = @Id;
+
+        SELECT * FROM [' + @DatabaseName + N'].dbo.BookingInstallments
+        WHERE BookingId = @Id
+        ORDER BY InstallmentNo, Id;';
+    EXEC sp_executesql @sql, N'@Id INT', @Id;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Booking_Insert
+    @DatabaseName    NVARCHAR(100),
+    @BookingPrefix   NVARCHAR(20)  = 'BK',
+    @InvoicePrefix   NVARCHAR(20)  = 'INV',
+    @LeadId          INT           = NULL,
+    @PackageId       INT           = NULL,
+    @PackageOptionId INT           = NULL,
+    @OptionName      NVARCHAR(150) = NULL,
+    @CustomerName    NVARCHAR(150),
+    @CustomerMobile  NVARCHAR(30)  = NULL,
+    @CustomerEmail   NVARCHAR(150) = NULL,
+    @Adults          INT           = 1,
+    @Children        INT           = 0,
+    @Infants         INT           = 0,
+    @StartDate       DATE          = NULL,
+    @EndDate         DATE          = NULL,
+    @Days            INT           = NULL,
+    @Nights          INT           = NULL,
+    @DestinationId   INT           = NULL,
+    @TotalAmount     DECIMAL(18,2) = 0,
+    @Currency        NVARCHAR(10)  = 'INR',
+    @Status          NVARCHAR(20)  = 'Confirmed',
+    @Notes           NVARCHAR(MAX) = NULL,
+    @CreatedBy       INT           = 0,
+    @NewId           INT           OUTPUT,
+    @BookingNumber   NVARCHAR(40)  OUTPUT,
+    @InvoiceNumber   NVARCHAR(40)  OUTPUT
+AS BEGIN
+    SET NOCOUNT ON;
+    IF @BookingPrefix IS NULL OR LEN(@BookingPrefix) = 0 SET @BookingPrefix = N'BK';
+    IF @InvoicePrefix IS NULL OR LEN(@InvoicePrefix) = 0 SET @InvoicePrefix = N'INV';
+
+    DECLARE @year INT = YEAR(GETUTCDATE());
+    DECLARE @bkCount INT = 0, @invCount INT = 0;
+    DECLARE @bkPat  NVARCHAR(60) = @BookingPrefix + N'-' + CAST(@year AS NVARCHAR(4)) + N'-%';
+    DECLARE @invPat NVARCHAR(60) = @InvoicePrefix + N'-' + CAST(@year AS NVARCHAR(4)) + N'-%';
+
+    DECLARE @countSql NVARCHAR(MAX) = N'
+        SELECT @bk = COUNT(1) FROM [' + @DatabaseName + N'].dbo.Bookings WHERE BookingNumber LIKE @bkPat;
+        SELECT @inv = COUNT(1) FROM [' + @DatabaseName + N'].dbo.Bookings WHERE InvoiceNumber LIKE @invPat;';
+    EXEC sp_executesql @countSql,
+        N'@bk INT OUTPUT, @inv INT OUTPUT, @bkPat NVARCHAR(60), @invPat NVARCHAR(60)',
+        @bk = @bkCount OUTPUT, @inv = @invCount OUTPUT, @bkPat = @bkPat, @invPat = @invPat;
+
+    SET @BookingNumber = @BookingPrefix + N'-' + CAST(@year AS NVARCHAR(4)) + N'-' +
+                         RIGHT(N'0000' + CAST((@bkCount + 1) AS NVARCHAR(10)), 4);
+    SET @InvoiceNumber = @InvoicePrefix + N'-' + CAST(@year AS NVARCHAR(4)) + N'-' +
+                         RIGHT(N'0000' + CAST((@invCount + 1) AS NVARCHAR(10)), 4);
+
+    DECLARE @sql NVARCHAR(MAX) = N'
+        INSERT INTO [' + @DatabaseName + N'].dbo.Bookings
+            (BookingNumber, InvoiceNumber, LeadId, PackageId, PackageOptionId, OptionName,
+             CustomerName, CustomerMobile, CustomerEmail,
+             Adults, Children, Infants,
+             StartDate, EndDate, Days, Nights,
+             DestinationId, TotalAmount, Currency, Status, Notes,
+             IsActive, CreatedAt, CreatedBy)
+        VALUES
+            (@BookingNumber, @InvoiceNumber, @LeadId, @PackageId, @PackageOptionId, @OptionName,
+             @CustomerName, @CustomerMobile, @CustomerEmail,
+             @Adults, @Children, @Infants,
+             @StartDate, @EndDate, @Days, @Nights,
+             @DestinationId, @TotalAmount, @Currency, @Status, @Notes,
+             1, GETUTCDATE(), @CreatedBy);
+        SELECT @NewId = SCOPE_IDENTITY();';
+    EXEC sp_executesql @sql,
+        N'@BookingNumber NVARCHAR(40), @InvoiceNumber NVARCHAR(40),
+          @LeadId INT, @PackageId INT, @PackageOptionId INT, @OptionName NVARCHAR(150),
+          @CustomerName NVARCHAR(150), @CustomerMobile NVARCHAR(30), @CustomerEmail NVARCHAR(150),
+          @Adults INT, @Children INT, @Infants INT,
+          @StartDate DATE, @EndDate DATE, @Days INT, @Nights INT,
+          @DestinationId INT, @TotalAmount DECIMAL(18,2), @Currency NVARCHAR(10),
+          @Status NVARCHAR(20), @Notes NVARCHAR(MAX), @CreatedBy INT, @NewId INT OUTPUT',
+        @BookingNumber, @InvoiceNumber,
+        @LeadId, @PackageId, @PackageOptionId, @OptionName,
+        @CustomerName, @CustomerMobile, @CustomerEmail,
+        @Adults, @Children, @Infants,
+        @StartDate, @EndDate, @Days, @Nights,
+        @DestinationId, @TotalAmount, @Currency, @Status, @Notes, @CreatedBy,
+        @NewId OUTPUT;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Booking_Update
+    @DatabaseName    NVARCHAR(100),
+    @Id              INT,
+    @CustomerName    NVARCHAR(150),
+    @CustomerMobile  NVARCHAR(30)  = NULL,
+    @CustomerEmail   NVARCHAR(150) = NULL,
+    @Adults          INT           = 1,
+    @Children        INT           = 0,
+    @Infants         INT           = 0,
+    @StartDate       DATE          = NULL,
+    @EndDate         DATE          = NULL,
+    @Days            INT           = NULL,
+    @Nights          INT           = NULL,
+    @DestinationId   INT           = NULL,
+    @TotalAmount     DECIMAL(18,2) = 0,
+    @Currency        NVARCHAR(10)  = 'INR',
+    @Status          NVARCHAR(20)  = 'Confirmed',
+    @Notes           NVARCHAR(MAX) = NULL,
+    @UpdatedBy       INT           = 0
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        UPDATE [' + @DatabaseName + N'].dbo.Bookings SET
+            CustomerName = @CustomerName, CustomerMobile = @CustomerMobile, CustomerEmail = @CustomerEmail,
+            Adults = @Adults, Children = @Children, Infants = @Infants,
+            StartDate = @StartDate, EndDate = @EndDate, Days = @Days, Nights = @Nights,
+            DestinationId = @DestinationId,
+            TotalAmount = @TotalAmount, Currency = @Currency,
+            Status = @Status, Notes = @Notes,
+            UpdatedAt = GETUTCDATE(), UpdatedBy = @UpdatedBy
+        WHERE Id = @Id';
+    EXEC sp_executesql @sql,
+        N'@Id INT, @CustomerName NVARCHAR(150), @CustomerMobile NVARCHAR(30), @CustomerEmail NVARCHAR(150),
+          @Adults INT, @Children INT, @Infants INT,
+          @StartDate DATE, @EndDate DATE, @Days INT, @Nights INT,
+          @DestinationId INT, @TotalAmount DECIMAL(18,2), @Currency NVARCHAR(10),
+          @Status NVARCHAR(20), @Notes NVARCHAR(MAX), @UpdatedBy INT',
+        @Id, @CustomerName, @CustomerMobile, @CustomerEmail,
+        @Adults, @Children, @Infants,
+        @StartDate, @EndDate, @Days, @Nights,
+        @DestinationId, @TotalAmount, @Currency, @Status, @Notes, @UpdatedBy;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Booking_Delete
+    @DatabaseName NVARCHAR(100),
+    @Id           INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        UPDATE [' + @DatabaseName + N'].dbo.Bookings
+        SET IsActive = 0, UpdatedAt = GETUTCDATE()
+        WHERE Id = @Id';
+    EXEC sp_executesql @sql, N'@Id INT', @Id;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Booking_ReplaceInstallments
+    @DatabaseName NVARCHAR(100),
+    @BookingId    INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        DELETE FROM [' + @DatabaseName + N'].dbo.BookingInstallments WHERE BookingId = @BookingId';
+    EXEC sp_executesql @sql, N'@BookingId INT', @BookingId;
+END
+GO
+
+-- ============================================================
+-- DASHBOARD SUMMARY  (6 result sets in one round-trip)
+-- ============================================================
+CREATE OR ALTER PROCEDURE sp_Dashboard_GetSummary
+    @DatabaseName NVARCHAR(100)
+AS BEGIN
+    SET NOCOUNT ON;
+    -- CAST forces the first literal to NVARCHAR(MAX); without it the whole
+    -- concatenated string truncates to 4000 chars and later result sets vanish.
+    DECLARE @sql NVARCHAR(MAX) = CAST(N'' AS NVARCHAR(MAX)) + N'
+        DECLARE @today DATE = CAST(GETUTCDATE() AS DATE);
+        DECLARE @weekAgo DATE = DATEADD(DAY, -7, @today);
+        DECLARE @monthStart DATE = DATEFROMPARTS(YEAR(@today), MONTH(@today), 1);
+        DECLARE @sixMonthsAgo DATE = DATEADD(MONTH, -5, DATEFROMPARTS(YEAR(@today), MONTH(@today), 1));
+
+        ----------------------------------------------------------------
+        -- 1) KPI counters (single row)
+        ----------------------------------------------------------------
+        SELECT
+            (SELECT COUNT(*) FROM [' + @DatabaseName + N'].dbo.Leads) AS TotalLeads,
+            (SELECT COUNT(*) FROM [' + @DatabaseName + N'].dbo.Leads l
+             LEFT JOIN [' + @DatabaseName + N'].dbo.LeadStatuses s ON l.StatusId = s.Id
+             WHERE ISNULL(s.IsClosed, 0) = 0) AS ActiveLeads,
+            (SELECT COUNT(*) FROM [' + @DatabaseName + N'].dbo.Leads
+             WHERE CAST(CreatedAt AS DATE) >= @weekAgo) AS NewLeadsThisWeek,
+            (SELECT COUNT(*) FROM [' + @DatabaseName + N'].dbo.Bookings
+             WHERE IsActive = 1 AND CAST(CreatedAt AS DATE) >= @monthStart) AS BookingsThisMonth,
+            (SELECT ISNULL(SUM(TotalAmount), 0) FROM [' + @DatabaseName + N'].dbo.Bookings
+             WHERE IsActive = 1 AND CAST(CreatedAt AS DATE) >= @monthStart) AS RevenueThisMonth,
+            (SELECT ISNULL(SUM(b.TotalAmount), 0) - ISNULL(
+                (SELECT SUM(i.Amount) FROM [' + @DatabaseName + N'].dbo.BookingInstallments i
+                 INNER JOIN [' + @DatabaseName + N'].dbo.Bookings bb ON i.BookingId = bb.Id
+                 WHERE bb.IsActive = 1 AND i.PaymentStatus = ''Received''), 0)
+             FROM [' + @DatabaseName + N'].dbo.Bookings b WHERE b.IsActive = 1) AS OutstandingBalance,
+            (SELECT COUNT(*) FROM [' + @DatabaseName + N'].dbo.BookingInstallments i
+             INNER JOIN [' + @DatabaseName + N'].dbo.Bookings b ON i.BookingId = b.Id
+             WHERE b.IsActive = 1 AND i.PaymentStatus = ''Pending''
+               AND i.DueDate IS NOT NULL AND i.DueDate < @today) AS OverdueInstallmentsCount,
+            (SELECT ISNULL(SUM(i.Amount), 0) FROM [' + @DatabaseName + N'].dbo.BookingInstallments i
+             INNER JOIN [' + @DatabaseName + N'].dbo.Bookings b ON i.BookingId = b.Id
+             WHERE b.IsActive = 1 AND i.PaymentStatus = ''Pending''
+               AND i.DueDate IS NOT NULL AND i.DueDate < @today) AS OverdueAmount,
+            (SELECT COUNT(*) FROM [' + @DatabaseName + N'].dbo.Packages WHERE IsActive = 1) AS TotalPackages,
+            (SELECT ISNULL(SUM(i.Amount), 0) FROM [' + @DatabaseName + N'].dbo.BookingInstallments i
+             INNER JOIN [' + @DatabaseName + N'].dbo.Bookings b ON i.BookingId = b.Id
+             WHERE b.IsActive = 1 AND i.PaymentStatus = ''Received''
+               AND CAST(i.ReceivedDate AS DATE) >= @monthStart) AS CollectedThisMonth;
+
+        ----------------------------------------------------------------
+        -- 2) Revenue trend — last 6 months including current
+        ----------------------------------------------------------------
+        ;WITH Months AS (
+            SELECT 0 AS Offset
+            UNION ALL SELECT 1 UNION ALL SELECT 2
+            UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5
+        )
+        SELECT
+            YEAR(DATEADD(MONTH, -m.Offset, @monthStart))  AS YearNo,
+            MONTH(DATEADD(MONTH, -m.Offset, @monthStart)) AS MonthNo,
+            DATENAME(MONTH, DATEADD(MONTH, -m.Offset, @monthStart)) AS MonthLabel,
+            ISNULL(SUM(b.TotalAmount), 0)                 AS Revenue,
+            COUNT(b.Id)                                   AS BookingCount
+        FROM Months m
+        LEFT JOIN [' + @DatabaseName + N'].dbo.Bookings b
+            ON b.IsActive = 1
+           AND YEAR(b.CreatedAt)  = YEAR(DATEADD(MONTH, -m.Offset, @monthStart))
+           AND MONTH(b.CreatedAt) = MONTH(DATEADD(MONTH, -m.Offset, @monthStart))
+        GROUP BY m.Offset
+        ORDER BY m.Offset DESC;
+
+        ----------------------------------------------------------------
+        -- 3) Leads-by-status counts
+        ----------------------------------------------------------------
+        SELECT
+            ISNULL(s.Name, ''No Status'') AS StatusName,
+            ISNULL(s.Color, ''secondary'') AS StatusColor,
+            COUNT(l.Id) AS LeadCount
+        FROM [' + @DatabaseName + N'].dbo.Leads l
+        LEFT JOIN [' + @DatabaseName + N'].dbo.LeadStatuses s ON l.StatusId = s.Id
+        GROUP BY s.Name, s.Color, s.DisplayOrder
+        ORDER BY ISNULL(s.DisplayOrder, 999), StatusName;
+
+        ----------------------------------------------------------------
+        -- 4) Recent leads (last 5)
+        ----------------------------------------------------------------
+        SELECT TOP 5
+            l.Id, l.LeadNumber, l.Name, l.Mobile, l.CreatedAt,
+            ISNULL(s.Name, ''New'') AS StatusName,
+            ISNULL(s.Color, ''secondary'') AS StatusColor,
+            d.Name AS DestinationName
+        FROM [' + @DatabaseName + N'].dbo.Leads l
+        LEFT JOIN [' + @DatabaseName + N'].dbo.LeadStatuses s ON l.StatusId = s.Id
+        LEFT JOIN [' + @DatabaseName + N'].dbo.Destinations d ON l.DestinationId = d.Id
+        ORDER BY l.CreatedAt DESC;
+
+        ----------------------------------------------------------------
+        -- 5) Upcoming travel (active bookings starting in next 30 days)
+        ----------------------------------------------------------------
+        SELECT TOP 5
+            b.Id, b.BookingNumber, b.CustomerName, b.StartDate, b.Days,
+            b.TotalAmount, b.Currency, b.Status,
+            d.Name AS DestinationName
+        FROM [' + @DatabaseName + N'].dbo.Bookings b
+        LEFT JOIN [' + @DatabaseName + N'].dbo.Destinations d ON b.DestinationId = d.Id
+        WHERE b.IsActive = 1
+          AND b.Status <> ''Cancelled''
+          AND b.StartDate IS NOT NULL
+          AND b.StartDate >= @today
+          AND b.StartDate <= DATEADD(DAY, 30, @today)
+        ORDER BY b.StartDate ASC;
+
+        ----------------------------------------------------------------
+        -- 6) Overdue installments (top 5)
+        ----------------------------------------------------------------
+        SELECT TOP 5
+            i.Id, i.BookingId, i.InstallmentNo, i.Amount, i.DueDate,
+            DATEDIFF(DAY, i.DueDate, @today) AS DaysOverdue,
+            b.BookingNumber, b.CustomerName, b.Currency
+        FROM [' + @DatabaseName + N'].dbo.BookingInstallments i
+        INNER JOIN [' + @DatabaseName + N'].dbo.Bookings b ON i.BookingId = b.Id
+        WHERE b.IsActive = 1
+          AND i.PaymentStatus = ''Pending''
+          AND i.DueDate IS NOT NULL
+          AND i.DueDate < @today
+        ORDER BY i.DueDate ASC;';
+    EXEC sp_executesql @sql;
+END
+GO
+
+-- ============================================================
+-- DASHBOARD · MONTHLY BREAKDOWN  (filtered by year)
+-- Returns 2 sets:
+--   1) per-month rows: Year, Month, MonthLabel, TotalLeads, TotalNotes, TotalQuotes
+--   2) per-month per-status rows: Year, Month, StatusName, StatusColor, LeadCount
+-- ============================================================
+CREATE OR ALTER PROCEDURE sp_Dashboard_GetMonthlyBreakdown
+    @DatabaseName NVARCHAR(100),
+    @Year         INT
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = CAST(N'' AS NVARCHAR(MAX)) + N'
+        ;WITH Months AS (
+            SELECT 1 AS m UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4
+            UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8
+            UNION ALL SELECT 9 UNION ALL SELECT 10 UNION ALL SELECT 11 UNION ALL SELECT 12
+        )
+        -- 1) per-month aggregate counts
+        SELECT
+            @Year AS YearNo,
+            m.m   AS MonthNo,
+            DATENAME(MONTH, DATEFROMPARTS(@Year, m.m, 1)) AS MonthLabel,
+            (SELECT COUNT(*) FROM [' + @DatabaseName + N'].dbo.Leads
+                WHERE YEAR(CreatedAt) = @Year AND MONTH(CreatedAt) = m.m) AS TotalLeads,
+            (SELECT COUNT(*) FROM [' + @DatabaseName + N'].dbo.LeadActivities
+                WHERE YEAR(CreatedAt) = @Year AND MONTH(CreatedAt) = m.m) AS TotalNotes,
+            (SELECT COUNT(*) FROM [' + @DatabaseName + N'].dbo.Packages
+                WHERE YEAR(CreatedAt) = @Year AND MONTH(CreatedAt) = m.m AND IsActive = 1) AS TotalQuotes
+        FROM Months m
+        ORDER BY m.m;
+
+        -- 2) per-month leads-by-status breakdown
+        SELECT
+            @Year                                  AS YearNo,
+            MONTH(l.CreatedAt)                     AS MonthNo,
+            ISNULL(s.Name,  ''No Status'')         AS StatusName,
+            ISNULL(s.Color, ''secondary'')         AS StatusColor,
+            COUNT(l.Id)                            AS LeadCount
+        FROM [' + @DatabaseName + N'].dbo.Leads l
+        LEFT JOIN [' + @DatabaseName + N'].dbo.LeadStatuses s ON l.StatusId = s.Id
+        WHERE YEAR(l.CreatedAt) = @Year
+        GROUP BY MONTH(l.CreatedAt), s.Name, s.Color, s.DisplayOrder
+        ORDER BY MONTH(l.CreatedAt), ISNULL(s.DisplayOrder, 999);';
+
+    EXEC sp_executesql @sql, N'@Year INT', @Year;
+END
+GO
+
+-- ============================================================
+-- DASHBOARD · RANGE SUMMARY  (date-range picker)
+-- Returns 2 sets:
+--   1) single-row counts: TotalLeads, TotalNotes, TotalQuotes
+--   2) leads-by-status for the range (StatusName, StatusColor, LeadCount)
+-- ============================================================
+CREATE OR ALTER PROCEDURE sp_Dashboard_GetRangeSummary
+    @DatabaseName NVARCHAR(100),
+    @StartDate    DATE,
+    @EndDate      DATE
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = CAST(N'' AS NVARCHAR(MAX)) + N'
+        SELECT
+            (SELECT COUNT(*) FROM [' + @DatabaseName + N'].dbo.Leads
+                WHERE CAST(CreatedAt AS DATE) BETWEEN @StartDate AND @EndDate) AS TotalLeads,
+            (SELECT COUNT(*) FROM [' + @DatabaseName + N'].dbo.LeadActivities
+                WHERE CAST(CreatedAt AS DATE) BETWEEN @StartDate AND @EndDate) AS TotalNotes,
+            (SELECT COUNT(*) FROM [' + @DatabaseName + N'].dbo.Packages
+                WHERE IsActive = 1 AND CAST(CreatedAt AS DATE) BETWEEN @StartDate AND @EndDate) AS TotalQuotes;
+
+        SELECT
+            ISNULL(s.Name,  ''No Status'')  AS StatusName,
+            ISNULL(s.Color, ''secondary'')  AS StatusColor,
+            COUNT(l.Id)                     AS LeadCount
+        FROM [' + @DatabaseName + N'].dbo.Leads l
+        LEFT JOIN [' + @DatabaseName + N'].dbo.LeadStatuses s ON l.StatusId = s.Id
+        WHERE CAST(l.CreatedAt AS DATE) BETWEEN @StartDate AND @EndDate
+        GROUP BY s.Name, s.Color, s.DisplayOrder
+        HAVING COUNT(l.Id) > 0
+        ORDER BY ISNULL(s.DisplayOrder, 999), StatusName;';
+
+    EXEC sp_executesql @sql,
+        N'@StartDate DATE, @EndDate DATE',
+        @StartDate, @EndDate;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_BookingInstallment_Insert
+    @DatabaseName   NVARCHAR(100),
+    @BookingId      INT,
+    @InstallmentNo  INT,
+    @Amount         DECIMAL(18,2) = 0,
+    @PaymentMode    NVARCHAR(50)  = NULL,
+    @PaymentStatus  NVARCHAR(20)  = 'Pending',
+    @DueDate        DATE          = NULL,
+    @ReceivedDate   DATE          = NULL,
+    @Remark         NVARCHAR(500) = NULL,
+    @CreatedBy      INT           = 0
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = N'
+        INSERT INTO [' + @DatabaseName + N'].dbo.BookingInstallments
+            (BookingId, InstallmentNo, Amount, PaymentMode, PaymentStatus, DueDate, ReceivedDate, Remark, CreatedAt, CreatedBy)
+        VALUES
+            (@BookingId, @InstallmentNo, @Amount, @PaymentMode, @PaymentStatus, @DueDate, @ReceivedDate, @Remark, GETUTCDATE(), @CreatedBy)';
+    EXEC sp_executesql @sql,
+        N'@BookingId INT, @InstallmentNo INT, @Amount DECIMAL(18,2),
+          @PaymentMode NVARCHAR(50), @PaymentStatus NVARCHAR(20),
+          @DueDate DATE, @ReceivedDate DATE, @Remark NVARCHAR(500), @CreatedBy INT',
+        @BookingId, @InstallmentNo, @Amount, @PaymentMode, @PaymentStatus,
+        @DueDate, @ReceivedDate, @Remark, @CreatedBy;
 END
 GO

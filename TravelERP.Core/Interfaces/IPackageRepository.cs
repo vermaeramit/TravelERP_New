@@ -6,6 +6,7 @@ namespace TravelERP.Core.Interfaces;
 public interface IPackageRepository
 {
     Task<PagedResult<Package>> GetPagedAsync(string? search, int page, int pageSize);
+    Task<IEnumerable<Package>> GetByLeadAsync(int leadId);
     Task<Package?> GetByIdAsync(int id);
     Task<(int Id, string PackageNumber)> InsertAsync(Package package);
     Task UpdateAsync(Package package);

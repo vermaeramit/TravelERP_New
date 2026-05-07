@@ -1,15 +1,587 @@
+@model TravelERP.Web.Models.DashboardVm
 @{
     ViewData["Title"] = "Dashboard";
+    var greeting = DateTime.Now.Hour < 12 ? "Good morning" : DateTime.Now.Hour < 17 ? "Good afternoon" : "Good evening";
+    var userName = User.FindFirst("FullName")?.Value
+                ?? User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value
+                ?? User.Identity?.Name
+                ?? "there";
+
+    string Money(decimal v)
+    {
+        // Compact for big numbers; full for small.
+        if (v >= 10_000_000m) return $"{v / 10_000_000m:N2} Cr";
+        if (v >=     100_000m) return $"{v /     100_000m:N2} L";
+        if (v >=       1_000m) return $"{v /       1_000m:N1} K";
+        return $"{v:N0}";
+    }
 }
 
-<div class="row g-3 mb-4">
-    <div class="col-12">
-        <div class="card shadow-sm">
-            <div class="card-body text-center py-5 text-muted">
-                <i class="bi bi-speedometer2 fs-1 text-primary"></i>
-                <p class="mt-3 mb-0 fs-5 fw-semibold">Welcome to TravelERP</p>
-                <p class="small mt-1">Dashboard is being set up. Share your screenshots to build the features.</p>
+@section Styles {
+    <style>
+        .kpi-card {
+            background: #fff; border: 1px solid var(--bs-border-color); border-radius: .85rem;
+            padding: 1.1rem 1.2rem; height: 100%;
+            display: flex; align-items: flex-start; gap: 1rem;
+            transition: transform .12s, box-shadow .12s;
+        }
+        .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(0,0,0,.06); }
+        .kpi-icon {
+            width: 48px; height: 48px; border-radius: .65rem; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.4rem;
+        }
+        .kpi-card .kpi-label {
+            font-size: .72rem; text-transform: uppercase; letter-spacing: .8px;
+            color: var(--bs-secondary-color); font-weight: 700; margin-bottom: .15rem;
+        }
+        .kpi-card .kpi-value { font-size: 1.5rem; font-weight: 800; color: #111827; line-height: 1.1; }
+        .kpi-card .kpi-sub { font-size: .8rem; color: var(--bs-secondary-color); margin-top: .25rem; }
+        .kpi-card.kpi-overdue { border-color: #f1c4c4; background: #fff8f8; }
+        .kpi-card.kpi-overdue .kpi-icon { background: #fee2e2; color: #b91c1c; }
+        .kpi-card.kpi-leads     .kpi-icon { background: #e0eaff; color: #0d6efd; }
+        .kpi-card.kpi-bookings  .kpi-icon { background: #dcfce7; color: #15803d; }
+        .kpi-card.kpi-revenue   .kpi-icon { background: #fef3c7; color: #b45309; }
+        .kpi-card.kpi-balance   .kpi-icon { background: #fce7f3; color: #be185d; }
+        .kpi-card.kpi-collected .kpi-icon { background: #ddd6fe; color: #6d28d9; }
+
+        .panel-card {
+            background: #fff; border: 1px solid var(--bs-border-color); border-radius: .85rem;
+        }
+        .panel-card .panel-head {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: .85rem 1.1rem; border-bottom: 1px solid var(--bs-border-color);
+        }
+        .panel-card .panel-head h6 { margin: 0; font-weight: 700; }
+        .panel-card .panel-body { padding: .25rem 0; }
+        .panel-card .empty {
+            color: var(--bs-secondary-color); padding: 1.5rem; text-align: center; font-size: .9rem;
+        }
+
+        .lead-row, .upcoming-row, .overdue-row {
+            display: flex; align-items: center; gap: .75rem;
+            padding: .75rem 1.1rem; border-bottom: 1px solid var(--bs-border-color);
+            text-decoration: none; color: inherit;
+        }
+        .lead-row:last-child, .upcoming-row:last-child, .overdue-row:last-child { border-bottom: 0; }
+        .lead-row:hover, .upcoming-row:hover, .overdue-row:hover { background: #f9fafb; }
+
+        .avatar-pill {
+            width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
+            background: #e0eaff; color: #0d6efd;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: .85rem;
+        }
+        .row-meta { font-size: .8rem; color: var(--bs-secondary-color); }
+        .status-dot { display:inline-block; width:.55rem; height:.55rem; border-radius:50%; margin-right:.35rem; }
+
+        .overdue-row .pill-days {
+            background: #fee2e2; color: #b91c1c; font-size: .7rem; font-weight: 700;
+            padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+        }
+        .overdue-row .amount { color: #b91c1c; font-weight: 700; }
+
+        .chart-wrap { padding: .85rem 1.1rem; }
+        .chart-wrap canvas { max-height: 260px; }
+
+        .quick-link {
+            display: flex; align-items: center; gap: .55rem;
+            padding: .65rem .85rem;
+            background: #fff; border: 1px solid var(--bs-border-color);
+            border-radius: .55rem; text-decoration: none; color: inherit;
+            font-weight: 600; font-size: .9rem;
+            transition: all .12s;
+        }
+        .quick-link:hover { border-color: var(--bs-primary); color: var(--bs-primary); transform: translateY(-1px); }
+        .quick-link i { font-size: 1.1rem; color: var(--bs-primary); }
+    </style>
+}
+
+<!-- ─────────── HERO / WELCOME ─────────── -->
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+        <h4 class="fw-bold mb-1">@greeting, @userName 👋</h4>
+        <p class="text-muted mb-0 small">Here's a snapshot of your CRM activity right now.</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="/Leads/Create" class="quick-link"><i class="bi bi-plus-circle"></i>New Lead</a>
+        <a href="/Bookings"      class="quick-link"><i class="bi bi-journal-bookmark"></i>All Bookings</a>
+    </div>
+</div>
+
+<!-- ─────────── KPI CARDS ─────────── -->
+<div class="row g-3 mb-3">
+    <div class="col-xl-2 col-md-4 col-sm-6">
+        <div class="kpi-card kpi-leads">
+            <div class="kpi-icon"><i class="bi bi-funnel-fill"></i></div>
+            <div>
+                <div class="kpi-label">Active Leads</div>
+                <div class="kpi-value">@Model.Kpis.ActiveLeads</div>
+                <div class="kpi-sub">@Model.Kpis.NewLeadsThisWeek new this week</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-2 col-md-4 col-sm-6">
+        <div class="kpi-card kpi-bookings">
+            <div class="kpi-icon"><i class="bi bi-journal-check"></i></div>
+            <div>
+                <div class="kpi-label">Bookings · Month</div>
+                <div class="kpi-value">@Model.Kpis.BookingsThisMonth</div>
+                <div class="kpi-sub">@Model.Currency @Money(Model.Kpis.RevenueThisMonth) booked</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-2 col-md-4 col-sm-6">
+        <div class="kpi-card kpi-collected">
+            <div class="kpi-icon"><i class="bi bi-cash-stack"></i></div>
+            <div>
+                <div class="kpi-label">Collected · Month</div>
+                <div class="kpi-value">@Model.Currency @Money(Model.Kpis.CollectedThisMonth)</div>
+                <div class="kpi-sub">received via installments</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-2 col-md-4 col-sm-6">
+        <div class="kpi-card kpi-revenue">
+            <div class="kpi-icon"><i class="bi bi-graph-up"></i></div>
+            <div>
+                <div class="kpi-label">Total Packages</div>
+                <div class="kpi-value">@Model.Kpis.TotalPackages</div>
+                <div class="kpi-sub">all-time quotes</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-2 col-md-4 col-sm-6">
+        <div class="kpi-card kpi-balance">
+            <div class="kpi-icon"><i class="bi bi-wallet2"></i></div>
+            <div>
+                <div class="kpi-label">Outstanding</div>
+                <div class="kpi-value">@Model.Currency @Money(Model.Kpis.OutstandingBalance)</div>
+                <div class="kpi-sub">pending across all bookings</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-2 col-md-4 col-sm-6">
+        <div class="kpi-card @(Model.Kpis.OverdueInstallmentsCount > 0 ? "kpi-overdue" : "kpi-bookings")">
+            <div class="kpi-icon"><i class="bi @(Model.Kpis.OverdueInstallmentsCount > 0 ? "bi-exclamation-triangle-fill" : "bi-check-circle-fill")"></i></div>
+            <div>
+                <div class="kpi-label">Overdue</div>
+                <div class="kpi-value">@Model.Kpis.OverdueInstallmentsCount</div>
+                <div class="kpi-sub">@Model.Currency @Money(Model.Kpis.OverdueAmount) past due</div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- ─────────── CHARTS ROW ─────────── -->
+<div class="row g-3 mb-3">
+    <div class="col-lg-8">
+        <div class="panel-card h-100">
+            <div class="panel-head">
+                <h6><i class="bi bi-bar-chart-fill text-primary me-2"></i>Revenue · last 6 months</h6>
+                <span class="text-muted small">total: @Model.Currency @Money(Model.RevenueTrend.Sum(r => r.Revenue))</span>
+            </div>
+            <div class="chart-wrap"><canvas id="revenueChart"></canvas></div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="panel-card h-100">
+            <div class="panel-head">
+                <h6><i class="bi bi-pie-chart-fill text-primary me-2"></i>Leads by status</h6>
+                <span class="text-muted small">@Model.Kpis.TotalLeads total</span>
+            </div>
+            <div class="chart-wrap">
+                @if (Model.LeadsByStatus.Any(s => s.LeadCount > 0))
+                {
+                    <canvas id="statusChart"></canvas>
+                }
+                else
+                {
+                    <div class="empty py-5"><i class="bi bi-funnel fs-2 d-block mb-2 opacity-50"></i>No leads yet.</div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ─────────── PANEL ROW: recent leads / upcoming travel / overdue ─────────── -->
+<div class="row g-3">
+    <div class="col-lg-4">
+        <div class="panel-card h-100">
+            <div class="panel-head">
+                <h6><i class="bi bi-funnel-fill text-primary me-2"></i>Recent Leads</h6>
+                <a href="/Leads" class="small text-decoration-none">View all <i class="bi bi-arrow-right"></i></a>
+            </div>
+            <div class="panel-body">
+                @if (!Model.RecentLeads.Any())
+                {
+                    <div class="empty"><i class="bi bi-inbox fs-3 d-block mb-1 opacity-50"></i>No leads yet.</div>
+                }
+                else
+                {
+                    foreach (var l in Model.RecentLeads)
+                    {
+                        var initials = string.Concat(l.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(x => x[0])).ToUpperInvariant();
+                        <a href="/Leads/Details/@l.Id" class="lead-row">
+                            <div class="avatar-pill">@(initials.Length > 0 ? initials : "?")</div>
+                            <div class="flex-grow-1 min-w-0">
+                                <div class="d-flex justify-content-between gap-2">
+                                    <strong class="text-truncate">@l.Name</strong>
+                                    <span class="font-monospace small text-muted">@l.LeadNumber</span>
+                                </div>
+                                <div class="row-meta d-flex justify-content-between">
+                                    <span><span class="badge bg-@l.StatusColor-subtle text-@l.StatusColor">@l.StatusName</span>
+                                        @if (!string.IsNullOrEmpty(l.DestinationName)) { <span class="ms-1">· @l.DestinationName</span> }
+                                    </span>
+                                    <span>@l.CreatedAt.ToLocalTime().ToString("dd MMM")</span>
+                                </div>
+                            </div>
+                        </a>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="panel-card h-100">
+            <div class="panel-head">
+                <h6><i class="bi bi-airplane-fill text-primary me-2"></i>Upcoming Travel · 30 days</h6>
+                <a href="/Bookings" class="small text-decoration-none">All <i class="bi bi-arrow-right"></i></a>
+            </div>
+            <div class="panel-body">
+                @if (!Model.UpcomingTravel.Any())
+                {
+                    <div class="empty"><i class="bi bi-calendar2-x fs-3 d-block mb-1 opacity-50"></i>No travel scheduled.</div>
+                }
+                else
+                {
+                    foreach (var b in Model.UpcomingTravel)
+                    {
+                        var days = b.StartDate.HasValue ? (b.StartDate.Value.Date - DateTime.UtcNow.Date).Days : 0;
+                        var when = days <= 0 ? "today" : days == 1 ? "tomorrow" : $"in {days}d";
+                        <a href="/Bookings/Details/@b.Id" class="upcoming-row">
+                            <div class="avatar-pill" style="background:#dcfce7;color:#15803d"><i class="bi bi-suitcase"></i></div>
+                            <div class="flex-grow-1 min-w-0">
+                                <div class="d-flex justify-content-between gap-2">
+                                    <strong class="text-truncate">@b.CustomerName</strong>
+                                    <span class="font-monospace small text-muted">@b.BookingNumber</span>
+                                </div>
+                                <div class="row-meta d-flex justify-content-between">
+                                    <span>
+                                        @if (!string.IsNullOrEmpty(b.DestinationName)) { <span><i class="bi bi-geo-alt me-1"></i>@b.DestinationName</span> }
+                                        @if (b.Days.HasValue) { <span class="ms-1">· @b.Days d</span> }
+                                    </span>
+                                    <span class="fw-semibold text-primary">@when</span>
+                                </div>
+                            </div>
+                        </a>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="panel-card h-100">
+            <div class="panel-head">
+                <h6>
+                    <i class="bi bi-exclamation-triangle-fill @(Model.OverdueInstallments.Any() ? "text-danger" : "text-muted") me-2"></i>
+                    Overdue Payments
+                </h6>
+                @if (Model.OverdueInstallments.Any())
+                {
+                    <span class="badge bg-danger-subtle text-danger">@Model.Kpis.OverdueInstallmentsCount</span>
+                }
+            </div>
+            <div class="panel-body">
+                @if (!Model.OverdueInstallments.Any())
+                {
+                    <div class="empty"><i class="bi bi-check-circle fs-3 d-block mb-1 opacity-50 text-success"></i>All payments on track.</div>
+                }
+                else
+                {
+                    foreach (var i in Model.OverdueInstallments)
+                    {
+                        <a href="/Bookings/Details/@i.BookingId" class="overdue-row">
+                            <div class="flex-grow-1 min-w-0">
+                                <div class="d-flex justify-content-between gap-2">
+                                    <strong class="text-truncate">@i.CustomerName</strong>
+                                    <span class="amount">@i.Currency @i.Amount.ToString("N0")</span>
+                                </div>
+                                <div class="row-meta d-flex justify-content-between">
+                                    <span><span class="font-monospace">@i.BookingNumber</span> · Inst #@i.InstallmentNo</span>
+                                    <span class="pill-days">@i.DaysOverdue d overdue</span>
+                                </div>
+                            </div>
+                        </a>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ─────────── MONTHLY BREAKDOWN (year filter) ─────────── -->
+<div class="panel-card mt-3">
+    <div class="panel-head flex-wrap gap-2">
+        <h6><i class="bi bi-calendar3 text-primary me-2"></i>Monthly Breakdown</h6>
+        <div class="d-flex align-items-center gap-2 small">
+            <label class="text-muted mb-0">Year</label>
+            <select id="mbYear" class="form-select form-select-sm" style="width: 110px;">
+                @{
+                    var currentYear = DateTime.UtcNow.Year;
+                    for (int y = currentYear; y >= currentYear - 4; y--)
+                    {
+                        <option value="@y" selected="@(y == currentYear)">@y</option>
+                    }
+                }
+            </select>
+        </div>
+    </div>
+    <div class="chart-wrap"><canvas id="monthlyChart" style="height:320px"></canvas></div>
+</div>
+
+<!-- ─────────── DATE-RANGE ANALYTICS ─────────── -->
+<div class="row g-3 mt-1">
+    <div class="col-12">
+        <div class="panel-card">
+            <div class="panel-head flex-wrap gap-2">
+                <h6><i class="bi bi-funnel-fill text-primary me-2"></i>Date Range Analytics</h6>
+                <div class="d-flex align-items-center gap-2 small">
+                    <label class="text-muted mb-0">From</label>
+                    <input type="date" id="rangeFrom" class="form-control form-control-sm" style="width: 160px;" />
+                    <label class="text-muted mb-0">To</label>
+                    <input type="date" id="rangeTo" class="form-control form-control-sm" style="width: 160px;" />
+                    <button type="button" id="rangeShow" class="btn btn-sm btn-primary px-3">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Show
+                    </button>
+                </div>
+            </div>
+            <div class="row g-0">
+                <div class="col-md-7 border-end">
+                    <div class="chart-wrap">
+                        <div class="text-center text-muted small mb-2" id="rangeLabel">—</div>
+                        <canvas id="rangeBarChart" style="height:280px"></canvas>
+                    </div>
+                </div>
+                <div class="col-md-5">
+                    <div class="chart-wrap">
+                        <div class="text-center fw-bold mb-2">Lead Count</div>
+                        <canvas id="rangePieChart" style="height:280px"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script>
+        const trend = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+            Model.RevenueTrend.OrderBy(r => r.YearNo).ThenBy(r => r.MonthNo).Select(r => new {
+                label = r.MonthLabel.Substring(0, 3) + " " + (r.YearNo % 100).ToString("D2"),
+                value = r.Revenue,
+                count = r.BookingCount
+            })));
+        const statusData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+            Model.LeadsByStatus.Select(s => new { name = s.StatusName, value = s.LeadCount, color = s.StatusColor })));
+        const currency = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Currency));
+
+        // Revenue line chart
+        if (trend.length > 0) {
+            const ctx = document.getElementById('revenueChart');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: trend.map(t => t.label),
+                    datasets: [{
+                        label: 'Revenue',
+                        data:  trend.map(t => t.value),
+                        backgroundColor: 'rgba(13, 110, 253, .75)',
+                        borderRadius: 6,
+                        borderSkipped: false,
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: c => ` ${currency} ${Number(c.parsed.y).toLocaleString('en-IN')}  ·  ${trend[c.dataIndex].count} booking(s)`
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { ticks: { callback: v => v >= 100000 ? (v/100000).toFixed(1) + 'L' : v >= 1000 ? (v/1000).toFixed(0) + 'K' : v },
+                             grid: { color: 'rgba(0,0,0,.05)' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // Bootstrap → hex colour map (shared by all charts on this page)
+        const bsColorMap = {
+            primary: '#0d6efd', success: '#198754', danger: '#dc3545', warning: '#ffc107',
+            info: '#0dcaf0', secondary: '#6c757d', dark: '#212529', purple: '#6f42c1', orange: '#fd7e14'
+        };
+        const colorOf = name => bsColorMap[name] || '#6c757d';
+        const statusActive = statusData.filter(s => s.value > 0);
+        if (statusActive.length > 0) {
+            const ctx2 = document.getElementById('statusChart');
+            new Chart(ctx2, {
+                type: 'doughnut',
+                data: {
+                    labels: statusActive.map(s => s.name),
+                    datasets: [{
+                        data: statusActive.map(s => s.value),
+                        backgroundColor: statusActive.map(s => colorOf(s.color)),
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    cutout: '62%',
+                    plugins: {
+                        legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12 } }
+                    }
+                }
+            });
+        }
+
+        // ───────────────────────────────────────────────
+        // Monthly Breakdown chart (year-filtered)
+        // ───────────────────────────────────────────────
+        const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        let monthlyChart = null;
+
+        async function loadMonthly() {
+            const year = document.getElementById('mbYear').value;
+            const res = await fetch(`/Dashboard/MonthlyBreakdown?year=${year}`);
+            const data = await res.json();
+
+            // Pivot the by-status rows into per-status arrays (12 values each)
+            const statusMap = new Map();   // statusName -> { color, vals[12] }
+            data.byStatus.forEach(r => {
+                if (!statusMap.has(r.statusName)) {
+                    statusMap.set(r.statusName, { color: r.statusColor, vals: Array(12).fill(0) });
+                }
+                statusMap.get(r.statusName).vals[r.monthNo - 1] = r.leadCount;
+            });
+
+            const labels = MONTHS.map(m => `${m} ${year}`);
+            const datasets = [
+                { label: 'Total Leads',  data: data.totals.map(t => t.totalLeads),  backgroundColor: '#94a3b8', borderRadius: 4 },
+                { label: 'Notes',        data: data.totals.map(t => t.totalNotes),  backgroundColor: '#facc15', borderRadius: 4 },
+                { label: 'Quotes',       data: data.totals.map(t => t.totalQuotes), backgroundColor: '#1f2937', borderRadius: 4 }
+            ];
+            for (const [name, info] of statusMap) {
+                datasets.push({ label: name, data: info.vals, backgroundColor: colorOf(info.color), borderRadius: 4 });
+            }
+
+            if (monthlyChart) monthlyChart.destroy();
+            monthlyChart = new Chart(document.getElementById('monthlyChart'), {
+                type: 'bar',
+                data: { labels, datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
+                    scales: {
+                        x: { grid: { display: false } },
+                        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,.05)' } }
+                    }
+                }
+            });
+        }
+        document.getElementById('mbYear').addEventListener('change', loadMonthly);
+        loadMonthly();
+
+        // ───────────────────────────────────────────────
+        // Date-range analytics (left bar + right pie)
+        // ───────────────────────────────────────────────
+        let rangeBarChart = null, rangePieChart = null;
+
+        function defaultRange() {
+            const today = new Date();
+            const week  = new Date(); week.setDate(today.getDate() - 6);
+            const fmt = d => d.toISOString().slice(0, 10);
+            return { from: fmt(week), to: fmt(today) };
+        }
+        const def = defaultRange();
+        document.getElementById('rangeFrom').value = def.from;
+        document.getElementById('rangeTo').value   = def.to;
+
+        async function loadRange() {
+            const from = document.getElementById('rangeFrom').value;
+            const to   = document.getElementById('rangeTo').value;
+            if (!from || !to) return;
+            const res = await fetch(`/Dashboard/RangeSummary?from=${from}&to=${to}`);
+            const data = await res.json();
+            document.getElementById('rangeLabel').textContent = `${data.from}  →  ${data.to}`;
+
+            // Bar: Total Leads, Notes, Quotes
+            const barLabels = ['Total Leads', 'Total Notes', 'Quotes Created'];
+            const barValues = [data.totals.totalLeads, data.totals.totalNotes, data.totals.totalQuotes];
+            const barColors = ['#38bdf8', '#6366f1', '#22c55e'];
+            if (rangeBarChart) rangeBarChart.destroy();
+            rangeBarChart = new Chart(document.getElementById('rangeBarChart'), {
+                type: 'bar',
+                data: {
+                    labels: barLabels,
+                    datasets: [{
+                        data: barValues,
+                        backgroundColor: barColors,
+                        borderRadius: 6,
+                        maxBarThickness: 70
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: c => ` ${c.parsed.y.toLocaleString('en-IN')}` } },
+                        datalabels: false
+                    },
+                    scales: {
+                        x: { grid: { display: false } },
+                        y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(0,0,0,.05)' } }
+                    }
+                }
+            });
+
+            // Pie: leads by status
+            if (rangePieChart) rangePieChart.destroy();
+            const pie = (data.pie || []).filter(s => s.leadCount > 0);
+            if (pie.length > 0) {
+                const total = pie.reduce((a,b) => a + b.leadCount, 0);
+                rangePieChart = new Chart(document.getElementById('rangePieChart'), {
+                    type: 'pie',
+                    data: {
+                        labels: pie.map(s => s.statusName),
+                        datasets: [{
+                            data: pie.map(s => s.leadCount),
+                            backgroundColor: pie.map(s => colorOf(s.statusColor)),
+                            borderWidth: 2, borderColor: '#fff'
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } },
+                            tooltip: { callbacks: {
+                                label: c => ` ${c.label}: ${c.parsed} (${(c.parsed * 100 / total).toFixed(1)}%)`
+                            }}
+                        }
+                    }
+                });
+            }
+        }
+        document.getElementById('rangeShow').addEventListener('click', loadRange);
+        loadRange();
+    </script>
+}

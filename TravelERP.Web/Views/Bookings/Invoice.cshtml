@@ -1,0 +1,390 @@
+@using TravelERP.Core.Entities.Master
+@using TravelERP.Core.Entities.Tenant
+@using TravelERP.Web.Services
+@model Booking
+@{
+    Layout = null;
+    var company  = ViewBag.Company as Company;
+    var banks    = ViewBag.BankAccounts  as IEnumerable<BankAccount> ?? Enumerable.Empty<BankAccount>();
+    var whyItems = ViewBag.WhyBookWithUs as IReadOnlyList<PublicPackageService.WhyItem>
+                   ?? Array.Empty<PublicPackageService.WhyItem>();
+    ViewData["Title"] = $"Invoice {Model.InvoiceNumber}";
+
+    string IconClass(string raw) =>
+        string.IsNullOrWhiteSpace(raw) ? "bi-star" : (raw.StartsWith("bi-") ? raw : "bi-" + raw);
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>@ViewData["Title"] — @(company?.Name ?? "Invoice")</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" />
+    <style>
+        :root { --brand: #0d6efd; --brand-soft: #eff6ff; }
+        body { background: #f5f7fa; color: #111827; font-family: system-ui, -apple-system, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .inv-page { max-width: 900px; margin: 1.25rem auto; padding: 2rem; background: #fff; box-shadow: 0 2px 16px rgba(0,0,0,.06); border-radius: .5rem; }
+
+        .inv-header {
+            border-bottom: 3px solid var(--brand);
+            padding-bottom: 1.25rem; margin-bottom: 1.25rem;
+            display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;
+        }
+        .inv-logo { width: 90px; height: 90px; flex-shrink: 0;
+            background: #fff; border-radius: .5rem; padding: 4px;
+            display: flex; align-items: center; justify-content: center; }
+        .inv-logo img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+        .inv-from { line-height: 1.45; }
+        .inv-from h1 { font-size: 1.4rem; font-weight: 800; margin: 0 0 .15rem; color: var(--brand); }
+        .inv-from .company-meta { font-size: .85rem; color: #4b5563; }
+
+        .inv-meta-card {
+            background: var(--brand-soft);
+            border: 1px solid #cfe2ff;
+            border-radius: .5rem;
+            padding: .85rem 1.1rem;
+            min-width: 240px;
+        }
+        .inv-meta-card .label-tag {
+            font-size: .7rem; text-transform: uppercase; letter-spacing: 1px;
+            color: #1e3a8a; font-weight: 700;
+        }
+        .inv-meta-card .num {
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 1.05rem; font-weight: 800; color: var(--brand);
+        }
+        .inv-meta-card .row + .row { margin-top: .35rem; }
+
+        .section-title {
+            font-size: .72rem; text-transform: uppercase; letter-spacing: 1px;
+            color: #6b7280; font-weight: 700;
+            margin: 1.4rem 0 .55rem;
+        }
+
+        .bill-to {
+            background: #f9fafb; border: 1px solid #e5e7eb; border-radius: .5rem;
+            padding: 1rem 1.25rem;
+        }
+        .bill-to .name { font-size: 1.05rem; font-weight: 700; }
+        .bill-to .meta { color: #4b5563; font-size: .9rem; margin-top: .25rem; }
+
+        table.line-items {
+            width: 100%; border-collapse: collapse;
+            border: 1px solid #e5e7eb; border-radius: .5rem; overflow: hidden;
+        }
+        table.line-items thead th {
+            background: var(--brand); color: #fff;
+            padding: .7rem 1rem; text-align: left; font-weight: 700;
+            font-size: .8rem; text-transform: uppercase; letter-spacing: .5px;
+        }
+        table.line-items td {
+            padding: .85rem 1rem; border-top: 1px solid #e5e7eb;
+            vertical-align: top;
+        }
+        table.line-items tr:first-child td { border-top: 0; }
+        table.line-items td.amt, table.line-items th.amt { text-align: right; }
+        table.line-items .desc-sub { color: #6b7280; font-size: .85rem; margin-top: .15rem; }
+
+        .totals {
+            margin-top: 1rem;
+            display: flex; justify-content: flex-end;
+        }
+        .totals-card {
+            min-width: 320px;
+            background: #f9fafb; border: 1px solid #e5e7eb; border-radius: .5rem;
+            padding: 1rem 1.25rem;
+        }
+        .totals-row { display: flex; justify-content: space-between; padding: .25rem 0; font-size: .95rem; }
+        .totals-row.grand {
+            border-top: 2px solid var(--brand); margin-top: .65rem; padding-top: .85rem;
+            font-size: 1.15rem; font-weight: 800; color: var(--brand);
+        }
+        .totals-row.balance { font-weight: 700; }
+        .totals-row.paid { color: #198754; }
+
+        .pay-table { width: 100%; border-collapse: collapse; }
+        .pay-table th, .pay-table td { padding: .55rem .85rem; border-bottom: 1px solid #e5e7eb; font-size: .9rem; }
+        .pay-table th { background: #f3f4f6; text-align: left; font-weight: 700; font-size: .75rem; text-transform: uppercase; letter-spacing: .5px; color: #4b5563; }
+        .pay-table td.amt, .pay-table th.amt { text-align: right; font-family: ui-monospace, monospace; }
+        .pay-status { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: .72rem; font-weight: 700; }
+        .pay-status.received { background: #dcfce7; color: #166534; }
+        .pay-status.pending  { background: #fef3c7; color: #92400e; }
+        .pay-status.refunded { background: #fee2e2; color: #991b1b; }
+
+        .footer-strip {
+            margin-top: 2.5rem; border-top: 1px dashed #d1d5db; padding-top: 1rem;
+            text-align: center; color: #6b7280; font-size: .8rem;
+        }
+
+        /* ── Bank cards (matches Package View styling) ── */
+        .bank-card {
+            background: #fff; border: 1px solid #e5e7eb; border-radius: .75rem;
+            padding: 1rem 1.25rem; margin-bottom: .75rem;
+            display: flex; align-items: flex-start; gap: 1rem;
+            break-inside: avoid; page-break-inside: avoid;
+        }
+        .bank-card.is-default { border-color: var(--brand); background: var(--brand-soft); }
+        .bank-card .bc-icon {
+            width: 44px; height: 44px; border-radius: .5rem;
+            background: var(--brand); color: #fff;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem; flex-shrink: 0;
+        }
+        .bank-card .bc-name { font-weight: 700; color: #111827; }
+        .bank-card .bc-meta { display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; margin-top: .25rem; font-size: .85rem; color: #4b5563; }
+        .bank-card .bc-meta strong { color: #111827; font-family: ui-monospace, monospace; }
+        .bank-card .bc-default {
+            background: var(--brand); color: #fff; font-size: .65rem;
+            padding: 1px 8px; border-radius: 999px; margin-left: .5rem;
+            text-transform: uppercase; letter-spacing: .8px; font-weight: 700;
+        }
+
+        /* ── Terms block (matches Package View .pub-card styling) ── */
+        .terms-block {
+            background: #fff; border: 1px solid #e5e7eb; border-radius: .75rem;
+            padding: 1.25rem; font-size: .9rem; color: #374151; line-height: 1.6;
+            break-inside: avoid; page-break-inside: avoid;
+        }
+        .terms-block ol, .terms-block ul { padding-left: 1.25rem; margin: .35rem 0; }
+        .terms-block p { margin: 0 0 .5rem; }
+        .terms-block p:last-child { margin-bottom: 0; }
+
+        /* ── Why Book With Us grid (matches Package View) ── */
+        .why-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: .75rem;
+        }
+        .why-tile {
+            background: #fff; border: 1px solid #e5e7eb; border-radius: .75rem;
+            padding: 1rem .85rem; text-align: center;
+            break-inside: avoid; page-break-inside: avoid;
+        }
+        .why-tile .why-ic {
+            width: 50px; height: 50px; border-radius: 50%;
+            background: var(--brand-soft); color: var(--brand);
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto .5rem; font-size: 1.3rem;
+        }
+        .why-tile .why-tt { font-size: .85rem; font-weight: 600; color: #1f2937; }
+
+        .toolbar {
+            position: sticky; top: 0; background: #fff;
+            border-bottom: 1px solid #e5e7eb; padding: .65rem 1.25rem;
+            display: flex; justify-content: space-between; align-items: center;
+            z-index: 10;
+        }
+        @@media print {
+            body { background: #fff !important; }
+            .toolbar { display: none !important; }
+            .inv-page { box-shadow: none; margin: 0; max-width: none; padding: 1rem 1.5rem; }
+        }
+        @@page { size: A4; margin: 0; }
+    </style>
+</head>
+<body>
+
+@if (User.Identity?.IsAuthenticated == true)
+{
+    <div class="toolbar">
+        <span class="text-muted small"><i class="bi bi-receipt text-success me-1"></i>Internal preview — visible to you only</span>
+        <div class="d-flex gap-2">
+            <a href="/Bookings/Details/@Model.Id" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Back</a>
+            <a href="/Bookings/@Model.Id/invoice/pdf" class="btn btn-sm btn-primary"><i class="bi bi-file-earmark-pdf me-1"></i>Download PDF</a>
+        </div>
+    </div>
+}
+
+<div class="inv-page">
+    <!-- HEADER -->
+    <header class="inv-header">
+        <div class="d-flex gap-3 align-items-start">
+            @if (!string.IsNullOrEmpty(company?.LogoUrl))
+            {
+                <div class="inv-logo"><img src="@company.LogoUrl" alt="@company.Name" /></div>
+            }
+            <div class="inv-from">
+                <h1>@(company?.Name ?? "Travel Agency")</h1>
+                <div class="company-meta">
+                    @if (!string.IsNullOrEmpty(company?.Address)) { <div>@company.Address</div> }
+                    @if (!string.IsNullOrEmpty(company?.City) || !string.IsNullOrEmpty(company?.Country))
+                    {
+                        <div>@string.Join(", ", new[] { company?.City, company?.Country }.Where(x => !string.IsNullOrEmpty(x)))</div>
+                    }
+                    <div>
+                        @if (!string.IsNullOrEmpty(company?.Phone)) { <span><i class="bi bi-telephone me-1"></i>@company.Phone</span> }
+                        @if (!string.IsNullOrEmpty(company?.Email)) { <span class="ms-2"><i class="bi bi-envelope me-1"></i>@company.Email</span> }
+                    </div>
+                    @if (!string.IsNullOrEmpty(company?.TaxNumber))
+                    {
+                        <div><strong>GSTIN/Tax #:</strong> @company.TaxNumber</div>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="inv-meta-card">
+            <div class="label-tag">Tax Invoice</div>
+            <div class="num mb-2">@Model.InvoiceNumber</div>
+            <div class="d-flex justify-content-between"><span class="text-muted small">Booking #</span><span class="fw-bold font-monospace">@Model.BookingNumber</span></div>
+            @if (!string.IsNullOrEmpty(Model.PackageNumber))
+            {
+                <div class="d-flex justify-content-between"><span class="text-muted small">Trip ID</span><span class="fw-bold font-monospace">@Model.PackageNumber</span></div>
+            }
+            <div class="d-flex justify-content-between"><span class="text-muted small">Issue Date</span><span class="fw-semibold">@Model.CreatedAt.ToLocalTime().ToString("dd MMM yyyy")</span></div>
+            <div class="d-flex justify-content-between"><span class="text-muted small">Status</span><span class="fw-bold text-uppercase">@Model.Status</span></div>
+        </div>
+    </header>
+
+    <!-- BILL TO -->
+    <div class="section-title">Bill To</div>
+    <div class="bill-to">
+        <div class="name">@Model.CustomerName</div>
+        <div class="meta">
+            @if (!string.IsNullOrEmpty(Model.CustomerMobile)) { <span><i class="bi bi-telephone me-1"></i>@Model.CustomerMobile</span> }
+            @if (!string.IsNullOrEmpty(Model.CustomerEmail)) { <span class="ms-3"><i class="bi bi-envelope me-1"></i>@Model.CustomerEmail</span> }
+        </div>
+    </div>
+
+    <!-- LINE ITEMS -->
+    <div class="section-title">Description of Service</div>
+    <table class="line-items">
+        <thead>
+            <tr>
+                <th style="width:60%">Description</th>
+                <th style="width:15%">Travelers</th>
+                <th style="width:25%" class="amt">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>
+                    <strong>@(Model.OptionName ?? "Travel Package")</strong>
+                    <div class="desc-sub">
+                        @if (!string.IsNullOrEmpty(Model.DestinationName)) { <span><i class="bi bi-geo-alt me-1"></i>@Model.DestinationName</span> }
+                        @if (Model.StartDate.HasValue) { <span class="ms-3"><i class="bi bi-calendar3 me-1"></i>@Model.StartDate.Value.ToString("dd MMM yyyy")</span> }
+                        @if (Model.Days.HasValue)      { <span class="ms-3"><i class="bi bi-clock me-1"></i>@Model.Days days / @(Model.Nights ?? Model.Days - 1) nights</span> }
+                    </div>
+                </td>
+                <td>
+                    <div>@Model.TotalPax pax</div>
+                    <div class="desc-sub">@Model.Adults A · @Model.Children C · @Model.Infants I</div>
+                </td>
+                <td class="amt fw-bold">@Model.Currency @Model.TotalAmount.ToString("N2")</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- TOTALS -->
+    <div class="totals">
+        <div class="totals-card">
+            <div class="totals-row"><span>Subtotal</span><span class="font-monospace">@Model.Currency @Model.TotalAmount.ToString("N2")</span></div>
+            <div class="totals-row grand"><span>Total</span><span class="font-monospace">@Model.Currency @Model.TotalAmount.ToString("N2")</span></div>
+            @if (Model.PaidAmount > 0)
+            {
+                <div class="totals-row paid"><span>Paid</span><span class="font-monospace">- @Model.Currency @Model.PaidAmount.ToString("N2")</span></div>
+                <div class="totals-row balance @(Model.BalanceAmount > 0 ? "text-danger" : "text-success")">
+                    <span>Balance Due</span><span class="font-monospace">@Model.Currency @Model.BalanceAmount.ToString("N2")</span>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- PAYMENT SCHEDULE -->
+    @if (Model.Installments.Any())
+    {
+        <div class="section-title">Payment Schedule</div>
+        <table class="pay-table">
+            <thead>
+                <tr>
+                    <th style="width:6%">#</th>
+                    <th style="width:14%">Mode</th>
+                    <th style="width:14%">Status</th>
+                    <th style="width:18%" class="amt">Amount</th>
+                    <th style="width:14%">Due Date</th>
+                    <th style="width:14%">Received</th>
+                    <th>Remark</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var i in Model.Installments)
+                {
+                    <tr>
+                        <td class="fw-bold">@i.InstallmentNo</td>
+                        <td>@(i.PaymentMode ?? "—")</td>
+                        <td><span class="pay-status @(i.PaymentStatus?.ToLower())">@i.PaymentStatus</span></td>
+                        <td class="amt fw-semibold">@Model.Currency @i.Amount.ToString("N2")</td>
+                        <td>@(i.DueDate?.ToString("dd MMM yyyy") ?? "—")</td>
+                        <td>@(i.ReceivedDate?.ToString("dd MMM yyyy") ?? "—")</td>
+                        <td>@(i.Remark ?? "")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    @* ──────────── TERMS & CONDITIONS (destination-wise, same as Package View) ──────────── *@
+    @if (!string.IsNullOrWhiteSpace(Model.DestinationTerms))
+    {
+        <div class="section-title">Terms &amp; Conditions</div>
+        <div class="terms-block">@Html.Raw(Model.DestinationTerms)</div>
+    }
+
+    @* ──────────── PAYMENT DETAILS — bank accounts (same as Package View) ──────────── *@
+    @if (banks.Any())
+    {
+        <div class="section-title">Payment Details</div>
+        @foreach (var bk in banks)
+        {
+            <div class="bank-card @(bk.IsDefault ? "is-default" : "")">
+                <div class="bc-icon"><i class="bi bi-bank2"></i></div>
+                <div class="flex-grow-1">
+                    <div>
+                        <span class="bc-name">@bk.BankName</span>
+                        @if (bk.IsDefault) { <span class="bc-default">Preferred</span> }
+                    </div>
+                    <div class="bc-meta">
+                        <span><span class="text-muted">A/c Holder:</span> <strong>@bk.HolderName</strong></span>
+                        <span><span class="text-muted">A/c No:</span> <strong>@bk.AccountNumber</strong></span>
+                        @if (!string.IsNullOrEmpty(bk.IfscCode)) { <span><span class="text-muted">IFSC:</span> <strong>@bk.IfscCode</strong></span> }
+                        @if (!string.IsNullOrEmpty(bk.Branch))   { <span><span class="text-muted">Branch:</span> @bk.Branch</span> }
+                        @if (!string.IsNullOrEmpty(bk.UpiId))    { <span><span class="text-muted">UPI:</span> <strong>@bk.UpiId</strong></span> }
+                    </div>
+                </div>
+            </div>
+        }
+    }
+
+    @* ──────────── WHY BOOK WITH US (same as Package View) ──────────── *@
+    @if (whyItems.Any())
+    {
+        <div class="section-title">Why Book With Us</div>
+        <div class="why-grid">
+            @foreach (var w in whyItems)
+            {
+                <div class="why-tile">
+                    <div class="why-ic"><i class="bi @IconClass(w.Icon)"></i></div>
+                    <div class="why-tt">@w.Title</div>
+                </div>
+            }
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Model.Notes))
+    {
+        <div class="section-title">Notes</div>
+        <div style="font-size:.9rem; color:#4b5563;">@Model.Notes</div>
+    }
+
+    <div class="footer-strip">
+        @if (!string.IsNullOrEmpty(company?.Name))
+        {
+            <div><strong>@company.Name</strong></div>
+        }
+        <div>This is a computer-generated invoice. Goods/services once availed are non-refundable except as per the agreed terms.</div>
+    </div>
+</div>
+
+</body>
+</html>

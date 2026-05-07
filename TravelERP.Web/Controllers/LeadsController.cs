@@ -90,7 +90,9 @@ public class LeadsController : Controller
     [HttpGet]
     public async Task<IActionResult> Details(int id,
         [FromServices] ILeadActivityRepository activities,
-        [FromServices] IActivityTemplateRepository templates)
+        [FromServices] IActivityTemplateRepository templates,
+        [FromServices] IPackageRepository packages,
+        [FromServices] IBookingRepository bookings)
     {
         if (!_tenant.CanView(AppModules.Leads)) return Forbid();
         var lead = await _repo.GetByIdAsync(id);
@@ -118,6 +120,8 @@ public class LeadsController : Controller
         ViewBag.AuthorMap  = authorMap;
         ViewBag.Statuses   = await _statuses.GetAllAsync();
         ViewBag.Templates  = await templates.GetAllAsync();
+        ViewBag.Packages   = await packages.GetByLeadAsync(id);
+        ViewBag.Bookings   = await bookings.GetByLeadAsync(id);
         return View(lead);
     }
 

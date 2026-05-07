@@ -103,6 +103,20 @@ GO
 IF COL_LENGTH('Companies','PackagePrefix') IS NULL
     ALTER TABLE Companies ADD PackagePrefix NVARCHAR(20) NOT NULL DEFAULT 'PKG';
 GO
+IF COL_LENGTH('Companies','BookingPrefix') IS NULL
+    ALTER TABLE Companies ADD BookingPrefix NVARCHAR(20) NOT NULL DEFAULT 'BK';
+GO
+IF COL_LENGTH('Companies','InvoicePrefix') IS NULL
+    ALTER TABLE Companies ADD InvoicePrefix NVARCHAR(20) NOT NULL DEFAULT 'INV';
+GO
+
+-- Public quote branding (idempotent)
+IF COL_LENGTH('Companies','GreetingParagraph') IS NULL
+    ALTER TABLE Companies ADD GreetingParagraph NVARCHAR(MAX) NULL;
+GO
+IF COL_LENGTH('Companies','WhyBookWithUs') IS NULL
+    ALTER TABLE Companies ADD WhyBookWithUs NVARCHAR(MAX) NULL;  -- JSON: [{"icon":"bi-headset","title":"24/7 Support"},...]
+GO
 
 -- ============================================================
 -- SUBSCRIPTION PLANS TABLE
