@@ -1,0 +1,128 @@
+@model TravelERP.Core.Entities.Master.Company
+@{
+    ViewData["Title"] = "Voucher Defaults";
+
+    // Sensible starter values when nothing is saved yet
+    var defaultNote   = Model?.VoucherHotelNote ?? "This booking is Non-Refundable and cannot be amended or modified. Failure to arrive at your hotel will be treated as a No-Show and no refund will be given as per hotel policy.";
+    var defaultPolicy = Model?.VoucherPolicyHtml ??
+        "<ul>" +
+        "<li>The usual check-in time is 02:00 PM hours however this might vary from hotel to hotel and with different destinations. Rooms may not be available for early check-in, unless especially required in advance. However, luggage may be deposited at the hotel reception and collected once the room is allotted.</li>" +
+        "<li>Note that reservation may be canceled automatically after 18:00 hours if hotel is not informed about the approximate time of late arrivals.</li>" +
+        "<li>Early Check in &amp; Check out is subject to room availability / Hotel Policy.</li>" +
+        "<li>Any late checkout may involve additional charges. Please check with the hotel reception in advance.</li>" +
+        "<li>For any specific queries related to a particular hotel, kindly reach out to local support team for further assistance.</li>" +
+        "<li>No refund will be given for any cancellation at any situation if trip get started / during the trip / prior the trip, cancellation will be done as per our Cancellation Policy.</li>" +
+        "<li>We are a Tour operator, we don't own any hotels, vehicles, airlines so T&amp;C will be applicable as per their payment policy need to clear all balance payment on arrival once pick up will done as per payment scheduled.</li>" +
+        "</ul>";
+}
+
+@section Styles {
+    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet" />
+    <style>
+        .quill-host { background: #fff; border-radius: 0 0 .375rem .375rem; }
+        .quill-host .ql-toolbar { border-radius: .375rem .375rem 0 0; }
+        .quill-host .ql-container { min-height: 220px; font-size: .9rem; }
+        .quill-host .ql-container.ql-snow { border-radius: 0 0 .375rem .375rem; }
+    </style>
+}
+
+<form asp-action="VoucherDefaults" method="post" class="row g-3" id="vdForm">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="hotelNote"  id="hotelNoteHidden"  />
+    <input type="hidden" name="policyHtml" id="policyHtmlHidden" />
+
+    <div class="col-lg-8">
+        <!-- Times -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-transparent border-0">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-clock text-primary me-2"></i>Default Check-in / Check-out</h6>
+                <small class="text-muted">Shown under each hotel block on the Hotel Voucher.</small>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Check-in Time</label>
+                        <input type="text" name="checkInTime" class="form-control"
+                               value="@(Model?.VoucherCheckInTime ?? "02:00 PM")"
+                               placeholder="e.g. 02:00 PM" maxlength="20" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Check-out Time</label>
+                        <input type="text" name="checkOutTime" class="form-control"
+                               value="@(Model?.VoucherCheckOutTime ?? "11:00 AM")"
+                               placeholder="e.g. 11:00 AM" maxlength="20" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hotel-block note -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-transparent border-0">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-info-circle text-primary me-2"></i>Hotel Block Note</h6>
+                <small class="text-muted">The cautionary note shown under every hotel on the voucher (e.g. non-refundable policy).</small>
+            </div>
+            <div class="card-body p-3">
+                <div class="quill-host"><div id="hotelNoteEditor"></div></div>
+            </div>
+        </div>
+
+        <!-- Policy bullets -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-transparent border-0">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-list-check text-primary me-2"></i>Check-in / Check-out Timings Policy</h6>
+                <small class="text-muted">The bullet list at the bottom of every voucher.</small>
+            </div>
+            <div class="card-body p-3">
+                <div class="quill-host"><div id="policyEditor"></div></div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2 justify-content-end">
+            <a href="/Dashboard" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary px-4">
+                <i class="bi bi-check-lg me-1"></i>Save Voucher Defaults
+            </button>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card shadow-sm bg-light border-0">
+            <div class="card-body small">
+                <h6 class="fw-bold mb-2"><i class="bi bi-info-circle text-primary me-2"></i>Where these appear</h6>
+                <ul class="ps-3 mb-2">
+                    <li><strong>Check-in / Check-out time</strong> — line under each hotel on the voucher.</li>
+                    <li><strong>Hotel Block Note</strong> — paragraph between each hotel and its time line.</li>
+                    <li><strong>Policy</strong> — the bullet list at the bottom, before the company footer.</li>
+                </ul>
+                <p class="mb-0 text-muted">Per-hotel note from the package builder (the "Other / Notes" field) is appended to the hotel block note when present.</p>
+            </div>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+    <script>
+        const toolbar = [
+            [{ header: [false, 1, 2, 3] }],
+            ['bold', 'italic', 'underline'],
+            [{ list: 'ordered' }, { list: 'bullet' }],
+            ['link', 'clean']
+        ];
+        const noteQ   = new Quill('#hotelNoteEditor', { theme: 'snow', modules: { toolbar } });
+        const policyQ = new Quill('#policyEditor',    { theme: 'snow', modules: { toolbar } });
+
+        const noteInit   = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(defaultNote));
+        const policyInit = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(defaultPolicy));
+        if (noteInit)   noteQ.clipboard.dangerouslyPasteHTML(noteInit);
+        if (policyInit) policyQ.clipboard.dangerouslyPasteHTML(policyInit);
+
+        document.getElementById('vdForm').addEventListener('submit', () => {
+            const noteHtml   = noteQ.root.innerHTML.trim();
+            const policyHtml = policyQ.root.innerHTML.trim();
+            document.getElementById('hotelNoteHidden').value  = (noteHtml   === '<p><br></p>') ? '' : noteHtml;
+            document.getElementById('policyHtmlHidden').value = (policyHtml === '<p><br></p>') ? '' : policyHtml;
+        });
+    </script>
+}

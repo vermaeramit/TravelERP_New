@@ -192,7 +192,10 @@ public class PackageRepository : IPackageRepository
                         DatabaseName    = _tenant.DatabaseName,
                         PackageOptionId = optionId,
                         DisplayOrder    = hOrder++,
-                        h.Nights, h.HotelId, h.RoomTypeId, h.MealPlanId, h.OtherText
+                        h.Nights, h.HotelId, h.RoomTypeId, h.MealPlanId, h.OtherText,
+                        Rooms     = h.Rooms     <= 0 ? 1 : h.Rooms,
+                        ExtraBeds = h.ExtraBeds <  0 ? 0 : h.ExtraBeds,
+                        h.HotelCnfNo
                     },
                     commandType: CommandType.StoredProcedure);
             }

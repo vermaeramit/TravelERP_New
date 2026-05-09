@@ -1,0 +1,189 @@
+@using TravelERP.Core.Entities.Tenant
+@model TodayPanel
+@{
+    ViewData["Title"] = "Today";
+    var myOnly = (bool?)ViewBag.MyOnly ?? true;
+}
+
+@section Styles {
+    <style>
+        .today-toolbar {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #fff; border: 1px solid var(--bs-border-color); border-radius: .65rem;
+            padding: .65rem 1rem; margin-bottom: 1rem;
+        }
+        .today-toolbar .summary span { font-size: .85rem; color: var(--bs-secondary-color); }
+        .today-toolbar .summary strong { color: #111827; }
+
+        .col-card {
+            background: #fff; border: 1px solid var(--bs-border-color); border-radius: .75rem;
+            display: flex; flex-direction: column; height: 100%;
+        }
+        .col-card .col-head {
+            padding: .75rem 1rem; border-bottom: 1px solid var(--bs-border-color);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .col-card .col-head h6 { margin: 0; font-weight: 700; }
+        .col-card .col-body { padding: 0; max-height: 70vh; overflow-y: auto; }
+        .col-card.overdue   .col-head { border-top: 3px solid #dc3545; }
+        .col-card.today     .col-head { border-top: 3px solid #0d6efd; }
+        .col-card.upcoming  .col-head { border-top: 3px solid #198754; }
+
+        .fu-row {
+            padding: .85rem 1rem; border-bottom: 1px solid #f1f3f6;
+            display: flex; gap: .65rem; align-items: flex-start;
+        }
+        .fu-row:last-child { border-bottom: 0; }
+        .fu-row.done { opacity: .45; transition: opacity .25s; }
+        .fu-icon {
+            width: 36px; height: 36px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+            font-size: .9rem;
+        }
+        .fu-row .fu-name {
+            font-weight: 600; color: #111827; text-decoration: none;
+        }
+        .fu-row .fu-name:hover { color: var(--bs-primary); }
+        .fu-row .fu-meta { font-size: .8rem; color: var(--bs-secondary-color); margin-top: .15rem; }
+        .fu-row .fu-subject { font-size: .85rem; color: #4b5563; margin-top: .25rem; }
+        .fu-row .fu-when { font-size: .75rem; font-weight: 700; }
+        .fu-row .fu-when.overdue { color: #dc3545; }
+        .fu-row .fu-when.today   { color: #0d6efd; }
+        .fu-row .fu-when.upcoming{ color: #198754; }
+        .fu-row .actions { display: flex; gap: .25rem; }
+
+        .empty-state {
+            padding: 2rem 1rem; text-align: center; color: var(--bs-secondary-color);
+        }
+        .empty-state i { font-size: 2rem; opacity: .35; display: block; margin-bottom: .35rem; }
+    </style>
+}
+
+<div class="today-toolbar">
+    <div class="summary">
+        <span class="me-3"><i class="bi bi-exclamation-triangle-fill text-danger me-1"></i>Overdue: <strong>@Model.OverdueCount</strong></span>
+        <span class="me-3"><i class="bi bi-bell-fill text-primary me-1"></i>Today: <strong>@Model.TodayCount</strong></span>
+        <span><i class="bi bi-calendar-event text-success me-1"></i>Next 7 days: <strong>@Model.UpcomingCount</strong></span>
+    </div>
+    <form method="get" class="d-flex align-items-center gap-2">
+        <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" id="myOnly" name="myOnly" value="true" @(myOnly ? "checked" : "")
+                   onchange="this.form.submit()" />
+            <label class="form-check-label small" for="myOnly">My follow-ups only</label>
+        </div>
+    </form>
+</div>
+
+<div class="row g-3">
+    @* OVERDUE *@
+    <div class="col-lg-4">
+        <div class="col-card overdue">
+            <div class="col-head">
+                <h6><i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>Overdue</h6>
+                <span class="badge bg-danger-subtle text-danger">@Model.OverdueCount</span>
+            </div>
+            <div class="col-body">
+                @if (!Model.Overdue.Any())
+                {
+                    <div class="empty-state"><i class="bi bi-check-circle"></i>Nothing overdue. Nice.</div>
+                }
+                else
+                {
+                    @foreach (var a in Model.Overdue)
+                    {
+                        @await Html.PartialAsync("_FollowUpRow", new ViewDataDictionary(ViewData) {
+                            { "Activity", a }, { "Bucket", "overdue" }
+                        })
+                    }
+                }
+            </div>
+        </div>
+    </div>
+
+    @* TODAY *@
+    <div class="col-lg-4">
+        <div class="col-card today">
+            <div class="col-head">
+                <h6><i class="bi bi-bell-fill text-primary me-2"></i>Today</h6>
+                <span class="badge bg-primary-subtle text-primary">@Model.TodayCount</span>
+            </div>
+            <div class="col-body">
+                @if (!Model.Today.Any())
+                {
+                    <div class="empty-state"><i class="bi bi-emoji-smile"></i>No follow-ups scheduled today.</div>
+                }
+                else
+                {
+                    @foreach (var a in Model.Today)
+                    {
+                        @await Html.PartialAsync("_FollowUpRow", new ViewDataDictionary(ViewData) {
+                            { "Activity", a }, { "Bucket", "today" }
+                        })
+                    }
+                }
+            </div>
+        </div>
+    </div>
+
+    @* UPCOMING *@
+    <div class="col-lg-4">
+        <div class="col-card upcoming">
+            <div class="col-head">
+                <h6><i class="bi bi-calendar-event text-success me-2"></i>Upcoming · 7 days</h6>
+                <span class="badge bg-success-subtle text-success">@Model.UpcomingCount</span>
+            </div>
+            <div class="col-body">
+                @if (!Model.Upcoming.Any())
+                {
+                    <div class="empty-state"><i class="bi bi-calendar2-x"></i>Nothing in the next week.</div>
+                }
+                else
+                {
+                    @foreach (var a in Model.Upcoming)
+                    {
+                        @await Html.PartialAsync("_FollowUpRow", new ViewDataDictionary(ViewData) {
+                            { "Activity", a }, { "Bucket", "upcoming" }
+                        })
+                    }
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // CSRF token
+        const csrf = document.querySelector('meta[name="request-verification-token"]')?.content
+                  || (function() { const i = document.createElement('input'); document.body.appendChild(i); return ''; })();
+        const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+
+        document.querySelectorAll('.fu-mark-done').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = btn.dataset.id;
+                const row = btn.closest('.fu-row');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+                try {
+                    const fd = new FormData();
+                    if (tokenInput) fd.append('__RequestVerificationToken', tokenInput.value);
+                    const r = await fetch(`/Today/MarkDone/${id}`, { method: 'POST', body: fd });
+                    const j = await r.json();
+                    if (j.success) {
+                        row.classList.add('done');
+                        setTimeout(() => row.remove(), 350);
+                    } else {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="bi bi-check2"></i>';
+                    }
+                } catch (ex) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-check2"></i>';
+                    alert('Failed: ' + (ex.message || ex));
+                }
+            });
+        });
+    </script>
+    @* Anti-forgery token used by the JS POST above *@
+    <form style="display:none">@Html.AntiForgeryToken()</form>
+}

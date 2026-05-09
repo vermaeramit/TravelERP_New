@@ -176,6 +176,19 @@
             display: flex; justify-content: space-between; align-items: center;
             z-index: 10;
         }
+        /* Pagination — keep cards intact across PDF page breaks. Outside the
+           print media query so they apply during screen-media rendering too. */
+        .bill-to,
+        table.line-items,
+        .totals-card,
+        .footer-strip,
+        .pay-table thead,
+        .pay-table tr {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+        .section-title { break-after: avoid; page-break-after: avoid; }
+
         @@media print {
             body { background: #fff !important; }
             .toolbar { display: none !important; }
@@ -186,7 +199,10 @@
 </head>
 <body>
 
-@if (User.Identity?.IsAuthenticated == true)
+@{
+    var isPdfRender = string.Equals(Context.Request.Query["pdf"], "1", StringComparison.Ordinal);
+}
+@if (User.Identity?.IsAuthenticated == true && !isPdfRender)
 {
     <div class="toolbar">
         <span class="text-muted small"><i class="bi bi-receipt text-success me-1"></i>Internal preview — visible to you only</span>

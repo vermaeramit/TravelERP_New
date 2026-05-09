@@ -28,6 +28,26 @@ public class Company : BaseEntity
     public string BookingPrefix { get; set; } = "BK";
     public string InvoicePrefix { get; set; } = "INV";
 
+    // SMTP / email-sending (per-tenant)
+    public string? SmtpHost { get; set; }
+    public int? SmtpPort { get; set; }
+    public string? SmtpUsername { get; set; }
+    public string? SmtpPassword { get; set; }
+    public string? SmtpFromEmail { get; set; }
+    public string? SmtpFromName { get; set; }
+    public bool SmtpUseTls { get; set; } = true;
+
+    // Voucher defaults — shown on every Hotel Voucher. Configurable per company.
+    public string? VoucherCheckInTime  { get; set; }
+    public string? VoucherCheckOutTime { get; set; }
+    public string? VoucherHotelNote    { get; set; }
+    public string? VoucherPolicyHtml   { get; set; }
+
+    public bool IsSmtpConfigured =>
+        !string.IsNullOrWhiteSpace(SmtpHost)
+        && SmtpPort.HasValue
+        && !string.IsNullOrWhiteSpace(SmtpFromEmail);
+
     // Public quote branding
     public string? GreetingParagraph { get; set; }
     public string? WhyBookWithUs { get; set; }   // JSON: [{"icon":"bi-headset","title":"24/7 Support"}, …]

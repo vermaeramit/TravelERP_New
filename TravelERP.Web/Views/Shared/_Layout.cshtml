@@ -49,9 +49,12 @@
                 </li>
             </ul>
             <ul class="navbar-nav ms-auto">
-                <li class="nav-item dropdown">
-                    <a class="nav-link" href="#" data-bs-toggle="dropdown">
+                <li class="nav-item">
+                    <a class="nav-link position-relative" href="/Today" id="navbarBellLink" title="Today's follow-ups">
                         <i class="bi bi-bell fs-5"></i>
+                        <span id="navbarBellBadge"
+                              class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none"
+                              style="font-size: .65rem; padding: .25em .45em;">0</span>
                     </a>
                 </li>
                 <li class="nav-item">
@@ -117,6 +120,14 @@
                             <i class="nav-icon bi bi-speedometer2"></i><p>Dashboard</p>
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a href="/Today" class="nav-link @NavActive("Today")">
+                            <i class="nav-icon bi bi-bell"></i>
+                            <p>Today
+                                <span class="badge bg-danger ms-2 d-none" id="sidebarTodayBadge">0</span>
+                            </p>
+                        </a>
+                    </li>
 
                     @if (CanSee("Leads") || CanSee("Bookings"))
                     {
@@ -140,21 +151,6 @@
                     }
                     @* Tour Packages are managed per-lead from /Leads/Details — no top-level link *@
 
-                    @if (CanSee("HR"))
-                    {
-                        <li class="nav-header">HR</li>
-                        <li class="nav-item @TreeviewOpen("HR")">
-                            <a href="#" class="nav-link">
-                                <i class="nav-icon bi bi-person-badge"></i>
-                                <p>Human Resources <i class="nav-arrow bi bi-chevron-right"></i></p>
-                            </a>
-                            <ul class="nav nav-treeview">
-                                <li class="nav-item">
-                                    <a href="/HR/Employees" class="nav-link"><i class="nav-icon bi bi-person-lines-fill"></i><p>Employees</p></a>
-                                </li>
-                            </ul>
-                        </li>
-                    }
 
                     @if (CanSee("Masters"))
                     {
@@ -295,6 +291,12 @@
                                         <a href="/Company/QuoteBranding" class="nav-link"><i class="nav-icon bi bi-stars"></i><p>Quote Branding</p></a>
                                     </li>
                                     <li class="nav-item">
+                                        <a href="/Company/VoucherDefaults" class="nav-link"><i class="nav-icon bi bi-building-check"></i><p>Voucher Defaults</p></a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="/Company/EmailSettings" class="nav-link"><i class="nav-icon bi bi-envelope-paper"></i><p>Email Settings</p></a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="/Company/NumberSeries" class="nav-link"><i class="nav-icon bi bi-hash"></i><p>Number Series</p></a>
                                     </li>
                                 }
@@ -377,6 +379,22 @@
     (function () {
         const t = localStorage.getItem('erp-theme') || 'light';
         document.documentElement.setAttribute('data-bs-theme', t);
+    })();
+
+    // Today-panel badges (navbar bell + sidebar). Refreshed on every page load.
+    (async function () {
+        try {
+            const r = await fetch('/Today/Counts', { credentials: 'same-origin' });
+            if (!r.ok) return;
+            const j = await r.json();
+            const bell = document.getElementById('navbarBellBadge');
+            const side = document.getElementById('sidebarTodayBadge');
+            const n = j.actionable || 0;
+            if (n > 0) {
+                if (bell) { bell.textContent = n; bell.classList.remove('d-none'); }
+                if (side) { side.textContent = n; side.classList.remove('d-none'); }
+            }
+        } catch { /* unauthenticated or first-load — ignore */ }
     })();
 </script>
 

@@ -106,6 +106,43 @@ public class CompanyRepository : ICompanyRepository
             commandType: CommandType.StoredProcedure) > 0;
     }
 
+    public async Task<bool> UpdateEmailSettingsAsync(int companyId, Company settings, int? updatedBy)
+    {
+        using var conn = _factory.CreateMasterConnection();
+        return await conn.ExecuteAsync(
+            "sp_Company_UpdateEmailSettings",
+            new
+            {
+                Id            = companyId,
+                settings.SmtpHost,
+                settings.SmtpPort,
+                settings.SmtpUsername,
+                settings.SmtpPassword,
+                settings.SmtpFromEmail,
+                settings.SmtpFromName,
+                settings.SmtpUseTls,
+                UpdatedBy     = updatedBy
+            },
+            commandType: CommandType.StoredProcedure) > 0;
+    }
+
+    public async Task<bool> UpdateVoucherDefaultsAsync(int companyId, Company settings, int? updatedBy)
+    {
+        using var conn = _factory.CreateMasterConnection();
+        return await conn.ExecuteAsync(
+            "sp_Company_UpdateVoucherDefaults",
+            new
+            {
+                Id                  = companyId,
+                settings.VoucherCheckInTime,
+                settings.VoucherCheckOutTime,
+                settings.VoucherHotelNote,
+                settings.VoucherPolicyHtml,
+                UpdatedBy           = updatedBy
+            },
+            commandType: CommandType.StoredProcedure) > 0;
+    }
+
     public async Task<bool> ExistsAsync(string slug)
     {
         using var conn = _factory.CreateMasterConnection();

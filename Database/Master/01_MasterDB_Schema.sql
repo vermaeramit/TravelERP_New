@@ -118,6 +118,23 @@ IF COL_LENGTH('Companies','WhyBookWithUs') IS NULL
     ALTER TABLE Companies ADD WhyBookWithUs NVARCHAR(MAX) NULL;  -- JSON: [{"icon":"bi-headset","title":"24/7 Support"},...]
 GO
 
+-- SMTP / email-sending settings (idempotent)
+IF COL_LENGTH('Companies','SmtpHost')      IS NULL ALTER TABLE Companies ADD SmtpHost      NVARCHAR(200) NULL;
+IF COL_LENGTH('Companies','SmtpPort')      IS NULL ALTER TABLE Companies ADD SmtpPort      INT           NULL;
+IF COL_LENGTH('Companies','SmtpUsername')  IS NULL ALTER TABLE Companies ADD SmtpUsername  NVARCHAR(200) NULL;
+IF COL_LENGTH('Companies','SmtpPassword')  IS NULL ALTER TABLE Companies ADD SmtpPassword  NVARCHAR(500) NULL;
+IF COL_LENGTH('Companies','SmtpFromEmail') IS NULL ALTER TABLE Companies ADD SmtpFromEmail NVARCHAR(200) NULL;
+IF COL_LENGTH('Companies','SmtpFromName')  IS NULL ALTER TABLE Companies ADD SmtpFromName  NVARCHAR(150) NULL;
+IF COL_LENGTH('Companies','SmtpUseTls')    IS NULL ALTER TABLE Companies ADD SmtpUseTls    BIT NOT NULL DEFAULT 1;
+GO
+
+-- Voucher defaults (idempotent) — what shows up on every Hotel Voucher
+IF COL_LENGTH('Companies','VoucherCheckInTime')  IS NULL ALTER TABLE Companies ADD VoucherCheckInTime  NVARCHAR(20)  NULL;
+IF COL_LENGTH('Companies','VoucherCheckOutTime') IS NULL ALTER TABLE Companies ADD VoucherCheckOutTime NVARCHAR(20)  NULL;
+IF COL_LENGTH('Companies','VoucherHotelNote')    IS NULL ALTER TABLE Companies ADD VoucherHotelNote    NVARCHAR(MAX) NULL;
+IF COL_LENGTH('Companies','VoucherPolicyHtml')   IS NULL ALTER TABLE Companies ADD VoucherPolicyHtml   NVARCHAR(MAX) NULL;
+GO
+
 -- ============================================================
 -- SUBSCRIPTION PLANS TABLE
 -- ============================================================

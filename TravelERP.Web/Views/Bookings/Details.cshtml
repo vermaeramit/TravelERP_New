@@ -20,6 +20,15 @@
     };
 }
 
+@section Styles {
+    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet" />
+    <style>
+        .email-quill-host { background: #fff; border-radius: 0 0 .375rem .375rem; }
+        .email-quill-host .ql-toolbar { border-radius: .375rem .375rem 0 0; }
+        .email-quill-host .ql-container { min-height: 180px; max-height: 320px; overflow-y: auto; font-size: .9rem; }
+    </style>
+}
+
 <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
     <div>
         <h4 class="fw-bold mb-1">@Model.CustomerName</h4>
@@ -53,9 +62,17 @@
         <a href="/Bookings/@Model.Id/invoice" target="_blank" class="btn btn-outline-primary btn-sm">
             <i class="bi bi-receipt me-1"></i>Invoice
         </a>
-        <a href="/Bookings/@Model.Id/invoice/pdf" class="btn btn-primary btn-sm">
-            <i class="bi bi-file-earmark-pdf me-1"></i>Invoice PDF
+        <a href="/Bookings/@Model.Id/voucher" target="_blank" class="btn btn-outline-warning btn-sm">
+            <i class="bi bi-building me-1"></i>Voucher
         </a>
+        <button type="button" class="btn btn-info btn-sm text-white"
+                data-bs-toggle="modal" data-bs-target="#bookingEmailModal">
+            <i class="bi bi-envelope-paper-fill me-1"></i>Email Invoice
+        </button>
+        <button type="button" class="btn btn-warning btn-sm"
+                data-bs-toggle="modal" data-bs-target="#bookingVoucherEmailModal">
+            <i class="bi bi-envelope-check-fill me-1"></i>Email Voucher
+        </button>
         @if (canEdit)
         {
             <a href="/Bookings/Edit/@Model.Id" class="btn btn-warning btn-sm">
@@ -64,6 +81,199 @@
         }
     </div>
 </div>
+
+@{
+    var invSubject = $"Invoice {Model.InvoiceNumber} — {Model.CustomerName}";
+    var invBody    = $"<p>Dear {Model.CustomerName},</p>" +
+                     $"<p>Please find your invoice <strong>{Model.InvoiceNumber}</strong> attached for booking <strong>{Model.BookingNumber}</strong>.</p>" +
+                     $"<p>Total: <strong>{Model.Currency} {Model.TotalAmount:N2}</strong>" +
+                     (Model.BalanceAmount > 0 ? $" — Balance due: <strong>{Model.Currency} {Model.BalanceAmount:N2}</strong>" : " — fully paid") +
+                     "</p><p>Please feel free to reach out if you have any questions.</p>";
+}
+
+<!-- Send Invoice by Email -->
+<div class="modal fade" id="bookingEmailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <form id="bookingEmailForm">
+                @Html.AntiForgeryToken()
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-envelope-paper-fill text-primary me-2"></i>Email Invoice
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">To <span class="text-danger">*</span></label>
+                            <input type="email" name="To" class="form-control form-control-sm"
+                                   value="@Model.CustomerEmail" required multiple />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Cc</label>
+                            <input type="text" name="Cc" class="form-control form-control-sm"
+                                   placeholder="optional, comma-separated" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold">Subject <span class="text-danger">*</span></label>
+                            <input type="text" name="Subject" class="form-control form-control-sm" value="@invSubject" required />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold">Body</label>
+                            <div class="email-quill-host"><div id="invoiceBodyEditor"></div></div>
+                            <input type="hidden" name="Body" id="invoiceBodyHidden" />
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="AttachPdf" id="bkAttachPdf" value="true" checked />
+                                <input type="hidden" name="AttachPdf" value="false" />
+                                <label class="form-check-label small" for="bkAttachPdf">
+                                    <i class="bi bi-file-earmark-pdf me-1 text-danger"></i>
+                                    Attach <strong>Invoice-@(Model.InvoiceNumber).pdf</strong>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="bookingEmailResult" class="mt-3 small"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4" id="bookingEmailSendBtn">
+                        <i class="bi bi-send me-1"></i>Send
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@{
+    var vchSubject = $"Hotel Voucher {Model.BookingNumber} — {Model.CustomerName}";
+    var vchBody    = $"<p>Dear {Model.CustomerName},</p>" +
+                     $"<p>Please find your Hotel Voucher for booking <strong>{Model.BookingNumber}</strong> attached.</p>" +
+                     $"<p>Travel: {(Model.StartDate?.ToString("dd MMM yyyy") ?? "TBD")}" +
+                     (Model.Days.HasValue ? $" · {Model.Days} days" : "") +
+                     (string.IsNullOrEmpty(Model.DestinationName) ? "" : $" · {Model.DestinationName}") +
+                     "</p>" +
+                     "<p>Please present an electronic or paper copy of the voucher upon hotel check-in.</p>" +
+                     "<p>Have a great trip!</p>";
+}
+
+<!-- Send Voucher by Email -->
+<div class="modal fade" id="bookingVoucherEmailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <form id="bookingVoucherEmailForm">
+                @Html.AntiForgeryToken()
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-envelope-check-fill text-warning me-2"></i>Email Hotel Voucher
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">To <span class="text-danger">*</span></label>
+                            <input type="email" name="To" class="form-control form-control-sm"
+                                   value="@Model.CustomerEmail" required multiple />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Cc</label>
+                            <input type="text" name="Cc" class="form-control form-control-sm"
+                                   placeholder="optional, comma-separated" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold">Subject <span class="text-danger">*</span></label>
+                            <input type="text" name="Subject" class="form-control form-control-sm" value="@vchSubject" required />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold">Body</label>
+                            <div class="email-quill-host"><div id="voucherBodyEditor"></div></div>
+                            <input type="hidden" name="Body" id="voucherBodyHidden" />
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="AttachPdf" id="vchAttachPdf" value="true" checked />
+                                <input type="hidden" name="AttachPdf" value="false" />
+                                <label class="form-check-label small" for="vchAttachPdf">
+                                    <i class="bi bi-file-earmark-pdf me-1 text-danger"></i>
+                                    Attach <strong>Voucher-@(Model.BookingNumber).pdf</strong>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="bookingVoucherEmailResult" class="mt-3 small"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning px-4" id="bookingVoucherEmailSendBtn">
+                        <i class="bi bi-send me-1"></i>Send
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+    <script>
+        const emailToolbar = [
+            [{ header: [false, 1, 2, 3] }],
+            ['bold', 'italic', 'underline'],
+            [{ list: 'ordered' }, { list: 'bullet' }],
+            ['link', 'clean']
+        ];
+
+        // Two Quill editors — one per email modal. Initialized once on page load
+        // so the toolbar measurements are correct by the time the modal opens.
+        const invQuill = new Quill('#invoiceBodyEditor',  { theme: 'snow', modules: { toolbar: emailToolbar } });
+        const vchQuill = new Quill('#voucherBodyEditor',  { theme: 'snow', modules: { toolbar: emailToolbar } });
+
+        const invBodyInit = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(invBody));
+        const vchBodyInit = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(vchBody));
+        if (invBodyInit) invQuill.clipboard.dangerouslyPasteHTML(invBodyInit);
+        if (vchBodyInit) vchQuill.clipboard.dangerouslyPasteHTML(vchBodyInit);
+
+        function quillHtml(q) {
+            const html = q.root.innerHTML.trim();
+            return (html === '<p><br></p>') ? '' : html;
+        }
+
+        function wireEmailForm(formId, sendBtnId, resultId, modalId, endpoint, quill, hiddenId) {
+            const f = document.getElementById(formId);
+            if (!f) return;
+            f.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                document.getElementById(hiddenId).value = quillHtml(quill);
+
+                const out = document.getElementById(resultId);
+                const btn = document.getElementById(sendBtnId);
+                const orig = btn.innerHTML;
+                btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sending… (PDF render takes ~5s)';
+                out.innerHTML = '';
+                try {
+                    const r = await fetch(endpoint, { method: 'POST', body: new FormData(f) });
+                    const j = await r.json();
+                    if (j.success) {
+                        out.innerHTML = '<div class="alert alert-success py-2 mb-0"><i class="bi bi-check-circle-fill me-1"></i>Email sent.</div>';
+                        setTimeout(() => bootstrap.Modal.getInstance(document.getElementById(modalId)).hide(), 1200);
+                    } else {
+                        out.innerHTML = `<div class="alert alert-danger py-2 mb-0"><i class="bi bi-exclamation-triangle-fill me-1"></i>${j.error || 'Send failed'}</div>`;
+                    }
+                } catch (ex) {
+                    out.innerHTML = `<div class="alert alert-danger py-2 mb-0">${ex.message || ex}</div>`;
+                } finally {
+                    btn.disabled = false; btn.innerHTML = orig;
+                }
+            });
+        }
+        wireEmailForm('bookingEmailForm',        'bookingEmailSendBtn',        'bookingEmailResult',        'bookingEmailModal',        '/Bookings/@Model.Id/SendEmail',         invQuill, 'invoiceBodyHidden');
+        wireEmailForm('bookingVoucherEmailForm', 'bookingVoucherEmailSendBtn', 'bookingVoucherEmailResult', 'bookingVoucherEmailModal', '/Bookings/@Model.Id/SendVoucherEmail', vchQuill, 'voucherBodyHidden');
+    </script>
+}
 
 <div class="row g-3">
     <div class="col-lg-8">
@@ -184,6 +394,9 @@
                 </div>
             </div>
         </div>
+
+        <!-- Recent emails -->
+        @await Html.PartialAsync("_EmailLogPanel", ViewBag.EmailLogs as IEnumerable<TravelERP.Core.Entities.Tenant.EmailLog> ?? Enumerable.Empty<TravelERP.Core.Entities.Tenant.EmailLog>())
 
         <!-- Audit -->
         <div class="card shadow-sm bg-light border-0">

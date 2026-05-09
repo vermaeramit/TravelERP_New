@@ -259,7 +259,10 @@
                 hotelId    = h.HotelId,
                 roomTypeId = h.RoomTypeId,
                 mealPlanId = h.MealPlanId,
-                otherText  = h.OtherText
+                otherText  = h.OtherText,
+                rooms      = h.Rooms,
+                extraBeds  = h.ExtraBeds,
+                hotelCnfNo = h.HotelCnfNo
             })
         }),
         hotels    = hotels.Select(h => new { id = h.Id, name = h.Name, destinationId = h.DestinationId }),
@@ -376,6 +379,22 @@
                             </button>
                         </div>
                     </div>
+                    <div class="row g-2 mt-1">
+                        <div class="col-md-1">
+                            <label class="form-label small fw-semibold mb-1">Rooms</label>
+                            <input type="number" min="1" value="${h.rooms || 1}" class="form-control form-control-sm h-rooms" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small fw-semibold mb-1">Extra Beds</label>
+                            <input type="number" min="0" value="${h.extraBeds || 0}" class="form-control form-control-sm h-extrabeds" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-semibold mb-1">Hotel Cnf. No</label>
+                            <input type="text" value="${(h.hotelCnfNo || '').replace(/"/g, '&quot;')}" maxlength="60"
+                                   class="form-control form-control-sm h-cnfno"
+                                   placeholder="hotel-side confirmation # (optional)" />
+                        </div>
+                    </div>
                 </div>`;
         }
 
@@ -385,7 +404,10 @@
                 hotelId:    r.querySelector('.h-hotel').value    ? Number(r.querySelector('.h-hotel').value)    : null,
                 roomTypeId: r.querySelector('.h-roomtype').value ? Number(r.querySelector('.h-roomtype').value) : null,
                 mealPlanId: r.querySelector('.h-mealplan').value ? Number(r.querySelector('.h-mealplan').value) : null,
-                otherText:  r.querySelector('.h-other').value || ''
+                otherText:  r.querySelector('.h-other').value || '',
+                rooms:      Number(r.querySelector('.h-rooms')?.value)     || 1,
+                extraBeds:  Number(r.querySelector('.h-extrabeds')?.value) || 0,
+                hotelCnfNo: r.querySelector('.h-cnfno')?.value || ''
             }));
         }
 

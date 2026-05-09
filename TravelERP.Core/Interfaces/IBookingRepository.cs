@@ -11,4 +11,5 @@ public interface IBookingRepository
     Task<(int Id, string BookingNumber, string InvoiceNumber)> InsertAsync(Booking booking);
     Task UpdateAsync(Booking booking);
     Task DeleteAsync(int id);
+    Task SnapshotHotelsAsync(int bookingId, IEnumerable<PackageOptionHotel> hotels);
 }

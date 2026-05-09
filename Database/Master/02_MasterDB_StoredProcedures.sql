@@ -125,6 +125,32 @@ AS BEGIN
 END
 GO
 
+CREATE OR ALTER PROCEDURE sp_Company_UpdateEmailSettings
+    @Id            INT,
+    @SmtpHost      NVARCHAR(200) = NULL,
+    @SmtpPort      INT           = NULL,
+    @SmtpUsername  NVARCHAR(200) = NULL,
+    @SmtpPassword  NVARCHAR(500) = NULL,
+    @SmtpFromEmail NVARCHAR(200) = NULL,
+    @SmtpFromName  NVARCHAR(150) = NULL,
+    @SmtpUseTls    BIT           = 1,
+    @UpdatedBy     INT           = NULL
+AS BEGIN
+    SET NOCOUNT ON;
+    UPDATE Companies SET
+        SmtpHost      = @SmtpHost,
+        SmtpPort      = @SmtpPort,
+        SmtpUsername  = @SmtpUsername,
+        SmtpPassword  = @SmtpPassword,
+        SmtpFromEmail = @SmtpFromEmail,
+        SmtpFromName  = @SmtpFromName,
+        SmtpUseTls    = @SmtpUseTls,
+        UpdatedAt     = GETUTCDATE(),
+        UpdatedBy     = @UpdatedBy
+    WHERE Id = @Id;
+END
+GO
+
 CREATE OR ALTER PROCEDURE sp_Company_UpdateQuoteBranding
     @Id                INT,
     @GreetingParagraph NVARCHAR(MAX) = NULL,
@@ -140,6 +166,26 @@ AS BEGIN
         LogoUrl           = CASE WHEN @UpdateLogo = 1 THEN @LogoUrl ELSE LogoUrl END,
         UpdatedAt         = GETUTCDATE(),
         UpdatedBy         = @UpdatedBy
+    WHERE Id = @Id;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Company_UpdateVoucherDefaults
+    @Id                  INT,
+    @VoucherCheckInTime  NVARCHAR(20)  = NULL,
+    @VoucherCheckOutTime NVARCHAR(20)  = NULL,
+    @VoucherHotelNote    NVARCHAR(MAX) = NULL,
+    @VoucherPolicyHtml   NVARCHAR(MAX) = NULL,
+    @UpdatedBy           INT           = NULL
+AS BEGIN
+    SET NOCOUNT ON;
+    UPDATE Companies SET
+        VoucherCheckInTime  = @VoucherCheckInTime,
+        VoucherCheckOutTime = @VoucherCheckOutTime,
+        VoucherHotelNote    = @VoucherHotelNote,
+        VoucherPolicyHtml   = @VoucherPolicyHtml,
+        UpdatedAt           = GETUTCDATE(),
+        UpdatedBy           = @UpdatedBy
     WHERE Id = @Id;
 END
 GO
@@ -2206,16 +2252,21 @@ CREATE OR ALTER PROCEDURE sp_PackageOptionHotel_Insert
     @HotelId          INT           = NULL,
     @RoomTypeId       INT           = NULL,
     @MealPlanId       INT           = NULL,
-    @OtherText        NVARCHAR(300) = NULL
+    @OtherText        NVARCHAR(300) = NULL,
+    @Rooms            INT           = 1,
+    @ExtraBeds        INT           = 0,
+    @HotelCnfNo       NVARCHAR(60)  = NULL
 AS BEGIN
     SET NOCOUNT ON;
     DECLARE @sql NVARCHAR(MAX) = N'
         INSERT INTO [' + @DatabaseName + N'].dbo.PackageOptionHotels
-            (PackageOptionId, DisplayOrder, Nights, HotelId, RoomTypeId, MealPlanId, OtherText)
-        VALUES (@PackageOptionId, @DisplayOrder, @Nights, @HotelId, @RoomTypeId, @MealPlanId, @OtherText)';
+            (PackageOptionId, DisplayOrder, Nights, HotelId, RoomTypeId, MealPlanId, OtherText, Rooms, ExtraBeds, HotelCnfNo)
+        VALUES (@PackageOptionId, @DisplayOrder, @Nights, @HotelId, @RoomTypeId, @MealPlanId, @OtherText, @Rooms, @ExtraBeds, @HotelCnfNo)';
     EXEC sp_executesql @sql,
-        N'@PackageOptionId INT, @DisplayOrder INT, @Nights INT, @HotelId INT, @RoomTypeId INT, @MealPlanId INT, @OtherText NVARCHAR(300)',
-        @PackageOptionId, @DisplayOrder, @Nights, @HotelId, @RoomTypeId, @MealPlanId, @OtherText;
+        N'@PackageOptionId INT, @DisplayOrder INT, @Nights INT, @HotelId INT, @RoomTypeId INT, @MealPlanId INT,
+          @OtherText NVARCHAR(300), @Rooms INT, @ExtraBeds INT, @HotelCnfNo NVARCHAR(60)',
+        @PackageOptionId, @DisplayOrder, @Nights, @HotelId, @RoomTypeId, @MealPlanId, @OtherText,
+        @Rooms, @ExtraBeds, @HotelCnfNo;
 END
 GO
 
@@ -2338,7 +2389,7 @@ CREATE OR ALTER PROCEDURE sp_Booking_GetById
     @Id           INT
 AS BEGIN
     SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'
+    DECLARE @sql NVARCHAR(MAX) = CAST(N'' AS NVARCHAR(MAX)) + N'
         SELECT b.*,
                d.Name          AS DestinationName,
                d.PackageTerms  AS DestinationTerms,
@@ -2352,8 +2403,72 @@ AS BEGIN
 
         SELECT * FROM [' + @DatabaseName + N'].dbo.BookingInstallments
         WHERE BookingId = @Id
-        ORDER BY InstallmentNo, Id;';
+        ORDER BY InstallmentNo, Id;
+
+        SELECT * FROM [' + @DatabaseName + N'].dbo.BookingHotels
+        WHERE BookingId = @Id
+        ORDER BY DisplayOrder, Id;';
     EXEC sp_executesql @sql, N'@Id INT', @Id;
+END
+GO
+
+-- Insert one snapshot hotel row when a booking is created.
+CREATE OR ALTER PROCEDURE sp_BookingHotel_Insert
+    @DatabaseName  NVARCHAR(100),
+    @BookingId     INT,
+    @DisplayOrder  INT           = 0,
+    @Nights        INT           = 1,
+    @HotelName     NVARCHAR(200) = NULL,
+    @RoomTypeName  NVARCHAR(100) = NULL,
+    @MealPlanCode  NVARCHAR(10)  = NULL,
+    @MealPlanName  NVARCHAR(100) = NULL,
+    @OtherText     NVARCHAR(300) = NULL,
+    @Rooms         INT           = 1,
+    @ExtraBeds     INT           = 0,
+    @HotelCnfNo    NVARCHAR(60)  = NULL
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = CAST(N'' AS NVARCHAR(MAX)) + N'
+        INSERT INTO [' + @DatabaseName + N'].dbo.BookingHotels
+            (BookingId, DisplayOrder, Nights, HotelName, RoomTypeName,
+             MealPlanCode, MealPlanName, OtherText, Rooms, ExtraBeds, HotelCnfNo)
+        VALUES (@BookingId, @DisplayOrder, @Nights, @HotelName, @RoomTypeName,
+                @MealPlanCode, @MealPlanName, @OtherText, @Rooms, @ExtraBeds, @HotelCnfNo);';
+    EXEC sp_executesql @sql,
+        N'@BookingId INT, @DisplayOrder INT, @Nights INT, @HotelName NVARCHAR(200),
+          @RoomTypeName NVARCHAR(100), @MealPlanCode NVARCHAR(10), @MealPlanName NVARCHAR(100),
+          @OtherText NVARCHAR(300), @Rooms INT, @ExtraBeds INT, @HotelCnfNo NVARCHAR(60)',
+        @BookingId, @DisplayOrder, @Nights, @HotelName, @RoomTypeName,
+        @MealPlanCode, @MealPlanName, @OtherText, @Rooms, @ExtraBeds, @HotelCnfNo;
+END
+GO
+
+-- Backfill BookingHotels for any existing booking that has none.
+-- Looks up the booking's package option (by PackageId + OptionName) and
+-- snapshots its current hotel rows. Safe to re-run; only fills empty ones.
+CREATE OR ALTER PROCEDURE sp_Booking_BackfillHotels
+    @DatabaseName NVARCHAR(100)
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = CAST(N'' AS NVARCHAR(MAX)) + N'
+        INSERT INTO [' + @DatabaseName + N'].dbo.BookingHotels
+            (BookingId, DisplayOrder, Nights, HotelName, RoomTypeName,
+             MealPlanCode, MealPlanName, OtherText, Rooms, ExtraBeds, HotelCnfNo)
+        SELECT
+            b.Id, h.DisplayOrder, h.Nights,
+            ho.Name, rt.Name, mp.Code, mp.Name,
+            h.OtherText, h.Rooms, h.ExtraBeds, h.HotelCnfNo
+        FROM [' + @DatabaseName + N'].dbo.Bookings b
+        INNER JOIN [' + @DatabaseName + N'].dbo.PackageOptions     o
+            ON o.PackageId = b.PackageId AND o.OptionName = b.OptionName
+        INNER JOIN [' + @DatabaseName + N'].dbo.PackageOptionHotels h ON h.PackageOptionId = o.Id
+        LEFT JOIN  [' + @DatabaseName + N'].dbo.Hotels    ho ON h.HotelId    = ho.Id
+        LEFT JOIN  [' + @DatabaseName + N'].dbo.RoomTypes rt ON h.RoomTypeId = rt.Id
+        LEFT JOIN  [' + @DatabaseName + N'].dbo.MealPlans mp ON h.MealPlanId = mp.Id
+        WHERE b.IsActive = 1
+          AND b.PackageId IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM [' + @DatabaseName + N'].dbo.BookingHotels bh WHERE bh.BookingId = b.Id);';
+    EXEC sp_executesql @sql;
 END
 GO
 
@@ -2634,6 +2749,276 @@ AS BEGIN
           AND i.DueDate < @today
         ORDER BY i.DueDate ASC;';
     EXEC sp_executesql @sql;
+END
+GO
+
+-- ============================================================
+-- REPORTS  (cross-DB)
+-- ============================================================
+
+-- Sales Summary — KPIs + monthly trend over the date range
+CREATE OR ALTER PROCEDURE sp_Report_SalesSummary
+    @DatabaseName NVARCHAR(100),
+    @From         DATE,
+    @To           DATE
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = CAST(N'' AS NVARCHAR(MAX)) + N'
+        -- 1) KPIs
+        SELECT
+            COUNT(*)              AS BookingCount,
+            ISNULL(SUM(b.TotalAmount), 0) AS TotalRevenue,
+            CAST(ISNULL(AVG(NULLIF(b.TotalAmount, 0)), 0) AS DECIMAL(18,2)) AS AvgBookingValue,
+            (SELECT ISNULL(SUM(i.Amount), 0) FROM [' + @DatabaseName + N'].dbo.BookingInstallments i
+                INNER JOIN [' + @DatabaseName + N'].dbo.Bookings bb ON i.BookingId = bb.Id
+                WHERE bb.IsActive = 1 AND bb.IsActive = 1
+                  AND CAST(bb.CreatedAt AS DATE) BETWEEN @From AND @To
+                  AND i.PaymentStatus = ''Received'') AS Collected,
+            (SELECT COUNT(*) FROM [' + @DatabaseName + N'].dbo.Leads
+                WHERE CAST(CreatedAt AS DATE) BETWEEN @From AND @To) AS LeadCount
+        FROM [' + @DatabaseName + N'].dbo.Bookings b
+        WHERE b.IsActive = 1
+          AND CAST(b.CreatedAt AS DATE) BETWEEN @From AND @To;
+
+        -- 2) Monthly trend
+        SELECT
+            YEAR(b.CreatedAt)    AS YearNo,
+            MONTH(b.CreatedAt)   AS MonthNo,
+            DATENAME(MONTH, b.CreatedAt) AS MonthLabel,
+            COUNT(*)             AS BookingCount,
+            ISNULL(SUM(b.TotalAmount), 0) AS Revenue
+        FROM [' + @DatabaseName + N'].dbo.Bookings b
+        WHERE b.IsActive = 1
+          AND CAST(b.CreatedAt AS DATE) BETWEEN @From AND @To
+        GROUP BY YEAR(b.CreatedAt), MONTH(b.CreatedAt), DATENAME(MONTH, b.CreatedAt)
+        ORDER BY YEAR(b.CreatedAt), MONTH(b.CreatedAt);';
+    EXEC sp_executesql @sql, N'@From DATE, @To DATE', @From, @To;
+END
+GO
+
+-- Sales by Destination
+CREATE OR ALTER PROCEDURE sp_Report_SalesByDestination
+    @DatabaseName NVARCHAR(100),
+    @From         DATE,
+    @To           DATE
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = CAST(N'' AS NVARCHAR(MAX)) + N'
+        SELECT
+            ISNULL(d.Name, ''— No Destination —'') AS DestinationName,
+            COUNT(b.Id)              AS BookingCount,
+            ISNULL(SUM(b.TotalAmount), 0) AS TotalRevenue,
+            CAST(ISNULL(AVG(NULLIF(b.TotalAmount, 0)), 0) AS DECIMAL(18,2)) AS AvgBookingValue
+        FROM [' + @DatabaseName + N'].dbo.Bookings b
+        LEFT JOIN [' + @DatabaseName + N'].dbo.Destinations d ON b.DestinationId = d.Id
+        WHERE b.IsActive = 1
+          AND CAST(b.CreatedAt AS DATE) BETWEEN @From AND @To
+        GROUP BY d.Name
+        ORDER BY TotalRevenue DESC;';
+    EXEC sp_executesql @sql, N'@From DATE, @To DATE', @From, @To;
+END
+GO
+
+-- Sales by Agent — joins MasterUsers (master DB) with Bookings.CreatedBy
+CREATE OR ALTER PROCEDURE sp_Report_SalesByAgent
+    @DatabaseName NVARCHAR(100),
+    @From         DATE,
+    @To           DATE
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = CAST(N'' AS NVARCHAR(MAX)) + N'
+        SELECT
+            ISNULL(mu.FullName, ''— Unknown —'') AS AgentName,
+            COUNT(b.Id)              AS BookingCount,
+            ISNULL(SUM(b.TotalAmount), 0) AS TotalRevenue,
+            CAST(ISNULL(AVG(NULLIF(b.TotalAmount, 0)), 0) AS DECIMAL(18,2)) AS AvgBookingValue
+        FROM [' + @DatabaseName + N'].dbo.Bookings b
+        LEFT JOIN dbo.MasterUsers mu ON b.CreatedBy = mu.Id
+        WHERE b.IsActive = 1
+          AND CAST(b.CreatedAt AS DATE) BETWEEN @From AND @To
+        GROUP BY mu.FullName
+        ORDER BY TotalRevenue DESC;';
+    EXEC sp_executesql @sql, N'@From DATE, @To DATE', @From, @To;
+END
+GO
+
+-- Payment Aging — outstanding installments grouped by overdue buckets
+CREATE OR ALTER PROCEDURE sp_Report_PaymentAging
+    @DatabaseName NVARCHAR(100)
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = CAST(N'' AS NVARCHAR(MAX)) + N'
+        DECLARE @today DATE = CAST(GETUTCDATE() AS DATE);
+        SELECT
+            CASE
+                WHEN i.DueDate IS NULL OR i.DueDate >= @today THEN ''Current''
+                WHEN DATEDIFF(DAY, i.DueDate, @today) BETWEEN 1 AND 30  THEN ''1–30 days''
+                WHEN DATEDIFF(DAY, i.DueDate, @today) BETWEEN 31 AND 60 THEN ''31–60 days''
+                WHEN DATEDIFF(DAY, i.DueDate, @today) BETWEEN 61 AND 90 THEN ''61–90 days''
+                ELSE ''90+ days''
+            END                                AS Bucket,
+            CASE
+                WHEN i.DueDate IS NULL OR i.DueDate >= @today THEN 0
+                WHEN DATEDIFF(DAY, i.DueDate, @today) BETWEEN 1 AND 30  THEN 1
+                WHEN DATEDIFF(DAY, i.DueDate, @today) BETWEEN 31 AND 60 THEN 2
+                WHEN DATEDIFF(DAY, i.DueDate, @today) BETWEEN 61 AND 90 THEN 3
+                ELSE 4
+            END                                AS BucketOrder,
+            COUNT(*)                           AS InstallmentCount,
+            ISNULL(SUM(i.Amount), 0)           AS Outstanding
+        FROM [' + @DatabaseName + N'].dbo.BookingInstallments i
+        INNER JOIN [' + @DatabaseName + N'].dbo.Bookings b ON i.BookingId = b.Id
+        WHERE b.IsActive = 1
+          AND b.Status <> ''Cancelled''
+          AND i.PaymentStatus = ''Pending''
+        GROUP BY
+            CASE
+                WHEN i.DueDate IS NULL OR i.DueDate >= @today THEN ''Current''
+                WHEN DATEDIFF(DAY, i.DueDate, @today) BETWEEN 1 AND 30  THEN ''1–30 days''
+                WHEN DATEDIFF(DAY, i.DueDate, @today) BETWEEN 31 AND 60 THEN ''31–60 days''
+                WHEN DATEDIFF(DAY, i.DueDate, @today) BETWEEN 61 AND 90 THEN ''61–90 days''
+                ELSE ''90+ days''
+            END,
+            CASE
+                WHEN i.DueDate IS NULL OR i.DueDate >= @today THEN 0
+                WHEN DATEDIFF(DAY, i.DueDate, @today) BETWEEN 1 AND 30  THEN 1
+                WHEN DATEDIFF(DAY, i.DueDate, @today) BETWEEN 31 AND 60 THEN 2
+                WHEN DATEDIFF(DAY, i.DueDate, @today) BETWEEN 61 AND 90 THEN 3
+                ELSE 4
+            END
+        ORDER BY BucketOrder;
+
+        -- Detail rows: each pending installment with customer + days overdue
+        SELECT
+            b.Id                  AS BookingId,
+            b.BookingNumber,
+            b.CustomerName,
+            b.Currency,
+            i.InstallmentNo,
+            i.Amount,
+            i.DueDate,
+            CASE WHEN i.DueDate IS NULL OR i.DueDate >= @today THEN 0
+                 ELSE DATEDIFF(DAY, i.DueDate, @today) END AS DaysOverdue
+        FROM [' + @DatabaseName + N'].dbo.BookingInstallments i
+        INNER JOIN [' + @DatabaseName + N'].dbo.Bookings b ON i.BookingId = b.Id
+        WHERE b.IsActive = 1
+          AND b.Status <> ''Cancelled''
+          AND i.PaymentStatus = ''Pending''
+        ORDER BY i.DueDate;';
+    EXEC sp_executesql @sql;
+END
+GO
+
+-- ============================================================
+-- LEAD ACTIVITY · TODAY PANEL  (3 result sets: overdue / today / upcoming)
+-- A scheduled follow-up has IsCompleted=0 + NextFollowUpAt set.
+-- ============================================================
+CREATE OR ALTER PROCEDURE sp_LeadActivity_GetTodayPanel
+    @DatabaseName NVARCHAR(100),
+    @UserId       INT  = NULL,    -- when @MyOnly=1, restrict to the lead's assigned agent
+    @MyOnly       BIT  = 0
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = CAST(N'' AS NVARCHAR(MAX)) + N'
+        DECLARE @startOfDay DATETIME2 = CAST(CAST(GETUTCDATE() AS DATE) AS DATETIME2);
+        DECLARE @endOfDay   DATETIME2 = DATEADD(SECOND, -1, DATEADD(DAY, 1, @startOfDay));
+        DECLARE @endOfWeek  DATETIME2 = DATEADD(DAY, 7, @startOfDay);
+
+        -- Build the work set once into a temp table so we can re-query it in
+        -- multiple result sets. (CTEs in SQL Server only live for one statement.)
+        SELECT a.Id, a.LeadId, a.ActivityType, a.Subject, a.Notes, a.ActivityAt,
+               a.NextFollowUpAt, a.IsCompleted, a.CreatedByUserId, a.CreatedAt, a.UpdatedAt,
+               l.LeadNumber, l.Name AS LeadName, l.Mobile AS LeadMobile, l.Email AS LeadEmail,
+               l.AssignedToUserId,
+               s.Name  AS LeadStatusName,
+               s.Color AS LeadStatusColor
+        INTO   #base
+        FROM [' + @DatabaseName + N'].dbo.LeadActivities a
+        INNER JOIN [' + @DatabaseName + N'].dbo.Leads        l ON a.LeadId   = l.Id
+        LEFT JOIN  [' + @DatabaseName + N'].dbo.LeadStatuses s ON l.StatusId = s.Id
+        WHERE a.IsCompleted = 0
+          AND a.NextFollowUpAt IS NOT NULL
+          AND (@MyOnly = 0 OR l.AssignedToUserId = @UserId);
+
+        -- 1) Overdue
+        SELECT *,
+               DATEDIFF(DAY, NextFollowUpAt, @startOfDay) AS DaysOverdue
+        FROM #base
+        WHERE NextFollowUpAt < @startOfDay
+        ORDER BY NextFollowUpAt ASC;
+
+        -- 2) Today
+        SELECT *
+        FROM #base
+        WHERE NextFollowUpAt BETWEEN @startOfDay AND @endOfDay
+        ORDER BY NextFollowUpAt ASC;
+
+        -- 3) Upcoming (next 7 days)
+        SELECT *,
+               DATEDIFF(DAY, @startOfDay, NextFollowUpAt) AS DaysUntil
+        FROM #base
+        WHERE NextFollowUpAt > @endOfDay AND NextFollowUpAt <= @endOfWeek
+        ORDER BY NextFollowUpAt ASC;
+
+        -- 4) Summary counters (for navbar badge)
+        SELECT
+            (SELECT COUNT(*) FROM #base WHERE NextFollowUpAt < @startOfDay) AS OverdueCount,
+            (SELECT COUNT(*) FROM #base WHERE NextFollowUpAt BETWEEN @startOfDay AND @endOfDay) AS TodayCount,
+            (SELECT COUNT(*) FROM #base WHERE NextFollowUpAt > @endOfDay AND NextFollowUpAt <= @endOfWeek) AS UpcomingCount;
+
+        DROP TABLE #base;';
+    EXEC sp_executesql @sql,
+        N'@UserId INT, @MyOnly BIT',
+        @UserId, @MyOnly;
+END
+GO
+
+-- ============================================================
+-- EMAIL LOGS  (cross-DB)
+-- ============================================================
+CREATE OR ALTER PROCEDURE sp_EmailLog_Insert
+    @DatabaseName    NVARCHAR(100),
+    @RelatedType     NVARCHAR(20),
+    @RelatedId       INT           = NULL,
+    @ToEmail         NVARCHAR(500),
+    @CcEmail         NVARCHAR(500) = NULL,
+    @Subject         NVARCHAR(500),
+    @BodyPreview     NVARCHAR(1000)= NULL,
+    @AttachmentNames NVARCHAR(500) = NULL,
+    @Status          NVARCHAR(20)  = 'Sent',
+    @ErrorMessage    NVARCHAR(MAX) = NULL,
+    @SentBy          INT           = 0
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = CAST(N'' AS NVARCHAR(MAX)) + N'
+        INSERT INTO [' + @DatabaseName + N'].dbo.EmailLogs
+            (RelatedType, RelatedId, ToEmail, CcEmail, Subject, BodyPreview, AttachmentNames, Status, ErrorMessage, SentAt, SentBy)
+        VALUES
+            (@RelatedType, @RelatedId, @ToEmail, @CcEmail, @Subject, @BodyPreview, @AttachmentNames, @Status, @ErrorMessage, GETUTCDATE(), @SentBy);';
+    EXEC sp_executesql @sql,
+        N'@RelatedType NVARCHAR(20), @RelatedId INT, @ToEmail NVARCHAR(500), @CcEmail NVARCHAR(500),
+          @Subject NVARCHAR(500), @BodyPreview NVARCHAR(1000), @AttachmentNames NVARCHAR(500),
+          @Status NVARCHAR(20), @ErrorMessage NVARCHAR(MAX), @SentBy INT',
+        @RelatedType, @RelatedId, @ToEmail, @CcEmail, @Subject, @BodyPreview,
+        @AttachmentNames, @Status, @ErrorMessage, @SentBy;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_EmailLog_GetByRelated
+    @DatabaseName NVARCHAR(100),
+    @RelatedType  NVARCHAR(20),
+    @RelatedId    INT,
+    @Top          INT = 10
+AS BEGIN
+    SET NOCOUNT ON;
+    DECLARE @sql NVARCHAR(MAX) = CAST(N'' AS NVARCHAR(MAX)) + N'
+        SELECT TOP (@Top) *
+        FROM [' + @DatabaseName + N'].dbo.EmailLogs
+        WHERE RelatedType = @RelatedType AND RelatedId = @RelatedId
+        ORDER BY SentAt DESC;';
+    EXEC sp_executesql @sql,
+        N'@Top INT, @RelatedType NVARCHAR(20), @RelatedId INT',
+        @Top, @RelatedType, @RelatedId;
 END
 GO
 

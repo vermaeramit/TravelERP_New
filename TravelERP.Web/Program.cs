@@ -17,6 +17,7 @@ builder.Services.AddScoped<ITenantContext, TenantContext>();
 builder.Services.AddScoped<TenantDbProvisioningService>();
 builder.Services.AddScoped<PublicPackageService>();
 builder.Services.AddSingleton<PdfService>();
+builder.Services.AddScoped<EmailService>();
 
 // Master repositories
 builder.Services.AddScoped<ICompanyRepository, CompanyRepository>();
@@ -42,6 +43,7 @@ builder.Services.AddScoped<ILeadActivityRepository, LeadActivityRepository>();
 builder.Services.AddScoped<IActivityTemplateRepository, ActivityTemplateRepository>();
 builder.Services.AddScoped<IPackageRepository, PackageRepository>();
 builder.Services.AddScoped<IBookingRepository, BookingRepository>();
+builder.Services.AddScoped<IEmailLogRepository, EmailLogRepository>();
 
 // Cookie authentication
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)

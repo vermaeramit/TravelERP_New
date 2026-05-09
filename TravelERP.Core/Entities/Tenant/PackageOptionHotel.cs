@@ -10,6 +10,9 @@ public class PackageOptionHotel
     public int? RoomTypeId { get; set; }
     public int? MealPlanId { get; set; }
     public string? OtherText { get; set; }
+    public int Rooms { get; set; } = 1;
+    public int ExtraBeds { get; set; }
+    public string? HotelCnfNo { get; set; }   // wholesaler/hotel confirmation number — shown on Voucher
 
     // Joined
     public string? HotelName { get; set; }

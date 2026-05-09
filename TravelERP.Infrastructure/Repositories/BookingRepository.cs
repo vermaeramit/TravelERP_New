@@ -65,6 +65,7 @@ public class BookingRepository : IBookingRepository
         if (booking == null) return null;
 
         booking.Installments = (await multi.ReadAsync<BookingInstallment>()).ToList();
+        booking.Hotels       = (await multi.ReadAsync<BookingHotel>()).ToList();
         booking.PaidAmount = booking.Installments
             .Where(i => string.Equals(i.PaymentStatus, "Received", StringComparison.OrdinalIgnoreCase))
             .Sum(i => i.Amount);
@@ -138,6 +139,38 @@ public class BookingRepository : IBookingRepository
             "sp_Booking_Delete",
             new { DatabaseName = _tenant.DatabaseName, Id = id },
             commandType: CommandType.StoredProcedure);
+    }
+
+    public async Task SnapshotHotelsAsync(int bookingId, IEnumerable<PackageOptionHotel> hotels)
+    {
+        using var conn = _factory.CreateMasterConnection();
+        int order = 0;
+        foreach (var h in hotels)
+        {
+            // Skip purely empty rows
+            if (string.IsNullOrEmpty(h.HotelName) && string.IsNullOrEmpty(h.RoomTypeName)
+                && string.IsNullOrEmpty(h.MealPlanCode) && string.IsNullOrWhiteSpace(h.OtherText))
+                continue;
+
+            await conn.ExecuteAsync(
+                "sp_BookingHotel_Insert",
+                new
+                {
+                    DatabaseName = _tenant.DatabaseName,
+                    BookingId    = bookingId,
+                    DisplayOrder = order++,
+                    h.Nights,
+                    h.HotelName,
+                    h.RoomTypeName,
+                    h.MealPlanCode,
+                    h.MealPlanName,
+                    h.OtherText,
+                    Rooms      = h.Rooms     <= 0 ? 1 : h.Rooms,
+                    ExtraBeds  = h.ExtraBeds <  0 ? 0 : h.ExtraBeds,
+                    h.HotelCnfNo
+                },
+                commandType: CommandType.StoredProcedure);
+        }
     }
 
     private async Task SaveInstallmentsAsync(IDbConnection conn, int bookingId, IEnumerable<BookingInstallment> rows)

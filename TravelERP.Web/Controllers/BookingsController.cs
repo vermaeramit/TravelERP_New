@@ -130,6 +130,19 @@ public class BookingsController : Controller
         }
 
         var (id, number, _) = await _repo.InsertAsync(b);
+
+        // Snapshot the chosen package option's hotels onto this booking so the
+        // voucher stays correct even if the package is edited later.
+        if (b.PackageId.HasValue && b.PackageOptionId.HasValue)
+        {
+            var pkg = await _packages.GetByIdAsync(b.PackageId.Value);
+            var opt = pkg?.Options.FirstOrDefault(o => o.Id == b.PackageOptionId.Value);
+            if (opt != null)
+            {
+                await _repo.SnapshotHotelsAsync(id, opt.Hotels);
+            }
+        }
+
         TempData["Success"] = $"Booking {number} created.";
         return RedirectToAction(nameof(Details), new { id });
     }
@@ -173,12 +186,13 @@ public class BookingsController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> Details(int id)
+    public async Task<IActionResult> Details(int id, [FromServices] IEmailLogRepository emailLogs)
     {
         if (!_tenant.CanView(AppModules.Bookings)) return Forbid();
         var b = await _repo.GetByIdAsync(id);
         if (b == null) return NotFound();
         ViewData["Title"] = $"Booking {b.BookingNumber}";
+        ViewBag.EmailLogs = (await emailLogs.GetByRelatedAsync("Booking", b.Id, 5)).ToList();
         return View(b);
     }
 
@@ -189,6 +203,35 @@ public class BookingsController : Controller
         await _repo.DeleteAsync(id);
         TempData["Success"] = "Booking cancelled.";
         return RedirectToAction(nameof(Index));
+    }
+
+    [HttpGet("Bookings/{id:int}/voucher")]
+    public async Task<IActionResult> Voucher(int id)
+    {
+        if (!_tenant.CanView(AppModules.Bookings)) return Forbid();
+        var b = await _repo.GetByIdAsync(id);
+        if (b == null) return NotFound();
+
+        ViewBag.Company   = await _companies.GetByIdAsync(_tenant.CompanyId);
+        ViewData["Title"] = $"Voucher {b.BookingNumber}";
+        // Hotel rows now come from b.Hotels (the snapshot stored on the booking).
+        return View("Voucher", b);
+    }
+
+    [HttpGet("Bookings/{id:int}/voucher/pdf")]
+    public async Task<IActionResult> VoucherPdf(int id, CancellationToken ct)
+    {
+        if (!_tenant.CanView(AppModules.Bookings)) return Forbid();
+        var b = await _repo.GetByIdAsync(id);
+        if (b == null) return NotFound();
+
+        // ?pdf=1 tells the view to hide the internal toolbar.
+        var url = $"{Request.Scheme}://{Request.Host}/Bookings/{id}/voucher?pdf=1";
+        var cookieHeader = Request.Headers.Cookie.ToString();
+        var bytes = await _pdf.RenderUrlAsPdfAsync(url, ct, cookieHeader);
+
+        var fileName = $"Voucher-{b.BookingNumber.Replace(" ", "_")}.pdf";
+        return File(bytes, "application/pdf", fileName);
     }
 
     [HttpGet("Bookings/{id:int}/invoice")]
@@ -218,12 +261,128 @@ public class BookingsController : Controller
 
         // Render the invoice via headless Chromium for pixel-perfect fidelity.
         // Forward the auth cookie so the [Authorize]-protected /invoice route resolves.
-        var url = $"{Request.Scheme}://{Request.Host}/Bookings/{id}/invoice";
+        // ?pdf=1 tells the view to hide the internal toolbar.
+        var url = $"{Request.Scheme}://{Request.Host}/Bookings/{id}/invoice?pdf=1";
         var cookieHeader = Request.Headers.Cookie.ToString();
         var bytes = await _pdf.RenderUrlAsPdfAsync(url, ct, cookieHeader);
 
         var fileName = $"Invoice-{b.InvoiceNumber.Replace(" ", "_")}.pdf";
         return File(bytes, "application/pdf", fileName);
+    }
+
+    // ───────────────────── send invoice by email ─────────────────────
+
+    public class SendBookingEmailVm
+    {
+        public string To { get; set; } = "";
+        public string? Cc { get; set; }
+        public string Subject { get; set; } = "";
+        public string Body { get; set; } = "";
+        public bool AttachPdf { get; set; } = true;
+    }
+
+    [HttpPost("Bookings/{id:int}/SendEmail"), ValidateAntiForgeryToken]
+    public async Task<IActionResult> SendEmail(int id, SendBookingEmailVm vm,
+        [FromServices] EmailService emailService,
+        [FromServices] IEmailLogRepository emailLogs,
+        CancellationToken ct)
+    {
+        if (!_tenant.CanView(AppModules.Bookings)) return Forbid();
+        var b = await _repo.GetByIdAsync(id);
+        if (b == null) return NotFound();
+        var company = await _companies.GetByIdAsync(_tenant.CompanyId);
+        if (company == null) return NotFound();
+
+        EmailService.Attachment[]? attachments = null;
+        string? attachmentName = null;
+        if (vm.AttachPdf)
+        {
+            var url = $"{Request.Scheme}://{Request.Host}/Bookings/{id}/invoice?pdf=1";
+            var cookieHeader = Request.Headers.Cookie.ToString();
+            try
+            {
+                var bytes = await _pdf.RenderUrlAsPdfAsync(url, ct, cookieHeader);
+                attachmentName = $"Invoice-{b.InvoiceNumber.Replace(" ", "_")}.pdf";
+                attachments = new[] { new EmailService.Attachment(attachmentName, bytes) };
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, error = $"Couldn't generate invoice PDF: {ex.Message}" });
+            }
+        }
+
+        var result = await emailService.SendAsync(company, vm.To, vm.Subject ?? "", vm.Body ?? "", attachments, vm.Cc, ct);
+
+        await emailLogs.InsertAsync(new EmailLog
+        {
+            RelatedType = "Booking",
+            RelatedId   = b.Id,
+            ToEmail     = vm.To,
+            CcEmail     = string.IsNullOrWhiteSpace(vm.Cc) ? null : vm.Cc,
+            Subject     = vm.Subject ?? "",
+            BodyPreview = TextPreview(vm.Body),
+            AttachmentNames = attachmentName,
+            Status      = result.Success ? "Sent" : "Failed",
+            ErrorMessage = result.ErrorMessage
+        });
+
+        return Json(new { success = result.Success, error = result.ErrorMessage });
+    }
+
+    private static string? TextPreview(string? html)
+    {
+        if (string.IsNullOrWhiteSpace(html)) return null;
+        var stripped = System.Text.RegularExpressions.Regex.Replace(html, "<[^>]+>", " ");
+        stripped = System.Net.WebUtility.HtmlDecode(stripped).Trim();
+        return stripped.Length > 1000 ? stripped[..1000] : stripped;
+    }
+
+    [HttpPost("Bookings/{id:int}/SendVoucherEmail"), ValidateAntiForgeryToken]
+    public async Task<IActionResult> SendVoucherEmail(int id, SendBookingEmailVm vm,
+        [FromServices] EmailService emailService,
+        [FromServices] IEmailLogRepository emailLogs,
+        CancellationToken ct)
+    {
+        if (!_tenant.CanView(AppModules.Bookings)) return Forbid();
+        var b = await _repo.GetByIdAsync(id);
+        if (b == null) return NotFound();
+        var company = await _companies.GetByIdAsync(_tenant.CompanyId);
+        if (company == null) return NotFound();
+
+        EmailService.Attachment[]? attachments = null;
+        string? attachmentName = null;
+        if (vm.AttachPdf)
+        {
+            var url = $"{Request.Scheme}://{Request.Host}/Bookings/{id}/voucher?pdf=1";
+            var cookieHeader = Request.Headers.Cookie.ToString();
+            try
+            {
+                var bytes = await _pdf.RenderUrlAsPdfAsync(url, ct, cookieHeader);
+                attachmentName = $"Voucher-{b.BookingNumber.Replace(" ", "_")}.pdf";
+                attachments = new[] { new EmailService.Attachment(attachmentName, bytes) };
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, error = $"Couldn't generate voucher PDF: {ex.Message}" });
+            }
+        }
+
+        var result = await emailService.SendAsync(company, vm.To, vm.Subject ?? "", vm.Body ?? "", attachments, vm.Cc, ct);
+
+        await emailLogs.InsertAsync(new EmailLog
+        {
+            RelatedType = "Booking",
+            RelatedId   = b.Id,
+            ToEmail     = vm.To,
+            CcEmail     = string.IsNullOrWhiteSpace(vm.Cc) ? null : vm.Cc,
+            Subject     = vm.Subject ?? "",
+            BodyPreview = TextPreview(vm.Body),
+            AttachmentNames = attachmentName,
+            Status      = result.Success ? "Sent" : "Failed",
+            ErrorMessage = result.ErrorMessage
+        });
+
+        return Json(new { success = result.Success, error = result.ErrorMessage });
     }
 
     // ───────────────────── helpers ─────────────────────

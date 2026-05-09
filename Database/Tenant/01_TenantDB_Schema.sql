@@ -520,6 +520,23 @@ BEGIN
 END
 GO
 
+-- Voucher-specific extras (idempotent — safe to re-run)
+IF COL_LENGTH('PackageOptionHotels','Rooms')        IS NULL ALTER TABLE PackageOptionHotels ADD Rooms        INT NOT NULL DEFAULT 1;
+IF COL_LENGTH('PackageOptionHotels','ExtraBeds')    IS NULL ALTER TABLE PackageOptionHotels ADD ExtraBeds    INT NOT NULL DEFAULT 0;
+IF COL_LENGTH('PackageOptionHotels','HotelCnfNo')   IS NULL ALTER TABLE PackageOptionHotels ADD HotelCnfNo   NVARCHAR(60) NULL;
+GO
+
+-- Bookings.PackageOptionId FK: relax to ON DELETE SET NULL so editing a package
+-- (which delete-and-replaces its options) doesn't blow up on existing bookings.
+-- OptionName is denormalized on the Booking row, so historical data is preserved.
+IF EXISTS (SELECT * FROM sys.foreign_keys WHERE name = 'FK_Bookings_PackageOption')
+    ALTER TABLE Bookings DROP CONSTRAINT FK_Bookings_PackageOption;
+GO
+IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE name = 'FK_Bookings_PackageOption')
+    ALTER TABLE Bookings ADD CONSTRAINT FK_Bookings_PackageOption
+        FOREIGN KEY (PackageOptionId) REFERENCES PackageOptions(Id) ON DELETE SET NULL;
+GO
+
 -- ============================================================
 -- PACKAGE DAYS (day-wise itinerary; shared across options)
 -- ============================================================
@@ -551,6 +568,29 @@ BEGIN
         CONSTRAINT FK_PDS_Sightseeing FOREIGN KEY (SightseeingId) REFERENCES Sightseeings(Id)
     );
     CREATE INDEX IX_PDS_Day ON PackageDaySightseeings(PackageDayId);
+END
+GO
+
+-- ============================================================
+-- EMAIL LOGS  — outbound email audit trail
+-- ============================================================
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'EmailLogs') AND type = 'U')
+BEGIN
+    CREATE TABLE EmailLogs (
+        Id              INT IDENTITY(1,1) PRIMARY KEY,
+        RelatedType     NVARCHAR(20)  NOT NULL,                  -- 'Package' | 'Booking' | 'Other'
+        RelatedId       INT           NULL,
+        ToEmail         NVARCHAR(500) NOT NULL,
+        CcEmail         NVARCHAR(500) NULL,
+        Subject         NVARCHAR(500) NOT NULL,
+        BodyPreview     NVARCHAR(1000) NULL,                     -- first ~1000 chars of body for the audit panel
+        AttachmentNames NVARCHAR(500) NULL,                      -- comma-separated file names
+        Status          NVARCHAR(20)  NOT NULL DEFAULT 'Sent',   -- 'Sent' | 'Failed'
+        ErrorMessage    NVARCHAR(MAX) NULL,
+        SentAt          DATETIME2     NOT NULL DEFAULT GETUTCDATE(),
+        SentBy          INT           NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IX_EmailLogs_Related ON EmailLogs(RelatedType, RelatedId, SentAt DESC);
 END
 GO
 
@@ -597,6 +637,33 @@ BEGIN
     CREATE INDEX IX_Bookings_Lead    ON Bookings(LeadId);
     CREATE INDEX IX_Bookings_Package ON Bookings(PackageId);
     CREATE INDEX IX_Bookings_Created ON Bookings(CreatedAt DESC);
+END
+GO
+
+-- ============================================================
+-- BOOKING HOTELS  — snapshot of the package option's hotels at booking time
+-- (the booking owns its hotel rows so editing the source package later
+--  doesn't blow away the voucher data).
+-- ============================================================
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'BookingHotels') AND type = 'U')
+BEGIN
+    CREATE TABLE BookingHotels (
+        Id              INT IDENTITY(1,1) PRIMARY KEY,
+        BookingId       INT            NOT NULL,
+        DisplayOrder    INT            NOT NULL DEFAULT 0,
+        Nights          INT            NOT NULL DEFAULT 1,
+        HotelName       NVARCHAR(200)  NULL,
+        RoomTypeName    NVARCHAR(100)  NULL,
+        MealPlanCode    NVARCHAR(10)   NULL,
+        MealPlanName    NVARCHAR(100)  NULL,
+        OtherText       NVARCHAR(300)  NULL,
+        Rooms           INT            NOT NULL DEFAULT 1,
+        ExtraBeds       INT            NOT NULL DEFAULT 0,
+        HotelCnfNo      NVARCHAR(60)   NULL,
+        CONSTRAINT FK_BookingHotels_Booking FOREIGN KEY (BookingId)
+            REFERENCES Bookings(Id) ON DELETE CASCADE
+    );
+    CREATE INDEX IX_BookingHotels_Booking ON BookingHotels(BookingId, DisplayOrder);
 END
 GO
 

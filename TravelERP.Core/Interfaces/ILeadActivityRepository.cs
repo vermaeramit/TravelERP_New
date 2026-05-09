@@ -10,4 +10,5 @@ public interface ILeadActivityRepository
     Task UpdateAsync(LeadActivity activity);
     Task CompleteAsync(int id);
     Task DeleteAsync(int id);
+    Task<TodayPanel> GetTodayPanelAsync(int? userId, bool myOnly);
 }

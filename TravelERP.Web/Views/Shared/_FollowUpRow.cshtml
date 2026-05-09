@@ -1,0 +1,53 @@
+@using TravelERP.Core.Entities.Tenant
+@{
+    var a = (LeadActivity)ViewData["Activity"]!;
+    var bucket = (string)ViewData["Bucket"]!;     // "overdue" / "today" / "upcoming"
+    var (icon, color) = ActivityTypes.Style(a.ActivityType);
+    var when = a.NextFollowUpAt?.ToLocalTime();
+    var initials = string.Concat((a.LeadName ?? "?").Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(x => x[0])).ToUpperInvariant();
+    if (string.IsNullOrEmpty(initials)) initials = "?";
+
+    string whenLabel = bucket switch
+    {
+        "overdue"  => a.DaysOverdue == 0 ? "today" : $"{a.DaysOverdue}d ago",
+        "today"    => when?.ToString("HH:mm") ?? "today",
+        "upcoming" => a.DaysUntil == 1 ? "tomorrow" : $"in {a.DaysUntil}d",
+        _          => when?.ToString("dd MMM") ?? ""
+    };
+}
+
+<div class="fu-row">
+    <div class="fu-icon bg-@color-subtle text-@color">
+        <i class="bi @icon"></i>
+    </div>
+    <div class="flex-grow-1 min-w-0">
+        <div class="d-flex justify-content-between gap-2">
+            <a href="/Leads/Details/@a.LeadId" class="fu-name text-truncate">@a.LeadName</a>
+            <span class="fu-when @bucket">@whenLabel</span>
+        </div>
+        <div class="fu-meta">
+            <span class="font-monospace">@a.LeadNumber</span>
+            @if (!string.IsNullOrEmpty(a.LeadStatusName))
+            {
+                <span class="badge bg-@(a.LeadStatusColor ?? "secondary")-subtle text-@(a.LeadStatusColor ?? "secondary") ms-1">@a.LeadStatusName</span>
+            }
+            @if (!string.IsNullOrEmpty(a.LeadMobile))
+            {
+                <span class="ms-2"><i class="bi bi-telephone me-1"></i>@a.LeadMobile</span>
+            }
+        </div>
+        @if (!string.IsNullOrWhiteSpace(a.Subject))
+        {
+            <div class="fu-subject">@a.Subject</div>
+        }
+    </div>
+    <div class="actions">
+        <a href="/Leads/Details/@a.LeadId" class="btn btn-sm btn-outline-secondary" title="Open lead">
+            <i class="bi bi-arrow-up-right"></i>
+        </a>
+        <button type="button" class="btn btn-sm btn-outline-success fu-mark-done"
+                data-id="@a.Id" title="Mark this follow-up as done">
+            <i class="bi bi-check2"></i>
+        </button>
+    </div>
+</div>

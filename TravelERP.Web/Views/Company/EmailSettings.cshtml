@@ -1,0 +1,118 @@
+@model TravelERP.Core.Entities.Master.Company
+@{ ViewData["Title"] = "Email Settings"; }
+
+<form asp-action="EmailSettings" method="post" class="row g-3" id="emailForm">
+    @Html.AntiForgeryToken()
+
+    <div class="col-lg-8">
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-transparent border-0">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-envelope-paper text-primary me-2"></i>SMTP Configuration</h6>
+                <small class="text-muted">Used for sending Quotes &amp; Invoices to customers from within the app.</small>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-8">
+                        <label asp-for="SmtpHost" class="form-label small fw-semibold">SMTP Host <span class="text-danger">*</span></label>
+                        <input asp-for="SmtpHost" class="form-control" placeholder="e.g. smtp.gmail.com / smtp.office365.com" />
+                    </div>
+                    <div class="col-md-4">
+                        <label asp-for="SmtpPort" class="form-label small fw-semibold">Port <span class="text-danger">*</span></label>
+                        <input asp-for="SmtpPort" type="number" min="1" max="65535" class="form-control" placeholder="587 / 465 / 25" />
+                        <small class="text-muted">587 = STARTTLS, 465 = SSL, 25 = plain</small>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label asp-for="SmtpUsername" class="form-label small fw-semibold">Username</label>
+                        <input asp-for="SmtpUsername" class="form-control" placeholder="usually your full email address" />
+                    </div>
+                    <div class="col-md-6">
+                        <label asp-for="SmtpPassword" class="form-label small fw-semibold">Password</label>
+                        <input asp-for="SmtpPassword" type="password" class="form-control" autocomplete="new-password"
+                               placeholder="@(string.IsNullOrEmpty(Model?.SmtpPassword) ? "" : "•••••••• (leave blank to keep current)")" />
+                        <small class="text-muted">For Gmail / Outlook use an <em>app password</em>, not your login.</small>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label asp-for="SmtpFromEmail" class="form-label small fw-semibold">From Email <span class="text-danger">*</span></label>
+                        <input asp-for="SmtpFromEmail" type="email" class="form-control" placeholder="quotes@yourcompany.com" />
+                    </div>
+                    <div class="col-md-6">
+                        <label asp-for="SmtpFromName" class="form-label small fw-semibold">From Name</label>
+                        <input asp-for="SmtpFromName" class="form-control" placeholder="defaults to company name" />
+                    </div>
+
+                    <div class="col-12">
+                        <div class="form-check form-switch">
+                            <input asp-for="SmtpUseTls" class="form-check-input" type="checkbox" id="SmtpUseTls" />
+                            <label class="form-check-label" for="SmtpUseTls">Use TLS / SSL (recommended)</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2 justify-content-end">
+            <a href="/Dashboard" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary px-4"><i class="bi bi-check-lg me-1"></i>Save Settings</button>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card shadow-sm border-primary">
+            <div class="card-header bg-primary text-white">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-send-check me-2"></i>Test Send</h6>
+            </div>
+            <div class="card-body">
+                <p class="small text-muted mb-2">Save settings first, then send a test email to confirm the configuration works.</p>
+                <input type="email" id="testTo" class="form-control form-control-sm mb-2"
+                       placeholder="recipient@example.com"
+                       value="@(User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value)" />
+                <button type="button" id="btnTestSend" class="btn btn-outline-primary btn-sm w-100">
+                    <i class="bi bi-send me-1"></i>Send Test Email
+                </button>
+                <div id="testResult" class="small mt-2"></div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm bg-light border-0 mt-3">
+            <div class="card-body small">
+                <h6 class="fw-bold mb-2"><i class="bi bi-info-circle text-primary me-2"></i>Common Providers</h6>
+                <ul class="mb-0 ps-3">
+                    <li><strong>Gmail:</strong> smtp.gmail.com · 587 · TLS · App password</li>
+                    <li><strong>Outlook 365:</strong> smtp.office365.com · 587 · TLS</li>
+                    <li><strong>SendGrid:</strong> smtp.sendgrid.net · 587 · TLS · username "apikey"</li>
+                    <li><strong>Zoho:</strong> smtp.zoho.com · 465 · SSL</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+    <script>
+        const btn = document.getElementById('btnTestSend');
+        const out = document.getElementById('testResult');
+        btn.addEventListener('click', async () => {
+            const to = document.getElementById('testTo').value.trim();
+            if (!to) { out.innerHTML = '<span class="text-danger">Enter a recipient first.</span>'; return; }
+            btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sending…';
+            out.innerHTML = '';
+            const fd = new FormData();
+            fd.append('testTo', to);
+            fd.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]').value);
+            try {
+                const r = await fetch('/Company/EmailSettings/TestSend', { method: 'POST', body: fd });
+                const j = await r.json();
+                out.innerHTML = j.success
+                    ? `<span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>Test email sent to ${to}.</span>`
+                    : `<span class="text-danger"><i class="bi bi-exclamation-triangle-fill me-1"></i>${j.error || 'Send failed'}</span>`;
+            } catch (e) {
+                out.innerHTML = `<span class="text-danger">${e.message || e}</span>`;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-send me-1"></i>Send Test Email';
+            }
+        });
+    </script>
+}

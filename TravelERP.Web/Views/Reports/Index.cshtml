@@ -1,2 +1,344 @@
-@{ ViewData["Title"] = "Reports"; }
-<div class="card shadow-sm"><div class="card-body text-center py-5 text-muted"><i class="bi bi-bar-chart fs-1"></i><p class="mt-2">Reports — coming soon</p></div></div>
+@model TravelERP.Web.Models.ReportsVm
+@{
+    ViewData["Title"] = "Reports";
+
+    string Money(decimal v)
+    {
+        if (v >= 10_000_000m) return $"{v / 10_000_000m:N2} Cr";
+        if (v >=     100_000m) return $"{v /     100_000m:N2} L";
+        if (v >=       1_000m) return $"{v /       1_000m:N1} K";
+        return $"{v:N0}";
+    }
+
+    string AgingClass(string bucket) => bucket switch
+    {
+        "Current"     => "bg-success-subtle text-success",
+        "1–30 days"   => "bg-warning-subtle text-warning",
+        "31–60 days"  => "bg-warning text-dark",
+        "61–90 days"  => "bg-danger-subtle text-danger",
+        "90+ days"    => "bg-danger text-white",
+        _             => "bg-secondary-subtle text-secondary"
+    };
+}
+
+@section Styles {
+    <style>
+        .filter-bar {
+            background: #fff; border: 1px solid var(--bs-border-color); border-radius: .65rem;
+            padding: .65rem 1rem; margin-bottom: 1rem;
+        }
+        .kpi-tile {
+            background: #fff; border: 1px solid var(--bs-border-color); border-radius: .75rem;
+            padding: 1rem 1.1rem;
+        }
+        .kpi-tile .lbl { font-size: .7rem; text-transform: uppercase; letter-spacing: .8px;
+                         color: var(--bs-secondary-color); font-weight: 700; }
+        .kpi-tile .val { font-size: 1.5rem; font-weight: 800; color: #111827; line-height: 1.1; margin-top: .15rem; }
+        .kpi-tile .sub { font-size: .8rem; color: var(--bs-secondary-color); margin-top: .15rem; }
+
+        .nav-pills .nav-link { color: var(--bs-secondary-color); font-weight: 600; }
+        .nav-pills .nav-link.active { background: var(--bs-primary); color: #fff; }
+
+        .tab-pane > .card { border-top-left-radius: 0; border-top-right-radius: 0; }
+
+        .aging-bucket {
+            border-radius: .65rem; padding: .85rem 1rem;
+            display: flex; flex-direction: column;
+        }
+        .aging-bucket .lbl { font-size: .72rem; text-transform: uppercase; letter-spacing: .7px;
+                              font-weight: 700; opacity: .85; }
+        .aging-bucket .val { font-size: 1.3rem; font-weight: 800; }
+        .aging-bucket .cnt { font-size: .8rem; opacity: .8; }
+    </style>
+}
+
+<!-- ─────────── FILTER BAR ─────────── -->
+<form method="get" class="filter-bar d-flex flex-wrap gap-2 align-items-center">
+    <span class="text-muted small me-1">Range:</span>
+    <input type="date" name="from" value="@Model.From.ToString("yyyy-MM-dd")" class="form-control form-control-sm" style="width: 160px;" />
+    <span class="text-muted small">to</span>
+    <input type="date" name="to" value="@Model.To.ToString("yyyy-MM-dd")" class="form-control form-control-sm" style="width: 160px;" />
+    <button type="submit" class="btn btn-primary btn-sm px-3"><i class="bi bi-arrow-clockwise me-1"></i>Show</button>
+
+    <div class="ms-auto small text-muted">
+        @Model.From.ToString("dd MMM yyyy") &nbsp;→&nbsp; @Model.To.ToString("dd MMM yyyy")
+    </div>
+</form>
+
+<!-- ─────────── TABS ─────────── -->
+<ul class="nav nav-pills mb-0" role="tablist">
+    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-summary"  type="button"><i class="bi bi-graph-up me-1"></i>Sales Summary</button></li>
+    <li class="nav-item"><button class="nav-link"        data-bs-toggle="tab" data-bs-target="#tab-dest"     type="button"><i class="bi bi-geo-alt me-1"></i>By Destination</button></li>
+    <li class="nav-item"><button class="nav-link"        data-bs-toggle="tab" data-bs-target="#tab-agent"    type="button"><i class="bi bi-person-badge me-1"></i>By Agent</button></li>
+    <li class="nav-item"><button class="nav-link"        data-bs-toggle="tab" data-bs-target="#tab-aging"    type="button"><i class="bi bi-exclamation-triangle me-1"></i>Payment Aging</button></li>
+</ul>
+<div class="tab-content border border-top-0 bg-white" style="border-radius: 0 0 .75rem .75rem;">
+
+    <!-- ───── SALES SUMMARY ───── -->
+    <div class="tab-pane fade show active p-3" id="tab-summary">
+        <div class="row g-3 mb-3">
+            <div class="col-md-3 col-6">
+                <div class="kpi-tile">
+                    <div class="lbl">Bookings</div>
+                    <div class="val">@Model.Summary.BookingCount</div>
+                    <div class="sub">in selected range</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="kpi-tile">
+                    <div class="lbl">Total Revenue</div>
+                    <div class="val">@Model.Currency @Money(Model.Summary.TotalRevenue)</div>
+                    <div class="sub">booked</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="kpi-tile">
+                    <div class="lbl">Avg Booking</div>
+                    <div class="val">@Model.Currency @Money(Model.Summary.AvgBookingValue)</div>
+                    <div class="sub">per booking</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="kpi-tile">
+                    <div class="lbl">Collected</div>
+                    <div class="val text-success">@Model.Currency @Money(Model.Summary.Collected)</div>
+                    <div class="sub">received via installments</div>
+                </div>
+            </div>
+        </div>
+
+        @if (Model.MonthlyTrend.Any())
+        {
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-transparent border-0 fw-bold">
+                    <i class="bi bi-bar-chart-fill text-primary me-2"></i>Monthly Trend
+                </div>
+                <div class="card-body" style="height: 320px;">
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="text-center text-muted py-4">
+                <i class="bi bi-bar-chart fs-2 d-block opacity-50"></i>
+                No bookings in this range.
+            </div>
+        }
+    </div>
+
+    <!-- ───── BY DESTINATION ───── -->
+    <div class="tab-pane fade p-3" id="tab-dest">
+        <div class="d-flex justify-content-end mb-2">
+            <a href="/Reports/Export/Destinations?from=@Model.From.ToString("yyyy-MM-dd")&to=@Model.To.ToString("yyyy-MM-dd")"
+               class="btn btn-sm btn-outline-success">
+                <i class="bi bi-file-earmark-spreadsheet me-1"></i>Export CSV
+            </a>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Destination</th>
+                        <th class="text-end">Bookings</th>
+                        <th class="text-end">Revenue</th>
+                        <th class="text-end">Avg Booking</th>
+                        <th class="text-end" style="width:18%">Share</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.ByDestination.Any())
+                    {
+                        <tr><td colspan="5" class="text-center text-muted py-4">No data.</td></tr>
+                    }
+                    else
+                    {
+                        var max = Model.ByDestination.Max(r => r.TotalRevenue);
+                        foreach (var r in Model.ByDestination)
+                        {
+                            var pct = max > 0 ? (double)(r.TotalRevenue / max) * 100 : 0;
+                            <tr>
+                                <td class="fw-semibold">@r.DestinationName</td>
+                                <td class="text-end">@r.BookingCount</td>
+                                <td class="text-end fw-bold">@Model.Currency @r.TotalRevenue.ToString("N0")</td>
+                                <td class="text-end">@Model.Currency @r.AvgBookingValue.ToString("N0")</td>
+                                <td>
+                                    <div class="progress" style="height:.5rem">
+                                        <div class="progress-bar bg-primary" style="width: @pct.ToString("F0")%"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ───── BY AGENT ───── -->
+    <div class="tab-pane fade p-3" id="tab-agent">
+        <div class="d-flex justify-content-end mb-2">
+            <a href="/Reports/Export/Agents?from=@Model.From.ToString("yyyy-MM-dd")&to=@Model.To.ToString("yyyy-MM-dd")"
+               class="btn btn-sm btn-outline-success">
+                <i class="bi bi-file-earmark-spreadsheet me-1"></i>Export CSV
+            </a>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Agent</th>
+                        <th class="text-end">Bookings</th>
+                        <th class="text-end">Revenue</th>
+                        <th class="text-end">Avg Booking</th>
+                        <th class="text-end" style="width:18%">Share</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.ByAgent.Any())
+                    {
+                        <tr><td colspan="5" class="text-center text-muted py-4">No data.</td></tr>
+                    }
+                    else
+                    {
+                        var max = Model.ByAgent.Max(r => r.TotalRevenue);
+                        foreach (var r in Model.ByAgent)
+                        {
+                            var pct = max > 0 ? (double)(r.TotalRevenue / max) * 100 : 0;
+                            <tr>
+                                <td class="fw-semibold">@r.AgentName</td>
+                                <td class="text-end">@r.BookingCount</td>
+                                <td class="text-end fw-bold">@Model.Currency @r.TotalRevenue.ToString("N0")</td>
+                                <td class="text-end">@Model.Currency @r.AvgBookingValue.ToString("N0")</td>
+                                <td>
+                                    <div class="progress" style="height:.5rem">
+                                        <div class="progress-bar bg-success" style="width: @pct.ToString("F0")%"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ───── PAYMENT AGING ───── -->
+    <div class="tab-pane fade p-3" id="tab-aging">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <small class="text-muted">All pending installments across active bookings — based on today's date.</small>
+            <a href="/Reports/Export/Aging" class="btn btn-sm btn-outline-success">
+                <i class="bi bi-file-earmark-spreadsheet me-1"></i>Export CSV
+            </a>
+        </div>
+
+        <div class="row g-2 mb-3">
+            @{
+                var buckets = new[] { "Current", "1–30 days", "31–60 days", "61–90 days", "90+ days" };
+            }
+            @foreach (var name in buckets)
+            {
+                var b = Model.AgingBuckets.FirstOrDefault(x => x.Bucket == name)
+                        ?? new TravelERP.Web.Models.AgingBucketRow { Bucket = name };
+                <div class="col-md col-6">
+                    <div class="aging-bucket @AgingClass(name)">
+                        <div class="lbl">@name</div>
+                        <div class="val">@Model.Currency @Money(b.Outstanding)</div>
+                        <div class="cnt">@b.InstallmentCount installment@(b.InstallmentCount == 1 ? "" : "s")</div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Booking #</th>
+                        <th>Customer</th>
+                        <th class="text-end">Inst.</th>
+                        <th class="text-end">Amount</th>
+                        <th>Due Date</th>
+                        <th class="text-end">Days Overdue</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.AgingDetails.Any())
+                    {
+                        <tr><td colspan="6" class="text-center text-success py-4"><i class="bi bi-check-circle me-1"></i>All installments are current — no overdue payments.</td></tr>
+                    }
+                    else
+                    {
+                        foreach (var d in Model.AgingDetails)
+                        {
+                            <tr>
+                                <td><a href="/Bookings/Details/@d.BookingId" class="text-decoration-none font-monospace fw-bold">@d.BookingNumber</a></td>
+                                <td>@d.CustomerName</td>
+                                <td class="text-end">@d.InstallmentNo</td>
+                                <td class="text-end fw-bold">@d.Currency @d.Amount.ToString("N0")</td>
+                                <td>@(d.DueDate?.ToString("dd MMM yyyy") ?? "—")</td>
+                                <td class="text-end">
+                                    @if (d.DaysOverdue > 0)
+                                    {
+                                        <span class="badge bg-danger-subtle text-danger">@d.DaysOverdue d</span>
+                                    }
+                                    else { <span class="text-muted">—</span> }
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script>
+        const trend = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+            Model.MonthlyTrend.Select(r => new {
+                label = r.MonthLabel.Substring(0, 3) + " " + (r.YearNo % 100).ToString("D2"),
+                count = r.BookingCount,
+                rev   = r.Revenue
+            })));
+        const currency = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Currency));
+        const trendCanvas = document.getElementById('trendChart');
+        if (trendCanvas && trend.length) {
+            new Chart(trendCanvas, {
+                type: 'bar',
+                data: {
+                    labels: trend.map(t => t.label),
+                    datasets: [
+                        { label: 'Revenue', data: trend.map(t => t.rev),
+                          backgroundColor: 'rgba(13,110,253,.75)', borderRadius: 6, yAxisID: 'y' },
+                        { label: 'Bookings', data: trend.map(t => t.count),
+                          type: 'line', borderColor: '#198754', backgroundColor: '#198754',
+                          borderWidth: 2, tension: .25, yAxisID: 'y1' }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12 } },
+                        tooltip: { callbacks: {
+                            label: c => c.dataset.label === 'Revenue'
+                                ? ` ${currency} ${Number(c.parsed.y).toLocaleString('en-IN')}`
+                                : ` ${c.parsed.y} booking(s)`
+                        } }
+                    },
+                    scales: {
+                        x: { grid: { display: false } },
+                        y:  { position: 'left',
+                              ticks: { callback: v => v >= 100000 ? (v/100000).toFixed(1) + 'L' : v >= 1000 ? (v/1000).toFixed(0) + 'K' : v },
+                              grid: { color: 'rgba(0,0,0,.05)' } },
+                        y1: { position: 'right', beginAtZero: true,
+                              ticks: { precision: 0 }, grid: { display: false } }
+                    }
+                }
+            });
+        }
+    </script>
+}

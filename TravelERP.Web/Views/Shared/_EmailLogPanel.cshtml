@@ -1,0 +1,53 @@
+@using TravelERP.Core.Entities.Tenant
+@model IEnumerable<EmailLog>
+@{
+    var logs = Model?.ToList() ?? new List<EmailLog>();
+}
+
+<div class="card shadow-sm mb-3">
+    <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center">
+        <h6 class="mb-0 fw-bold"><i class="bi bi-envelope-paper text-primary me-2"></i>Recent Emails</h6>
+        <span class="badge bg-light text-dark border">@logs.Count</span>
+    </div>
+    @if (!logs.Any())
+    {
+        <div class="card-body text-center text-muted py-3 small">
+            <i class="bi bi-inbox d-block fs-3 opacity-50"></i>
+            No emails sent yet.
+        </div>
+    }
+    else
+    {
+        <ul class="list-group list-group-flush">
+            @foreach (var l in logs)
+            {
+                var isFail = string.Equals(l.Status, "Failed", StringComparison.OrdinalIgnoreCase);
+                <li class="list-group-item small">
+                    <div class="d-flex justify-content-between align-items-start gap-2">
+                        <div class="flex-grow-1 min-w-0">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <i class="bi @(isFail ? "bi-exclamation-triangle-fill text-danger" : "bi-check-circle-fill text-success")"></i>
+                                <span class="fw-semibold text-truncate">@l.Subject</span>
+                            </div>
+                            <div class="text-muted">
+                                <i class="bi bi-arrow-right me-1"></i>@l.ToEmail
+                                @if (!string.IsNullOrEmpty(l.CcEmail)) { <span class="ms-2"><i class="bi bi-cc-circle me-1"></i>@l.CcEmail</span> }
+                                @if (!string.IsNullOrEmpty(l.AttachmentNames))
+                                {
+                                    <span class="ms-2"><i class="bi bi-paperclip me-1"></i>@l.AttachmentNames</span>
+                                }
+                            </div>
+                            @if (isFail && !string.IsNullOrEmpty(l.ErrorMessage))
+                            {
+                                <div class="text-danger mt-1" style="font-size:.78rem">@l.ErrorMessage</div>
+                            }
+                        </div>
+                        <div class="text-muted small text-end" style="white-space:nowrap">
+                            @l.SentAt.ToLocalTime().ToString("dd MMM, HH:mm")
+                        </div>
+                    </div>
+                </li>
+            }
+        </ul>
+    }
+</div>

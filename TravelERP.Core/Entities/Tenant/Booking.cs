@@ -40,6 +40,7 @@ public class Booking
     public int TotalCount { get; set; }   // for paged lists
 
     public List<BookingInstallment> Installments { get; set; } = [];
+    public List<BookingHotel> Hotels { get; set; } = [];
 
     public int TotalPax => Adults + Children + Infants;
     public decimal BalanceAmount => TotalAmount - PaidAmount;

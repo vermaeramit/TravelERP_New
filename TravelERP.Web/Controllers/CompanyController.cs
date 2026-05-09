@@ -62,6 +62,87 @@ public class CompanyController : Controller
         return View();
     }
 
+    [HttpGet("VoucherDefaults")]
+    public async Task<IActionResult> VoucherDefaults()
+    {
+        if (!_tenant.IsSuperAdmin) return Forbid();
+        ViewData["Title"] = "Voucher Defaults";
+        var company = await _companies.GetByIdAsync(_tenant.CompanyId);
+        return View(company);
+    }
+
+    [HttpPost("VoucherDefaults"), ValidateAntiForgeryToken]
+    public async Task<IActionResult> VoucherDefaults(
+        string? checkInTime, string? checkOutTime,
+        string? hotelNote, string? policyHtml)
+    {
+        if (!_tenant.IsSuperAdmin) return Forbid();
+        var existing = await _companies.GetByIdAsync(_tenant.CompanyId);
+        if (existing == null) return NotFound();
+
+        existing.VoucherCheckInTime  = string.IsNullOrWhiteSpace(checkInTime)  ? null : checkInTime.Trim();
+        existing.VoucherCheckOutTime = string.IsNullOrWhiteSpace(checkOutTime) ? null : checkOutTime.Trim();
+        existing.VoucherHotelNote    = string.IsNullOrWhiteSpace(hotelNote)    ? null : hotelNote;
+        existing.VoucherPolicyHtml   = string.IsNullOrWhiteSpace(policyHtml)   ? null : policyHtml;
+
+        await _companies.UpdateVoucherDefaultsAsync(_tenant.CompanyId, existing, _tenant.UserId);
+        TempData["Success"] = "Voucher defaults saved.";
+        return RedirectToAction(nameof(VoucherDefaults));
+    }
+
+    [HttpGet("EmailSettings")]
+    public async Task<IActionResult> EmailSettings()
+    {
+        if (!_tenant.IsSuperAdmin) return Forbid();
+        ViewData["Title"] = "Email Settings";
+        var company = await _companies.GetByIdAsync(_tenant.CompanyId);
+        return View(company);
+    }
+
+    [HttpPost("EmailSettings"), ValidateAntiForgeryToken]
+    public async Task<IActionResult> EmailSettings(TravelERP.Core.Entities.Master.Company model)
+    {
+        if (!_tenant.IsSuperAdmin) return Forbid();
+
+        // We only persist the SMTP block — leave the rest of the company alone.
+        var existing = await _companies.GetByIdAsync(_tenant.CompanyId);
+        if (existing == null) return NotFound();
+
+        existing.SmtpHost      = model.SmtpHost?.Trim();
+        existing.SmtpPort      = model.SmtpPort;
+        existing.SmtpUsername  = model.SmtpUsername?.Trim();
+        // Empty password = keep existing (don't blank it out on every save)
+        if (!string.IsNullOrWhiteSpace(model.SmtpPassword)) existing.SmtpPassword = model.SmtpPassword;
+        existing.SmtpFromEmail = model.SmtpFromEmail?.Trim();
+        existing.SmtpFromName  = model.SmtpFromName?.Trim();
+        existing.SmtpUseTls    = model.SmtpUseTls;
+
+        await _companies.UpdateEmailSettingsAsync(_tenant.CompanyId, existing, _tenant.UserId);
+        TempData["Success"] = "Email settings saved.";
+        return RedirectToAction(nameof(EmailSettings));
+    }
+
+    [HttpPost("EmailSettings/TestSend"), ValidateAntiForgeryToken]
+    public async Task<IActionResult> TestSendEmail(
+        [FromServices] TravelERP.Web.Services.EmailService emailService,
+        string testTo)
+    {
+        if (!_tenant.IsSuperAdmin) return Forbid();
+        var company = await _companies.GetByIdAsync(_tenant.CompanyId);
+        if (company == null) return NotFound();
+
+        if (string.IsNullOrWhiteSpace(testTo))
+            return Json(new { success = false, error = "Recipient is required." });
+
+        var result = await emailService.SendAsync(
+            company,
+            toEmail: testTo,
+            subject: $"Test email from {company.Name}",
+            htmlBody: $"<p>This is a test email sent from <strong>{company.Name}</strong> to confirm your SMTP configuration is working.</p><p>If you received this, you're all set.</p>");
+
+        return Json(new { success = result.Success, error = result.ErrorMessage });
+    }
+
     [HttpGet("QuoteBranding")]
     public async Task<IActionResult> QuoteBranding()
     {

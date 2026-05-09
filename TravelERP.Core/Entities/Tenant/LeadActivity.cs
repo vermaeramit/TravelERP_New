@@ -14,8 +14,33 @@ public class LeadActivity
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
 
+    // Joined fields (populated when reading from the today-panel SP)
+    public string? LeadNumber { get; set; }
+    public string? LeadName { get; set; }
+    public string? LeadMobile { get; set; }
+    public string? LeadEmail { get; set; }
+    public int? AssignedToUserId { get; set; }
+    public string? LeadStatusName { get; set; }
+    public string? LeadStatusColor { get; set; }
+
+    // Computed for the today panel
+    public int DaysOverdue { get; set; }
+    public int DaysUntil { get; set; }
+
     public bool IsScheduledFollowUp => !IsCompleted && NextFollowUpAt.HasValue;
     public bool IsOverdue => IsScheduledFollowUp && NextFollowUpAt < DateTime.UtcNow;
+}
+
+public class TodayPanel
+{
+    public List<LeadActivity> Overdue { get; set; } = [];
+    public List<LeadActivity> Today { get; set; } = [];
+    public List<LeadActivity> Upcoming { get; set; } = [];
+    public int OverdueCount { get; set; }
+    public int TodayCount { get; set; }
+    public int UpcomingCount { get; set; }
+
+    public int ActionableCount => OverdueCount + TodayCount;
 }
 
 public static class ActivityTypes

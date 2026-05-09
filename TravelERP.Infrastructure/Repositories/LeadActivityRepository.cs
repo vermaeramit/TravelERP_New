@@ -83,4 +83,28 @@ public class LeadActivityRepository : ILeadActivityRepository
             new { DatabaseName = _tenant.DatabaseName, Id = id },
             commandType: CommandType.StoredProcedure);
     }
+
+    public async Task<TodayPanel> GetTodayPanelAsync(int? userId, bool myOnly)
+    {
+        using var conn = _factory.CreateMasterConnection();
+        using var multi = await conn.QueryMultipleAsync(
+            "sp_LeadActivity_GetTodayPanel",
+            new { DatabaseName = _tenant.DatabaseName, UserId = userId, MyOnly = myOnly },
+            commandType: CommandType.StoredProcedure);
+
+        var panel = new TodayPanel
+        {
+            Overdue  = (await multi.ReadAsync<LeadActivity>()).ToList(),
+            Today    = (await multi.ReadAsync<LeadActivity>()).ToList(),
+            Upcoming = (await multi.ReadAsync<LeadActivity>()).ToList()
+        };
+        var counts = await multi.ReadSingleOrDefaultAsync<dynamic>();
+        if (counts != null)
+        {
+            panel.OverdueCount  = (int)counts.OverdueCount;
+            panel.TodayCount    = (int)counts.TodayCount;
+            panel.UpcomingCount = (int)counts.UpcomingCount;
+        }
+        return panel;
+    }
 }

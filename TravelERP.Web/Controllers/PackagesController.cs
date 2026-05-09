@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using TravelERP.Core.Constants;
 using TravelERP.Core.Entities.Tenant;
 using TravelERP.Core.Interfaces;
+using TravelERP.Web.Services;
 
 namespace TravelERP.Web.Controllers;
 
@@ -144,7 +145,9 @@ public class PackagesController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> Details(int id, [FromServices] IBookingRepository bookings)
+    public async Task<IActionResult> Details(int id,
+        [FromServices] IBookingRepository bookings,
+        [FromServices] IEmailLogRepository emailLogs)
     {
         if (!_tenant.CanView(AppModules.Packages)) return Forbid();
         var pkg = await _repo.GetByIdAsync(id);
@@ -154,15 +157,14 @@ public class PackagesController : Controller
         var company = await _companies.GetByIdAsync(_tenant.CompanyId);
         ViewBag.CompanySlug = company?.Slug ?? "";
 
-        // Enforce single-booking-per-lead/package rule. If an active booking already
-        // exists for this package (or its lead), surface it so the view can swap
-        // "Convert to Booking" → "View Booking" link.
         if (pkg.LeadId.HasValue)
         {
             var leadBookings = (await bookings.GetByLeadAsync(pkg.LeadId.Value)).ToList();
             ViewBag.ExistingBooking = leadBookings.FirstOrDefault(b => b.PackageId == pkg.Id)
                                    ?? leadBookings.FirstOrDefault();
         }
+
+        ViewBag.EmailLogs = (await emailLogs.GetByRelatedAsync("Package", pkg.Id, 5)).ToList();
         return View(pkg);
     }
 
@@ -173,6 +175,76 @@ public class PackagesController : Controller
         await _repo.DeleteAsync(id);
         TempData["Success"] = "Package deactivated.";
         return RedirectToAction(nameof(Index));
+    }
+
+    // ───────────────────── send quote by email ─────────────────────
+
+    public class SendEmailVm
+    {
+        public int Id { get; set; }
+        public string To { get; set; } = "";
+        public string? Cc { get; set; }
+        public string Subject { get; set; } = "";
+        public string Body { get; set; } = "";
+        public bool AttachPdf { get; set; } = true;
+    }
+
+    [HttpPost("Packages/{id:int}/SendEmail"), ValidateAntiForgeryToken]
+    public async Task<IActionResult> SendEmail(int id, SendEmailVm vm,
+        [FromServices] EmailService emailService,
+        [FromServices] PdfService pdfService,
+        [FromServices] IEmailLogRepository emailLogs,
+        CancellationToken ct)
+    {
+        if (!_tenant.CanView(AppModules.Packages)) return Forbid();
+        var pkg = await _repo.GetByIdAsync(id);
+        if (pkg == null) return NotFound();
+        var company = await _companies.GetByIdAsync(_tenant.CompanyId);
+        if (company == null) return NotFound();
+
+        // Generate the public-quote PDF (same engine the customer would download).
+        EmailService.Attachment[]? attachments = null;
+        string? attachmentName = null;
+        if (vm.AttachPdf && !string.IsNullOrEmpty(pkg.ShareToken))
+        {
+            var url = $"{Request.Scheme}://{Request.Host}/p/{company.Slug}/{pkg.ShareToken}";
+            try
+            {
+                var bytes = await pdfService.RenderUrlAsPdfAsync(url, ct);
+                attachmentName = $"Quote-{pkg.PackageNumber.Replace(" ", "_")}.pdf";
+                attachments = new[] { new EmailService.Attachment(attachmentName, bytes) };
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, error = $"Couldn't generate the PDF: {ex.Message}" });
+            }
+        }
+
+        var result = await emailService.SendAsync(company, vm.To, vm.Subject ?? "", vm.Body ?? "", attachments, vm.Cc, ct);
+
+        // Log every send attempt — both successes and failures.
+        await emailLogs.InsertAsync(new EmailLog
+        {
+            RelatedType = "Package",
+            RelatedId   = pkg.Id,
+            ToEmail     = vm.To,
+            CcEmail     = string.IsNullOrWhiteSpace(vm.Cc) ? null : vm.Cc,
+            Subject     = vm.Subject ?? "",
+            BodyPreview = TextPreview(vm.Body),
+            AttachmentNames = attachmentName,
+            Status      = result.Success ? "Sent" : "Failed",
+            ErrorMessage = result.ErrorMessage
+        });
+
+        return Json(new { success = result.Success, error = result.ErrorMessage });
+    }
+
+    private static string? TextPreview(string? html)
+    {
+        if (string.IsNullOrWhiteSpace(html)) return null;
+        var stripped = System.Text.RegularExpressions.Regex.Replace(html, "<[^>]+>", " ");
+        stripped = System.Net.WebUtility.HtmlDecode(stripped).Trim();
+        return stripped.Length > 1000 ? stripped[..1000] : stripped;
     }
 
     // ───────────────────── helpers ─────────────────────
@@ -297,7 +369,10 @@ public class PackagesController : Controller
                                 HotelId    = h.HotelId,
                                 RoomTypeId = h.RoomTypeId,
                                 MealPlanId = h.MealPlanId,
-                                OtherText  = string.IsNullOrWhiteSpace(h.OtherText) ? null : h.OtherText.Trim()
+                                OtherText  = string.IsNullOrWhiteSpace(h.OtherText) ? null : h.OtherText.Trim(),
+                                Rooms      = h.Rooms <= 0 ? 1 : h.Rooms,
+                                ExtraBeds  = h.ExtraBeds < 0 ? 0 : h.ExtraBeds,
+                                HotelCnfNo = string.IsNullOrWhiteSpace(h.HotelCnfNo) ? null : h.HotelCnfNo.Trim()
                             }).ToList();
                         }
                     }
@@ -343,6 +418,9 @@ public class PackagesController : Controller
             public int? RoomTypeId { get; set; }
             public int? MealPlanId { get; set; }
             public string? OtherText { get; set; }
+            public int Rooms { get; set; } = 1;
+            public int ExtraBeds { get; set; }
+            public string? HotelCnfNo { get; set; }
         }
 
         public class DayDto
