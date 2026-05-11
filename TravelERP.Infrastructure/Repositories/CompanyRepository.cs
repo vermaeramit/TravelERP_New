@@ -72,6 +72,30 @@ public class CompanyRepository : ICompanyRepository
             "sp_Company_Update", company, commandType: CommandType.StoredProcedure) > 0;
     }
 
+    public async Task<bool> UpdateProfileAsync(Company c, int? updatedBy)
+    {
+        using var conn = _factory.CreateMasterConnection();
+        return await conn.ExecuteAsync(
+            "sp_Company_UpdateProfile",
+            new
+            {
+                Id             = c.Id,
+                c.Name,
+                c.Email,
+                c.Phone,
+                c.Address,
+                c.City,
+                c.Country,
+                c.LicenseNumber,
+                c.TaxNumber,
+                c.TimeZone,
+                c.Currency,
+                c.CurrencySymbol,
+                UpdatedBy      = updatedBy
+            },
+            commandType: CommandType.StoredProcedure) > 0;
+    }
+
     public async Task<bool> UpdateNumberSeriesAsync(int companyId, string leadPrefix, string packagePrefix, string bookingPrefix, string invoicePrefix, int? updatedBy)
     {
         using var conn = _factory.CreateMasterConnection();

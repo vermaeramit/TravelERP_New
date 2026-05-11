@@ -38,9 +38,8 @@ public class CompanyController : Controller
     public async Task<IActionResult> Settings(TravelERP.Core.Entities.Master.Company model)
     {
         if (!ModelState.IsValid) return View(model);
-        model.UpdatedBy = _tenant.UserId;
-        model.UpdatedAt = DateTime.UtcNow;
-        await _companies.UpdateAsync(model);
+        model.Id = _tenant.CompanyId;   // make sure we update the current tenant, not whatever the form posted
+        await _companies.UpdateProfileAsync(model, _tenant.UserId);
         TempData["Success"] = "Company settings saved.";
         return RedirectToAction(nameof(Settings));
     }

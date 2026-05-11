@@ -190,6 +190,40 @@ AS BEGIN
 END
 GO
 
+CREATE OR ALTER PROCEDURE sp_Company_UpdateProfile
+    @Id             INT,
+    @Name           NVARCHAR(200),
+    @Email          NVARCHAR(150) = NULL,
+    @Phone          NVARCHAR(50)  = NULL,
+    @Address        NVARCHAR(500) = NULL,
+    @City           NVARCHAR(100) = NULL,
+    @Country        NVARCHAR(100) = NULL,
+    @LicenseNumber  NVARCHAR(100) = NULL,
+    @TaxNumber      NVARCHAR(100) = NULL,
+    @TimeZone       NVARCHAR(100) = NULL,
+    @Currency       NVARCHAR(10)  = NULL,
+    @CurrencySymbol NVARCHAR(10)  = NULL,
+    @UpdatedBy      INT           = NULL
+AS BEGIN
+    SET NOCOUNT ON;
+    UPDATE Companies SET
+        Name           = @Name,
+        Email          = ISNULL(@Email, ''),
+        Phone          = ISNULL(@Phone, ''),
+        Address        = ISNULL(@Address, ''),
+        City           = ISNULL(@City, ''),
+        Country        = ISNULL(@Country, ''),
+        LicenseNumber  = ISNULL(@LicenseNumber, ''),
+        TaxNumber      = ISNULL(@TaxNumber, ''),
+        TimeZone       = ISNULL(@TimeZone, 'UTC'),
+        Currency       = ISNULL(@Currency, 'INR'),
+        CurrencySymbol = ISNULL(@CurrencySymbol, N'₹'),
+        UpdatedAt      = GETUTCDATE(),
+        UpdatedBy      = @UpdatedBy
+    WHERE Id = @Id;
+END
+GO
+
 CREATE OR ALTER PROCEDURE sp_Company_UpdateNumberSeries
     @Id            INT,
     @LeadPrefix    NVARCHAR(20),
