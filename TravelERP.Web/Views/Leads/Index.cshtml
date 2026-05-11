@@ -94,6 +94,8 @@
 <!-- FILTERS -->
 <div class="filter-bar p-3 mb-3 shadow-sm">
     <form method="get" class="row g-2 align-items-end">
+        @* Marker so the controller can tell "form was submitted" from "first visit / reset". *@
+        <input type="hidden" name="filtered" value="1" />
         <div class="col-md-2">
             <label class="form-label small fw-semibold mb-1">From</label>
             <input type="date" name="dateFrom" class="form-control form-control-sm"

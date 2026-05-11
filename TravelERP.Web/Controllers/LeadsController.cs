@@ -30,10 +30,15 @@ public class LeadsController : Controller
 
     public async Task<IActionResult> Index(int? statusId, int? sourceId, int? assignedTo,
         int? destinationId, DateTime? dateFrom, DateTime? dateTo,
-        string? search, bool showClosed = false, int page = 1, int pageSize = 10)
+        string? search, bool showClosed = false, bool filtered = false,
+        int page = 1, int pageSize = 10)
     {
         if (!_tenant.CanView(AppModules.Leads)) return Forbid();
         ViewData["Title"] = "Leads";
+
+        // "Include closed" defaults ON unless the user explicitly unchecked it via the filter form.
+        // Form submissions carry filtered=1; absence of "showClosed" then means unchecked → false.
+        var effectiveShowClosed = filtered ? showClosed : true;
 
         var filter = new LeadFilter
         {
@@ -44,7 +49,7 @@ public class LeadsController : Controller
             DateFrom      = dateFrom,
             DateTo        = dateTo,
             Search        = string.IsNullOrWhiteSpace(search) ? null : search.Trim(),
-            ShowClosed    = showClosed,
+            ShowClosed    = effectiveShowClosed,
             Page          = page < 1 ? 1 : page,
             PageSize      = pageSize is < 5 or > 100 ? 10 : pageSize
         };

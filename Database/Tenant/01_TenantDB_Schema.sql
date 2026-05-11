@@ -166,20 +166,13 @@ END
 GO
 
 -- ============================================================
--- DESIGNATIONS (Master)
+-- DESIGNATIONS (removed — Tenant Roles serve this purpose now)
 -- ============================================================
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'Designations') AND type = 'U')
-BEGIN
-    CREATE TABLE Designations (
-        Id          INT IDENTITY(1,1) PRIMARY KEY,
-        Name        NVARCHAR(100)  NOT NULL,
-        IsActive    BIT            NOT NULL DEFAULT 1,
-        CreatedAt   DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
-        CreatedBy   INT            NOT NULL DEFAULT 0,
-        UpdatedAt   DATETIME2      NULL,
-        UpdatedBy   INT            NULL
-    );
-END
+-- Drop the FK guard first if Employees still references it, then drop the table.
+IF OBJECT_ID(N'FK_Employees_Designation', 'F') IS NOT NULL
+    ALTER TABLE Employees DROP CONSTRAINT FK_Employees_Designation;
+IF OBJECT_ID(N'Designations', 'U') IS NOT NULL
+    DROP TABLE Designations;
 GO
 
 -- ============================================================
@@ -393,32 +386,12 @@ END
 GO
 
 -- ============================================================
--- EMPLOYEES (Master)
--- Loose link to MasterUsers via UserId (not enforced — cross-DB)
+-- EMPLOYEES (removed — profile fields absorbed into MasterUsers)
 -- ============================================================
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'Employees') AND type = 'U')
-BEGIN
-    CREATE TABLE Employees (
-        Id              INT IDENTITY(1,1) PRIMARY KEY,
-        UserId          INT            NULL,           -- MasterUsers.Id (cross-DB, loose)
-        DesignationId   INT            NULL,
-        FirstName       NVARCHAR(100)  NOT NULL,
-        LastName        NVARCHAR(100)  NULL,
-        Email           NVARCHAR(150)  NOT NULL,       -- CRM Login
-        Mobile          NVARCHAR(30)   NULL,
-        DateOfBirth     DATE           NULL,
-        ImageUrl        NVARCHAR(500)  NULL,
-        ReplyEmail      NVARCHAR(150)  NULL,           -- Mail Id (To get travelers reply)
-        IsActive        BIT            NOT NULL DEFAULT 1,
-        CreatedAt       DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
-        CreatedBy       INT            NOT NULL DEFAULT 0,
-        UpdatedAt       DATETIME2      NULL,
-        UpdatedBy       INT            NULL,
-        CONSTRAINT FK_Employees_Designation FOREIGN KEY (DesignationId)
-            REFERENCES Designations(Id)
-    );
-    CREATE INDEX IX_Employees_UserId ON Employees(UserId);
-END
+IF OBJECT_ID(N'FK_Employees_Designation', 'F') IS NOT NULL
+    ALTER TABLE Employees DROP CONSTRAINT FK_Employees_Designation;
+IF OBJECT_ID(N'Employees', 'U') IS NOT NULL
+    DROP TABLE Employees;
 GO
 
 -- ============================================================

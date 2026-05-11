@@ -115,8 +115,17 @@
         .pax-pills .pill strong { color: var(--brand); margin-right: .15rem; }
 
         /* ─────────── Option cards ─────────── */
+        .opt-grid {
+            display: grid;
+            grid-template-columns: repeat(var(--opt-cols, 2), 1fr);
+            gap: 1rem;
+            align-items: start;
+        }
+        @@media (max-width: 767px) {
+            .opt-grid { grid-template-columns: 1fr !important; }
+        }
         .opt-card {
-            border: 2px solid #e5e7eb; border-radius: .85rem; padding: 1.25rem; height: 100%;
+            border: 2px solid #e5e7eb; border-radius: .85rem; padding: 1.25rem;
             background: #fff;
         }
         .opt-card.recommended { border-color: var(--brand); background: var(--brand-soft); }
@@ -363,30 +372,36 @@
         </div>
     </div>
 
+    @{
+        var singleOption = Model.Options.Count == 1;
+        var optGridCols  = singleOption ? 1 : (Model.Options.Count >= 3 ? 3 : 2);
+    }
     <!-- ──────────── PRICE OPTIONS ──────────── -->
     <div class="section-title">
-        Choose your option
+        @(singleOption ? "Package Price" : "Choose your option")
         <span class="text-muted fw-normal" style="text-transform: none; letter-spacing: 0;">
-            — @(Model.PriceMode == "PerPax" ? "prices per person" : "all-inclusive total")
+            — @(Model.PriceMode == "PerPax" ? "per person" : "all-inclusive total")
         </span>
     </div>
-    <div class="row g-3">
+    <div class="opt-grid" style="--opt-cols: @optGridCols">
         @foreach (var o in Model.Options)
         {
-            <div class="col-md-@(Model.Options.Count >= 3 ? 4 : 6)">
-                <div class="opt-card @(o.IsRecommended ? "recommended" : "")">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div class="opt-name">@o.OptionName</div>
-                        @if (o.IsRecommended)
-                        {
-                            <span class="badge" style="background:var(--brand);"><i class="bi bi-star-fill me-1"></i>Recommended</span>
-                        }
-                    </div>
+                <div class="opt-card @(o.IsRecommended && !singleOption ? "recommended" : "")">
+                    @if (!singleOption)
+                    {
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="opt-name">@o.OptionName</div>
+                            @if (o.IsRecommended)
+                            {
+                                <span class="badge" style="background:var(--brand);"><i class="bi bi-star-fill me-1"></i>Recommended</span>
+                            }
+                        </div>
+                    }
 
                     <div class="price-mode">@(Model.PriceMode == "PerPax" ? "Per Pax" : "Total Price")</div>
                     <div class="price">@Model.Currency @o.FinalPrice.ToString("N0")</div>
 
-                    @if (o.LandPrice > 0 || o.FlightPrice > 0)
+                    @if (!singleOption && (o.LandPrice > 0 || o.FlightPrice > 0))
                     {
                         <div class="breakdown">
                             <div>Land: @Model.Currency @o.LandPrice.ToString("N0")</div>
@@ -440,7 +455,6 @@
                         <p class="small text-muted mt-3 mb-0">@o.Notes</p>
                     }
                 </div>
-            </div>
         }
     </div>
 

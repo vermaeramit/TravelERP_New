@@ -140,30 +140,40 @@
 
     <!-- RIGHT: side-by-side options -->
     <div class="col-lg-8">
+        @{
+            var detailsSingleOption = Model.Options.Count == 1;
+            var detailsOptColClass = detailsSingleOption ? "col-12" : (Model.Options.Count >= 3 ? "col-md-4" : "col-md-6");
+        }
         <h6 class="fw-bold mb-3 text-muted text-uppercase small">
-            <i class="bi bi-list-stars me-1"></i>@Model.Options.Count Price Option@(Model.Options.Count == 1 ? "" : "s")
+            <i class="bi bi-list-stars me-1"></i>@(detailsSingleOption ? "Package Price" : $"{Model.Options.Count} Price Options")
         </h6>
 
         <div class="row g-3">
             @foreach (var o in Model.Options)
             {
-                <div class="col-md-@(Model.Options.Count >= 3 ? 4 : 6)">
-                    <div class="opt-card @(o.IsRecommended ? "recommended" : "")">
-                        <div class="d-flex justify-content-between align-items-start mb-2">
-                            <div class="opt-name">@o.OptionName</div>
-                            @if (o.IsRecommended)
-                            {
-                                <span class="badge bg-primary"><i class="bi bi-star-fill me-1"></i>Recommended</span>
-                            }
-                        </div>
+                <div class="@detailsOptColClass">
+                    <div class="opt-card @(o.IsRecommended && !detailsSingleOption ? "recommended" : "")">
+                        @if (!detailsSingleOption)
+                        {
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div class="opt-name">@o.OptionName</div>
+                                @if (o.IsRecommended)
+                                {
+                                    <span class="badge bg-primary"><i class="bi bi-star-fill me-1"></i>Recommended</span>
+                                }
+                            </div>
+                        }
 
                         <div class="mb-2">
                             <div class="price-mode">@(Model.PriceMode == "PerPax" ? "Per Pax" : "Total")</div>
                             <div class="price">@Model.Currency @o.FinalPrice.ToString("N0")</div>
-                            <div class="small text-muted">
-                                Land: @Model.Currency @o.LandPrice.ToString("N0")
-                                · Flight: @Model.Currency @o.FlightPrice.ToString("N0")
-                            </div>
+                            @if (!detailsSingleOption)
+                            {
+                                <div class="small text-muted">
+                                    Land: @Model.Currency @o.LandPrice.ToString("N0")
+                                    · Flight: @Model.Currency @o.FlightPrice.ToString("N0")
+                                </div>
+                            }
                         </div>
 
                         @if (o.Hotels.Any())
@@ -396,9 +406,6 @@
                                     data-bs-dismiss="modal">
                                 <i class="bi bi-envelope-paper-fill me-1"></i>Send by Email
                             </button>
-                            <a href="@emailHref" class="btn btn-sm btn-outline-info" title="Open default mail client">
-                                <i class="bi bi-envelope me-1"></i>mailto
-                            </a>
                         }
                         @if (!string.IsNullOrEmpty(Model.CustomerMobile))
                         {

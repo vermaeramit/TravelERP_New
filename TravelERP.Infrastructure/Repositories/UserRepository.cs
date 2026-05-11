@@ -47,6 +47,9 @@ public class UserRepository : IUserRepository
         p.Add("Role",            (byte)user.Role);
         p.Add("IsActive",        user.IsActive);
         p.Add("ProfileImageUrl", user.ProfileImageUrl);
+        p.Add("Mobile",          user.Mobile);
+        p.Add("DateOfBirth",     user.DateOfBirth);
+        p.Add("ReplyEmail",      user.ReplyEmail);
         p.Add("CreatedAt",       user.CreatedAt);
         p.Add("CreatedBy",       user.CreatedBy);
         p.Add("NewId", dbType: DbType.Int32, direction: ParameterDirection.Output);
@@ -57,8 +60,20 @@ public class UserRepository : IUserRepository
     public async Task<bool> UpdateAsync(MasterUser user)
     {
         using var conn = _factory.CreateMasterConnection();
+        var p = new DynamicParameters();
+        p.Add("Id",              user.Id);
+        p.Add("FullName",        user.FullName);
+        p.Add("Email",           user.Email);
+        p.Add("Role",            (byte)user.Role);
+        p.Add("IsActive",        user.IsActive);
+        p.Add("ProfileImageUrl", user.ProfileImageUrl);
+        p.Add("Mobile",          user.Mobile);
+        p.Add("DateOfBirth",     user.DateOfBirth);
+        p.Add("ReplyEmail",      user.ReplyEmail);
+        p.Add("UpdatedAt",       user.UpdatedAt);
+        p.Add("UpdatedBy",       user.UpdatedBy);
         return await conn.ExecuteAsync(
-            "sp_User_Update", user, commandType: CommandType.StoredProcedure) > 0;
+            "sp_User_Update", p, commandType: CommandType.StoredProcedure) > 0;
     }
 
     public async Task<bool> UpdateLastLoginAsync(int userId)

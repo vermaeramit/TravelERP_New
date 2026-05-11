@@ -259,6 +259,9 @@ CREATE OR ALTER PROCEDURE sp_User_Insert
     @Role            TINYINT       = 2,
     @IsActive        BIT           = 1,
     @ProfileImageUrl NVARCHAR(500) = NULL,
+    @Mobile          NVARCHAR(50)  = NULL,
+    @DateOfBirth     DATE          = NULL,
+    @ReplyEmail      NVARCHAR(200) = NULL,
     @CreatedAt       DATETIME      = NULL,
     @CreatedBy       INT           = NULL,
     @NewId           INT OUTPUT
@@ -266,9 +269,11 @@ AS BEGIN
     SET NOCOUNT ON;
     SET @CreatedAt = ISNULL(@CreatedAt, GETUTCDATE());
     INSERT INTO MasterUsers (CompanyId, FullName, Email, PasswordHash, Role, IsActive,
-        ProfileImageUrl, CreatedAt, CreatedBy, IsDeleted)
+        ProfileImageUrl, Mobile, DateOfBirth, ReplyEmail,
+        CreatedAt, CreatedBy, IsDeleted)
     VALUES (@CompanyId, @FullName, @Email, @PasswordHash, @Role, @IsActive,
-        @ProfileImageUrl, @CreatedAt, @CreatedBy, 0);
+        @ProfileImageUrl, @Mobile, @DateOfBirth, @ReplyEmail,
+        @CreatedAt, @CreatedBy, 0);
     SET @NewId = SCOPE_IDENTITY();
 END
 GO
@@ -280,6 +285,9 @@ CREATE OR ALTER PROCEDURE sp_User_Update
     @Role            TINYINT,
     @IsActive        BIT,
     @ProfileImageUrl NVARCHAR(500) = NULL,
+    @Mobile          NVARCHAR(50)  = NULL,
+    @DateOfBirth     DATE          = NULL,
+    @ReplyEmail      NVARCHAR(200) = NULL,
     @UpdatedAt       DATETIME      = NULL,
     @UpdatedBy       INT           = NULL
 AS BEGIN
@@ -287,9 +295,16 @@ AS BEGIN
     SET @UpdatedAt = ISNULL(@UpdatedAt, GETUTCDATE());
     UPDATE MasterUsers SET
         FullName=@FullName, Email=@Email, Role=@Role, IsActive=@IsActive,
-        ProfileImageUrl=@ProfileImageUrl, UpdatedAt=@UpdatedAt, UpdatedBy=@UpdatedBy
+        ProfileImageUrl=@ProfileImageUrl,
+        Mobile=@Mobile, DateOfBirth=@DateOfBirth, ReplyEmail=@ReplyEmail,
+        UpdatedAt=@UpdatedAt, UpdatedBy=@UpdatedBy
     WHERE Id = @Id;
 END
+GO
+
+-- Drop the legacy Employees-migration SP if it's still hanging around in master.
+IF OBJECT_ID(N'sp_User_MigrateFromEmployees', 'P') IS NOT NULL
+    DROP PROCEDURE sp_User_MigrateFromEmployees;
 GO
 
 CREATE OR ALTER PROCEDURE sp_User_UpdateLastLogin
@@ -887,64 +902,6 @@ END
 GO
 
 -- ============================================================
--- DESIGNATION PROCEDURES
--- ============================================================
-CREATE OR ALTER PROCEDURE sp_Designation_GetAll
-    @DatabaseName NVARCHAR(100)
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'
-        SELECT * FROM [' + @DatabaseName + N'].dbo.Designations WHERE IsActive = 1 ORDER BY Name';
-    EXEC sp_executesql @sql;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Designation_Insert
-    @DatabaseName NVARCHAR(100),
-    @Name         NVARCHAR(100),
-    @CreatedBy    INT = 0,
-    @NewId        INT OUTPUT
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'
-        INSERT INTO [' + @DatabaseName + N'].dbo.Designations (Name, IsActive, CreatedAt, CreatedBy)
-        VALUES (@Name, 1, GETUTCDATE(), @CreatedBy);
-        SELECT @NewId = SCOPE_IDENTITY();';
-    EXEC sp_executesql @sql,
-        N'@Name NVARCHAR(100), @CreatedBy INT, @NewId INT OUTPUT',
-        @Name, @CreatedBy, @NewId OUTPUT;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Designation_Update
-    @DatabaseName NVARCHAR(100),
-    @Id           INT,
-    @Name         NVARCHAR(100),
-    @UpdatedBy    INT = 0
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'
-        UPDATE [' + @DatabaseName + N'].dbo.Designations
-        SET Name = @Name, UpdatedAt = GETUTCDATE(), UpdatedBy = @UpdatedBy
-        WHERE Id = @Id';
-    EXEC sp_executesql @sql,
-        N'@Id INT, @Name NVARCHAR(100), @UpdatedBy INT',
-        @Id, @Name, @UpdatedBy;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Designation_Delete
-    @DatabaseName NVARCHAR(100),
-    @Id           INT
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'
-        UPDATE [' + @DatabaseName + N'].dbo.Designations SET IsActive = 0 WHERE Id = @Id';
-    EXEC sp_executesql @sql, N'@Id INT', @Id;
-END
-GO
-
--- ============================================================
 -- LEAD SOURCE PROCEDURES
 -- ============================================================
 CREATE OR ALTER PROCEDURE sp_LeadSource_GetAll
@@ -1137,109 +1094,6 @@ AS BEGIN
     SET NOCOUNT ON;
     DECLARE @sql NVARCHAR(MAX) = N'
         UPDATE [' + @DatabaseName + N'].dbo.MailTemplates SET IsActive = 0 WHERE Id = @Id';
-    EXEC sp_executesql @sql, N'@Id INT', @Id;
-END
-GO
-
--- ============================================================
--- EMPLOYEE PROCEDURES
--- ============================================================
-CREATE OR ALTER PROCEDURE sp_Employee_GetAll
-    @DatabaseName NVARCHAR(100)
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'
-        SELECT e.*, d.Name AS DesignationName
-        FROM [' + @DatabaseName + N'].dbo.Employees e
-        LEFT JOIN [' + @DatabaseName + N'].dbo.Designations d ON e.DesignationId = d.Id
-        WHERE e.IsActive = 1
-        ORDER BY e.FirstName, e.LastName';
-    EXEC sp_executesql @sql;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Employee_GetById
-    @DatabaseName NVARCHAR(100),
-    @Id           INT
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'
-        SELECT e.*, d.Name AS DesignationName
-        FROM [' + @DatabaseName + N'].dbo.Employees e
-        LEFT JOIN [' + @DatabaseName + N'].dbo.Designations d ON e.DesignationId = d.Id
-        WHERE e.Id = @Id';
-    EXEC sp_executesql @sql, N'@Id INT', @Id;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Employee_Insert
-    @DatabaseName  NVARCHAR(100),
-    @UserId        INT           = NULL,
-    @DesignationId INT           = NULL,
-    @FirstName     NVARCHAR(100),
-    @LastName      NVARCHAR(100) = NULL,
-    @Email         NVARCHAR(150),
-    @Mobile        NVARCHAR(30)  = NULL,
-    @DateOfBirth   DATE          = NULL,
-    @ImageUrl      NVARCHAR(500) = NULL,
-    @ReplyEmail    NVARCHAR(150) = NULL,
-    @CreatedBy     INT           = 0,
-    @NewId         INT OUTPUT
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'
-        INSERT INTO [' + @DatabaseName + N'].dbo.Employees
-            (UserId, DesignationId, FirstName, LastName, Email, Mobile, DateOfBirth, ImageUrl, ReplyEmail,
-             IsActive, CreatedAt, CreatedBy)
-        VALUES (@UserId, @DesignationId, @FirstName, @LastName, @Email, @Mobile, @DateOfBirth, @ImageUrl, @ReplyEmail,
-            1, GETUTCDATE(), @CreatedBy);
-        SELECT @NewId = SCOPE_IDENTITY();';
-    EXEC sp_executesql @sql,
-        N'@UserId INT, @DesignationId INT, @FirstName NVARCHAR(100), @LastName NVARCHAR(100), @Email NVARCHAR(150), @Mobile NVARCHAR(30), @DateOfBirth DATE, @ImageUrl NVARCHAR(500), @ReplyEmail NVARCHAR(150), @CreatedBy INT, @NewId INT OUTPUT',
-        @UserId, @DesignationId, @FirstName, @LastName, @Email, @Mobile, @DateOfBirth, @ImageUrl, @ReplyEmail, @CreatedBy, @NewId OUTPUT;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Employee_Update
-    @DatabaseName  NVARCHAR(100),
-    @Id            INT,
-    @DesignationId INT           = NULL,
-    @FirstName     NVARCHAR(100),
-    @LastName      NVARCHAR(100) = NULL,
-    @Email         NVARCHAR(150),
-    @Mobile        NVARCHAR(30)  = NULL,
-    @DateOfBirth   DATE          = NULL,
-    @ImageUrl      NVARCHAR(500) = NULL,
-    @ReplyEmail    NVARCHAR(150) = NULL,
-    @UpdatedBy     INT           = 0
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'
-        UPDATE [' + @DatabaseName + N'].dbo.Employees
-        SET DesignationId = @DesignationId,
-            FirstName = @FirstName,
-            LastName = @LastName,
-            Email = @Email,
-            Mobile = @Mobile,
-            DateOfBirth = @DateOfBirth,
-            ImageUrl = ISNULL(@ImageUrl, ImageUrl),
-            ReplyEmail = @ReplyEmail,
-            UpdatedAt = GETUTCDATE(),
-            UpdatedBy = @UpdatedBy
-        WHERE Id = @Id';
-    EXEC sp_executesql @sql,
-        N'@Id INT, @DesignationId INT, @FirstName NVARCHAR(100), @LastName NVARCHAR(100), @Email NVARCHAR(150), @Mobile NVARCHAR(30), @DateOfBirth DATE, @ImageUrl NVARCHAR(500), @ReplyEmail NVARCHAR(150), @UpdatedBy INT',
-        @Id, @DesignationId, @FirstName, @LastName, @Email, @Mobile, @DateOfBirth, @ImageUrl, @ReplyEmail, @UpdatedBy;
-END
-GO
-
-CREATE OR ALTER PROCEDURE sp_Employee_Delete
-    @DatabaseName NVARCHAR(100),
-    @Id           INT
-AS BEGIN
-    SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX) = N'
-        UPDATE [' + @DatabaseName + N'].dbo.Employees SET IsActive = 0 WHERE Id = @Id';
     EXEC sp_executesql @sql, N'@Id INT', @Id;
 END
 GO

@@ -64,7 +64,10 @@ public class CompanyController : Controller
     }
 
     [HttpPost("Users/Create"), ValidateAntiForgeryToken]
-    public async Task<IActionResult> CreateUser(UserFormVm vm, [FromServices] IRoleRepository roles)
+    [RequestSizeLimit(10 * 1024 * 1024)]
+    public async Task<IActionResult> CreateUser(
+        UserFormVm vm, IFormFile? photo,
+        [FromServices] IRoleRepository roles)
     {
         if (!_tenant.IsSuperAdmin) return Forbid();
         if (!ModelState.IsValid)
@@ -89,16 +92,22 @@ public class CompanyController : Controller
             return View("UserForm", vm);
         }
 
+        var imageUrl = await SaveUserPhotoAsync(photo);
+
         var user = new TravelERP.Core.Entities.Master.MasterUser
         {
-            CompanyId    = _tenant.CompanyId,
-            FullName     = vm.FullName.Trim(),
-            Email        = vm.Email.Trim().ToLowerInvariant(),
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(vm.Password),
-            Role         = vm.Role,
-            IsActive     = vm.IsActive,
-            CreatedBy    = _tenant.UserId,
-            CreatedAt    = DateTime.UtcNow
+            CompanyId       = _tenant.CompanyId,
+            FullName        = vm.FullName.Trim(),
+            Email           = vm.Email.Trim().ToLowerInvariant(),
+            PasswordHash    = BCrypt.Net.BCrypt.HashPassword(vm.Password),
+            Role            = vm.Role,
+            IsActive        = vm.IsActive,
+            ProfileImageUrl = imageUrl,
+            Mobile          = string.IsNullOrWhiteSpace(vm.Mobile) ? null : vm.Mobile.Trim(),
+            DateOfBirth     = vm.DateOfBirth,
+            ReplyEmail      = string.IsNullOrWhiteSpace(vm.ReplyEmail) ? null : vm.ReplyEmail.Trim(),
+            CreatedBy       = _tenant.UserId,
+            CreatedAt       = DateTime.UtcNow
         };
         var newId = await _users.InsertAsync(user);
         if (vm.TenantRoleId.HasValue && vm.TenantRoleId > 0)
@@ -118,17 +127,24 @@ public class CompanyController : Controller
         ViewBag.Roles = await roles.GetAllAsync();
         return View("UserForm", new UserFormVm
         {
-            Id = user.Id,
-            FullName = user.FullName,
-            Email = user.Email,
-            Role = user.Role,
+            Id           = user.Id,
+            FullName     = user.FullName,
+            Email        = user.Email,
+            Role         = user.Role,
             TenantRoleId = user.TenantRoleId,
-            IsActive = user.IsActive
+            IsActive     = user.IsActive,
+            Mobile       = user.Mobile,
+            DateOfBirth  = user.DateOfBirth,
+            ReplyEmail   = user.ReplyEmail,
+            ImageUrl     = user.ProfileImageUrl
         });
     }
 
     [HttpPost("Users/Edit/{id:int}"), ValidateAntiForgeryToken]
-    public async Task<IActionResult> EditUser(int id, UserFormVm vm, [FromServices] IRoleRepository roles)
+    [RequestSizeLimit(10 * 1024 * 1024)]
+    public async Task<IActionResult> EditUser(int id,
+        UserFormVm vm, IFormFile? photo,
+        [FromServices] IRoleRepository roles)
     {
         if (!_tenant.IsSuperAdmin) return Forbid();
         var user = await _users.GetByIdAsync(id);
@@ -140,10 +156,16 @@ public class CompanyController : Controller
             return View("UserForm", vm);
         }
 
-        user.FullName = vm.FullName.Trim();
-        user.Email    = vm.Email.Trim().ToLowerInvariant();
-        user.Role     = vm.Role;
-        user.IsActive = vm.IsActive;
+        var newImage = await SaveUserPhotoAsync(photo);
+
+        user.FullName    = vm.FullName.Trim();
+        user.Email       = vm.Email.Trim().ToLowerInvariant();
+        user.Role        = vm.Role;
+        user.IsActive    = vm.IsActive;
+        user.Mobile      = string.IsNullOrWhiteSpace(vm.Mobile) ? null : vm.Mobile.Trim();
+        user.DateOfBirth = vm.DateOfBirth;
+        user.ReplyEmail  = string.IsNullOrWhiteSpace(vm.ReplyEmail) ? null : vm.ReplyEmail.Trim();
+        if (newImage != null) user.ProfileImageUrl = newImage;
         user.UpdatedBy = _tenant.UserId;
         user.UpdatedAt = DateTime.UtcNow;
         await _users.UpdateAsync(user);
@@ -152,6 +174,24 @@ public class CompanyController : Controller
 
         TempData["Success"] = "User updated.";
         return RedirectToAction(nameof(Users));
+    }
+
+    private static readonly string[] AllowedPhotoExt = [".jpg", ".jpeg", ".png", ".webp", ".gif"];
+    private const long MaxPhotoBytes = 5 * 1024 * 1024;
+
+    private async Task<string?> SaveUserPhotoAsync(IFormFile? file)
+    {
+        if (file == null || file.Length == 0 || file.Length > MaxPhotoBytes) return null;
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (!AllowedPhotoExt.Contains(ext)) return null;
+
+        var folder = Path.Combine(_env.WebRootPath, "uploads", "users");
+        Directory.CreateDirectory(folder);
+        var fileName = $"u-{_tenant.CompanyId}-{Guid.NewGuid():N}{ext}";
+        var fullPath = Path.Combine(folder, fileName);
+        await using var fs = new FileStream(fullPath, FileMode.Create);
+        await file.CopyToAsync(fs);
+        return $"/uploads/users/{fileName}";
     }
 
     [HttpPost("Users/ResetPassword/{id:int}"), ValidateAntiForgeryToken]
@@ -218,6 +258,10 @@ public class CompanyController : Controller
         public TravelERP.Shared.Enums.UserRole Role { get; set; } = TravelERP.Shared.Enums.UserRole.Agent;
         public int? TenantRoleId { get; set; }
         public bool IsActive { get; set; } = true;
+        public string? Mobile { get; set; }
+        public DateTime? DateOfBirth { get; set; }
+        public string? ReplyEmail { get; set; }
+        public string? ImageUrl { get; set; }      // current photo URL (read-only display)
     }
 
     [HttpGet("Branches")]

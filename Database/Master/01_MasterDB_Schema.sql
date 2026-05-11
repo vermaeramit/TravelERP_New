@@ -96,6 +96,17 @@ IF COL_LENGTH('MasterUsers','TenantRoleId') IS NULL
     ALTER TABLE MasterUsers ADD TenantRoleId INT NULL;
 GO
 
+-- Profile fields absorbed from the deprecated Employees module (idempotent).
+IF COL_LENGTH('MasterUsers','Mobile')        IS NULL ALTER TABLE MasterUsers ADD Mobile      NVARCHAR(50)  NULL;
+IF COL_LENGTH('MasterUsers','DateOfBirth')   IS NULL ALTER TABLE MasterUsers ADD DateOfBirth DATE          NULL;
+IF COL_LENGTH('MasterUsers','ReplyEmail')    IS NULL ALTER TABLE MasterUsers ADD ReplyEmail  NVARCHAR(200) NULL;
+GO
+
+-- Drop DesignationId column if present (Designation master was removed).
+IF COL_LENGTH('MasterUsers','DesignationId') IS NOT NULL
+    ALTER TABLE MasterUsers DROP COLUMN DesignationId;
+GO
+
 -- Add configurable number prefixes (idempotent)
 IF COL_LENGTH('Companies','LeadPrefix') IS NULL
     ALTER TABLE Companies ADD LeadPrefix NVARCHAR(20) NOT NULL DEFAULT 'LD';

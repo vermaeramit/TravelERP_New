@@ -13,4 +13,9 @@ public class MasterUser : BaseEntity
     public DateTime? LastLoginAt { get; set; }
     public string? ProfileImageUrl { get; set; }
     public int? TenantRoleId { get; set; }
+
+    // Profile fields absorbed from the deprecated Employees module.
+    public string? Mobile { get; set; }
+    public DateTime? DateOfBirth { get; set; }
+    public string? ReplyEmail { get; set; }
 }
