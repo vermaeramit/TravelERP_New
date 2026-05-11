@@ -30,7 +30,7 @@ public class RolesController : Controller
     {
         if (!_tenant.CanAdd(AppModules.Roles)) return Forbid();
         ViewData["Title"] = "New Role";
-        ViewBag.Modules = AppModules.All;
+        ViewBag.Sections = AppModules.Sections;
         return View(new Role());
     }
 
@@ -38,7 +38,7 @@ public class RolesController : Controller
     public async Task<IActionResult> Create(Role model)
     {
         if (!_tenant.CanAdd(AppModules.Roles)) return Forbid();
-        if (!ModelState.IsValid) { ViewBag.Modules = AppModules.All; return View(model); }
+        if (!ModelState.IsValid) { ViewBag.Sections = AppModules.Sections; return View(model); }
 
         var id = await _repo.InsertAsync(model);
         await SavePermissions(id, Request.Form);
@@ -59,7 +59,7 @@ public class RolesController : Controller
             return RedirectToAction(nameof(Index));
         }
         ViewData["Title"] = $"Edit Role — {role.RoleName}";
-        ViewBag.Modules = AppModules.All;
+        ViewBag.Sections = AppModules.Sections;
         return View(role);
     }
 
@@ -67,7 +67,7 @@ public class RolesController : Controller
     public async Task<IActionResult> Edit(Role model)
     {
         if (!_tenant.CanEdit(AppModules.Roles)) return Forbid();
-        if (!ModelState.IsValid) { ViewBag.Modules = AppModules.All; return View(model); }
+        if (!ModelState.IsValid) { ViewBag.Sections = AppModules.Sections; return View(model); }
 
         await _repo.UpdateAsync(model);
         await SavePermissions(model.Id, Request.Form);

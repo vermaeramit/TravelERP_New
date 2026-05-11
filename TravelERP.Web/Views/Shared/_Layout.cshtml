@@ -152,96 +152,99 @@
                     @* Tour Packages are managed per-lead from /Leads/Details — no top-level link *@
 
 
-                    @if (CanSee("Masters"))
+                    @{
+                        var anyTravel  = CanSee("Destinations") || CanSee("Hotels") || CanSee("RoomTypes") || CanSee("MealPlans") || CanSee("Sightseeings") || CanSee("Itineraries");
+                        var anyCrm     = CanSee("LeadSources") || CanSee("LeadStatuses") || CanSee("ActivityTemplates") || CanSee("VisaTypes") || CanSee("MailTemplates");
+                        var anyFinance = CanSee("BankAccounts");
+                    }
+                    @if (anyTravel || anyCrm || anyFinance)
                     {
                         <li class="nav-header">MASTERS</li>
+                    }
+                    @if (anyTravel)
+                    {
                         <li class="nav-item @TreeviewOpenAny("Destinations","Hotels","RoomTypes","MealPlans","Sightseeings","Itineraries")">
                             <a href="#" class="nav-link">
                                 <i class="nav-icon bi bi-globe-asia-australia"></i>
                                 <p>Travel Masters <i class="nav-arrow bi bi-chevron-right"></i></p>
                             </a>
                             <ul class="nav nav-treeview">
-                                <li class="nav-item">
-                                    <a href="/Destinations" class="nav-link @NavActive("Destinations")">
-                                        <i class="nav-icon bi bi-geo-alt"></i><p>Destinations</p>
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a href="/Hotels" class="nav-link @NavActive("Hotels")">
-                                        <i class="nav-icon bi bi-building"></i><p>Hotels</p>
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a href="/RoomTypes" class="nav-link @NavActive("RoomTypes")">
-                                        <i class="nav-icon bi bi-door-closed"></i><p>Room Types</p>
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a href="/MealPlans" class="nav-link @NavActive("MealPlans")">
-                                        <i class="nav-icon bi bi-egg-fried"></i><p>Meal Plans</p>
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a href="/Sightseeings" class="nav-link @NavActive("Sightseeings")">
-                                        <i class="nav-icon bi bi-camera"></i><p>Sightseeing</p>
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a href="/Itineraries" class="nav-link @NavActive("Itineraries")">
-                                        <i class="nav-icon bi bi-list-ul"></i><p>Itineraries</p>
-                                    </a>
-                                </li>
+                                @if (CanSee("Destinations"))
+                                {
+                                    <li class="nav-item"><a href="/Destinations" class="nav-link @NavActive("Destinations")"><i class="nav-icon bi bi-geo-alt"></i><p>Destinations</p></a></li>
+                                }
+                                @if (CanSee("Hotels"))
+                                {
+                                    <li class="nav-item"><a href="/Hotels" class="nav-link @NavActive("Hotels")"><i class="nav-icon bi bi-building"></i><p>Hotels</p></a></li>
+                                }
+                                @if (CanSee("RoomTypes"))
+                                {
+                                    <li class="nav-item"><a href="/RoomTypes" class="nav-link @NavActive("RoomTypes")"><i class="nav-icon bi bi-door-closed"></i><p>Room Types</p></a></li>
+                                }
+                                @if (CanSee("MealPlans"))
+                                {
+                                    <li class="nav-item"><a href="/MealPlans" class="nav-link @NavActive("MealPlans")"><i class="nav-icon bi bi-egg-fried"></i><p>Meal Plans</p></a></li>
+                                }
+                                @if (CanSee("Sightseeings"))
+                                {
+                                    <li class="nav-item"><a href="/Sightseeings" class="nav-link @NavActive("Sightseeings")"><i class="nav-icon bi bi-camera"></i><p>Sightseeing</p></a></li>
+                                }
+                                @if (CanSee("Itineraries"))
+                                {
+                                    <li class="nav-item"><a href="/Itineraries" class="nav-link @NavActive("Itineraries")"><i class="nav-icon bi bi-list-ul"></i><p>Itineraries</p></a></li>
+                                }
                             </ul>
                         </li>
+                    }
+                    @if (anyCrm)
+                    {
                         <li class="nav-item @TreeviewOpenAny("LeadSources","LeadStatuses","ActivityTemplates","VisaTypes","MailTemplates")">
                             <a href="#" class="nav-link">
                                 <i class="nav-icon bi bi-collection-fill"></i>
                                 <p>CRM Masters <i class="nav-arrow bi bi-chevron-right"></i></p>
                             </a>
                             <ul class="nav nav-treeview">
-                                <li class="nav-item">
-                                    <a href="/LeadSources" class="nav-link @NavActive("LeadSources")">
-                                        <i class="nav-icon bi bi-megaphone"></i><p>Lead Sources</p>
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a href="/LeadStatuses" class="nav-link @NavActive("LeadStatuses")">
-                                        <i class="nav-icon bi bi-flag"></i><p>Lead Statuses</p>
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a href="/ActivityTemplates" class="nav-link @NavActive("ActivityTemplates")">
-                                        <i class="nav-icon bi bi-chat-square-text"></i><p>Activity Templates</p>
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a href="/VisaTypes" class="nav-link @NavActive("VisaTypes")">
-                                        <i class="nav-icon bi bi-passport"></i><p>Visa Types</p>
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a href="/MailTemplates" class="nav-link @NavActive("MailTemplates")">
-                                        <i class="nav-icon bi bi-envelope-paper"></i><p>Mail Templates</p>
-                                    </a>
-                                </li>
+                                @if (CanSee("LeadSources"))
+                                {
+                                    <li class="nav-item"><a href="/LeadSources" class="nav-link @NavActive("LeadSources")"><i class="nav-icon bi bi-megaphone"></i><p>Lead Sources</p></a></li>
+                                }
+                                @if (CanSee("LeadStatuses"))
+                                {
+                                    <li class="nav-item"><a href="/LeadStatuses" class="nav-link @NavActive("LeadStatuses")"><i class="nav-icon bi bi-flag"></i><p>Lead Statuses</p></a></li>
+                                }
+                                @if (CanSee("ActivityTemplates"))
+                                {
+                                    <li class="nav-item"><a href="/ActivityTemplates" class="nav-link @NavActive("ActivityTemplates")"><i class="nav-icon bi bi-chat-square-text"></i><p>Activity Templates</p></a></li>
+                                }
+                                @if (CanSee("VisaTypes"))
+                                {
+                                    <li class="nav-item"><a href="/VisaTypes" class="nav-link @NavActive("VisaTypes")"><i class="nav-icon bi bi-passport"></i><p>Visa Types</p></a></li>
+                                }
+                                @if (CanSee("MailTemplates"))
+                                {
+                                    <li class="nav-item"><a href="/MailTemplates" class="nav-link @NavActive("MailTemplates")"><i class="nav-icon bi bi-envelope-paper"></i><p>Mail Templates</p></a></li>
+                                }
                             </ul>
                         </li>
+                    }
+                    @if (anyFinance)
+                    {
                         <li class="nav-item @TreeviewOpenAny("BankAccounts")">
                             <a href="#" class="nav-link">
                                 <i class="nav-icon bi bi-cash-stack"></i>
                                 <p>Finance Masters <i class="nav-arrow bi bi-chevron-right"></i></p>
                             </a>
                             <ul class="nav nav-treeview">
-                                <li class="nav-item">
-                                    <a href="/BankAccounts" class="nav-link @NavActive("BankAccounts")">
-                                        <i class="nav-icon bi bi-bank"></i><p>Bank Accounts</p>
-                                    </a>
-                                </li>
+                                @if (CanSee("BankAccounts"))
+                                {
+                                    <li class="nav-item"><a href="/BankAccounts" class="nav-link @NavActive("BankAccounts")"><i class="nav-icon bi bi-bank"></i><p>Bank Accounts</p></a></li>
+                                }
                             </ul>
                         </li>
                     }
 
-                    @if (CanSee("Reports") || CanSee("Roles") || CanSee("Settings"))
+                    @{ var isSuperAdmin = User.HasClaim("IsSuperAdmin", "true"); }
+                    @if (CanSee("Reports") || CanSee("Roles") || isSuperAdmin)
                     {
                         <li class="nav-header">REPORTS &amp; SETTINGS</li>
                     }
@@ -261,7 +264,7 @@
                             </a>
                         </li>
                     }
-                    @if (CanSee("Settings"))
+                    @if (isSuperAdmin)
                     {
                         <li class="nav-item @TreeviewOpen("Company")">
                             <a href="#" class="nav-link">
@@ -275,21 +278,18 @@
                                 <li class="nav-item">
                                     <a href="/Company/Users" class="nav-link"><i class="nav-icon bi bi-people"></i><p>Users</p></a>
                                 </li>
-                                @if (User.HasClaim("IsSuperAdmin", "true"))
-                                {
-                                    <li class="nav-item">
-                                        <a href="/Company/QuoteBranding" class="nav-link"><i class="nav-icon bi bi-stars"></i><p>Quote Branding</p></a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a href="/Company/VoucherDefaults" class="nav-link"><i class="nav-icon bi bi-building-check"></i><p>Voucher Defaults</p></a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a href="/Company/EmailSettings" class="nav-link"><i class="nav-icon bi bi-envelope-paper"></i><p>Email Settings</p></a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a href="/Company/NumberSeries" class="nav-link"><i class="nav-icon bi bi-hash"></i><p>Number Series</p></a>
-                                    </li>
-                                }
+                                <li class="nav-item">
+                                    <a href="/Company/QuoteBranding" class="nav-link"><i class="nav-icon bi bi-stars"></i><p>Quote Branding</p></a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="/Company/VoucherDefaults" class="nav-link"><i class="nav-icon bi bi-building-check"></i><p>Voucher Defaults</p></a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="/Company/EmailSettings" class="nav-link"><i class="nav-icon bi bi-envelope-paper"></i><p>Email Settings</p></a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="/Company/NumberSeries" class="nav-link"><i class="nav-icon bi bi-hash"></i><p>Number Series</p></a>
+                                </li>
                             </ul>
                         </li>
                     }

@@ -20,7 +20,7 @@ public class LeadSourcesController : Controller
 
     public async Task<IActionResult> Index()
     {
-        if (!_tenant.CanView(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanView(AppModules.LeadSources)) return Forbid();
         ViewData["Title"] = "Lead Sources";
         return View(await _repo.GetAllAsync());
     }
@@ -28,7 +28,7 @@ public class LeadSourcesController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(string name)
     {
-        if (!_tenant.CanAdd(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanAdd(AppModules.LeadSources)) return Forbid();
         if (string.IsNullOrWhiteSpace(name))
         {
             TempData["Error"] = "Lead source name is required.";
@@ -42,7 +42,7 @@ public class LeadSourcesController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Update(int id, string name)
     {
-        if (!_tenant.CanEdit(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanEdit(AppModules.LeadSources)) return Forbid();
         if (string.IsNullOrWhiteSpace(name))
         {
             TempData["Error"] = "Lead source name is required.";
@@ -56,7 +56,7 @@ public class LeadSourcesController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(int id)
     {
-        if (!_tenant.CanDelete(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanDelete(AppModules.LeadSources)) return Forbid();
         await _repo.DeleteAsync(id);
         TempData["Success"] = "Lead source deactivated.";
         return RedirectToAction(nameof(Index));

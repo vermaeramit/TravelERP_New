@@ -20,7 +20,7 @@ public class MealPlansController : Controller
 
     public async Task<IActionResult> Index()
     {
-        if (!_tenant.CanView(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanView(AppModules.MealPlans)) return Forbid();
         ViewData["Title"] = "Meal Plans";
         return View(await _repo.GetAllAsync());
     }
@@ -28,7 +28,7 @@ public class MealPlansController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(string code, string name)
     {
-        if (!_tenant.CanAdd(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanAdd(AppModules.MealPlans)) return Forbid();
         if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(name))
         {
             TempData["Error"] = "Code and Name are required.";
@@ -42,7 +42,7 @@ public class MealPlansController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Update(int id, string code, string name)
     {
-        if (!_tenant.CanEdit(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanEdit(AppModules.MealPlans)) return Forbid();
         if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(name))
         {
             TempData["Error"] = "Code and Name are required.";
@@ -56,7 +56,7 @@ public class MealPlansController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(int id)
     {
-        if (!_tenant.CanDelete(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanDelete(AppModules.MealPlans)) return Forbid();
         await _repo.DeleteAsync(id);
         TempData["Success"] = "Meal plan deactivated.";
         return RedirectToAction(nameof(Index));

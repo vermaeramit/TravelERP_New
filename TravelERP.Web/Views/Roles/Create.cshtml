@@ -44,7 +44,7 @@
                 <table class="table table-bordered mb-0 align-middle">
                     <thead class="table-light">
                         <tr>
-                            <th style="width:220px">Module</th>
+                            <th style="width:240px">Module</th>
                             <th class="text-center">View</th>
                             <th class="text-center">Add</th>
                             <th class="text-center">Edit</th>
@@ -52,15 +52,21 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var module in (string[])ViewBag.Modules)
+                        @foreach (var grp in ((string Section, string[] Modules)[])ViewBag.Sections)
                         {
-                            <tr>
-                                <td class="fw-semibold small ps-3">@module</td>
-                                <td class="text-center"><input type="checkbox" name="View[@module]"   value="true" class="form-check-input perm-check" /></td>
-                                <td class="text-center"><input type="checkbox" name="Add[@module]"    value="true" class="form-check-input perm-check" /></td>
-                                <td class="text-center"><input type="checkbox" name="Edit[@module]"   value="true" class="form-check-input perm-check" /></td>
-                                <td class="text-center"><input type="checkbox" name="Delete[@module]" value="true" class="form-check-input perm-check" /></td>
+                            <tr class="table-light">
+                                <td colspan="5" class="fw-bold small text-uppercase text-muted ps-3" style="letter-spacing:.05em">@grp.Section</td>
                             </tr>
+                            @foreach (var module in grp.Modules)
+                            {
+                                <tr>
+                                    <td class="fw-semibold small ps-4">@module</td>
+                                    <td class="text-center"><input type="checkbox" name="View[@module]"   value="true" class="form-check-input perm-check" /></td>
+                                    <td class="text-center"><input type="checkbox" name="Add[@module]"    value="true" class="form-check-input perm-check" /></td>
+                                    <td class="text-center"><input type="checkbox" name="Edit[@module]"   value="true" class="form-check-input perm-check" /></td>
+                                    <td class="text-center"><input type="checkbox" name="Delete[@module]" value="true" class="form-check-input perm-check" /></td>
+                                </tr>
+                            }
                         }
                     </tbody>
                 </table>

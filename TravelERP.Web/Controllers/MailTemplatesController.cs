@@ -23,7 +23,7 @@ public class MailTemplatesController : Controller
 
     public async Task<IActionResult> Index()
     {
-        if (!_tenant.CanView(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanView(AppModules.MailTemplates)) return Forbid();
         ViewData["Title"] = "Mail Templates";
         return View(await _repo.GetAllAsync());
     }
@@ -31,7 +31,7 @@ public class MailTemplatesController : Controller
     [HttpGet]
     public IActionResult Create()
     {
-        if (!_tenant.CanAdd(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanAdd(AppModules.MailTemplates)) return Forbid();
         ViewData["Title"] = "Add Mail Template";
         ViewBag.Categories = Categories;
         return View(new MailTemplate());
@@ -40,7 +40,7 @@ public class MailTemplatesController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(MailTemplate model)
     {
-        if (!_tenant.CanAdd(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanAdd(AppModules.MailTemplates)) return Forbid();
         if (string.IsNullOrWhiteSpace(model.Name))
             ModelState.AddModelError(nameof(model.Name), "Template name is required.");
         if (string.IsNullOrWhiteSpace(model.Subject))
@@ -61,7 +61,7 @@ public class MailTemplatesController : Controller
     [HttpGet]
     public async Task<IActionResult> Edit(int id)
     {
-        if (!_tenant.CanEdit(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanEdit(AppModules.MailTemplates)) return Forbid();
         var t = await _repo.GetByIdAsync(id);
         if (t == null) return NotFound();
         ViewData["Title"] = $"Edit — {t.Name}";
@@ -72,7 +72,7 @@ public class MailTemplatesController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(MailTemplate model)
     {
-        if (!_tenant.CanEdit(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanEdit(AppModules.MailTemplates)) return Forbid();
         if (string.IsNullOrWhiteSpace(model.Name))
             ModelState.AddModelError(nameof(model.Name), "Template name is required.");
         if (string.IsNullOrWhiteSpace(model.Subject))
@@ -93,7 +93,7 @@ public class MailTemplatesController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(int id)
     {
-        if (!_tenant.CanDelete(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanDelete(AppModules.MailTemplates)) return Forbid();
         await _repo.DeleteAsync(id);
         TempData["Success"] = "Mail template deactivated.";
         return RedirectToAction(nameof(Index));

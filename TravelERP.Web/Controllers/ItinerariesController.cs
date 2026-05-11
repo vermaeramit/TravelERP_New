@@ -23,7 +23,7 @@ public class ItinerariesController : Controller
 
     public async Task<IActionResult> Index()
     {
-        if (!_tenant.CanView(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanView(AppModules.Itineraries)) return Forbid();
         ViewData["Title"] = "Itineraries";
         return View(await _repo.GetAllAsync());
     }
@@ -31,7 +31,7 @@ public class ItinerariesController : Controller
     [HttpGet]
     public async Task<IActionResult> Create()
     {
-        if (!_tenant.CanAdd(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanAdd(AppModules.Itineraries)) return Forbid();
         ViewData["Title"] = "Add Itinerary";
         ViewBag.Destinations = await _destinations.GetAllAsync();
         return View(new Itinerary());
@@ -40,7 +40,7 @@ public class ItinerariesController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(Itinerary model)
     {
-        if (!_tenant.CanAdd(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanAdd(AppModules.Itineraries)) return Forbid();
         if (model.DestinationId == 0)
             ModelState.AddModelError(nameof(model.DestinationId), "Destination is required.");
         if (string.IsNullOrWhiteSpace(model.Title))
@@ -61,7 +61,7 @@ public class ItinerariesController : Controller
     [HttpGet]
     public async Task<IActionResult> Edit(int id)
     {
-        if (!_tenant.CanEdit(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanEdit(AppModules.Itineraries)) return Forbid();
         var i = await _repo.GetByIdAsync(id);
         if (i == null) return NotFound();
         ViewData["Title"] = $"Edit — {i.Title}";
@@ -72,7 +72,7 @@ public class ItinerariesController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(Itinerary model)
     {
-        if (!_tenant.CanEdit(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanEdit(AppModules.Itineraries)) return Forbid();
         var existing = await _repo.GetByIdAsync(model.Id);
         if (existing == null) return NotFound();
 
@@ -96,7 +96,7 @@ public class ItinerariesController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(int id)
     {
-        if (!_tenant.CanDelete(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanDelete(AppModules.Itineraries)) return Forbid();
         await _repo.DeleteAsync(id);
         TempData["Success"] = "Itinerary deactivated.";
         return RedirectToAction(nameof(Index));

@@ -25,7 +25,7 @@ public class DestinationsController : Controller
 
     public async Task<IActionResult> Index()
     {
-        if (!_tenant.CanView(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanView(AppModules.Destinations)) return Forbid();
         ViewData["Title"] = "Destinations";
         return View(await _repo.GetAllAsync());
     }
@@ -33,7 +33,7 @@ public class DestinationsController : Controller
     [HttpGet]
     public IActionResult Create()
     {
-        if (!_tenant.CanAdd(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanAdd(AppModules.Destinations)) return Forbid();
         ViewData["Title"] = "Add Destination";
         return View(new Destination());
     }
@@ -46,7 +46,7 @@ public class DestinationsController : Controller
         List<string>? reviewTexts,
         List<IFormFile?>? reviewImages)
     {
-        if (!_tenant.CanAdd(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanAdd(AppModules.Destinations)) return Forbid();
         if (string.IsNullOrWhiteSpace(model.Name))
             ModelState.AddModelError(nameof(model.Name), "Destination name is required.");
 
@@ -69,7 +69,7 @@ public class DestinationsController : Controller
     [HttpGet]
     public async Task<IActionResult> Edit(int id)
     {
-        if (!_tenant.CanEdit(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanEdit(AppModules.Destinations)) return Forbid();
         var dest = await _repo.GetByIdAsync(id);
         if (dest == null) return NotFound();
         ViewData["Title"] = $"Edit — {dest.Name}";
@@ -85,7 +85,7 @@ public class DestinationsController : Controller
         List<IFormFile?>? reviewImages,
         List<string>? reviewExistingImages)
     {
-        if (!_tenant.CanEdit(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanEdit(AppModules.Destinations)) return Forbid();
         var existing = await _repo.GetByIdAsync(model.Id);
         if (existing == null) return NotFound();
 
@@ -115,7 +115,7 @@ public class DestinationsController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(int id)
     {
-        if (!_tenant.CanDelete(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanDelete(AppModules.Destinations)) return Forbid();
         await _repo.DeleteAsync(id);
         TempData["Success"] = "Destination deactivated.";
         return RedirectToAction(nameof(Index));

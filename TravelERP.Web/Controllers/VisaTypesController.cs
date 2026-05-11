@@ -20,7 +20,7 @@ public class VisaTypesController : Controller
 
     public async Task<IActionResult> Index()
     {
-        if (!_tenant.CanView(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanView(AppModules.VisaTypes)) return Forbid();
         ViewData["Title"] = "Visa Types";
         return View(await _repo.GetAllAsync());
     }
@@ -28,7 +28,7 @@ public class VisaTypesController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(string name, string? country)
     {
-        if (!_tenant.CanAdd(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanAdd(AppModules.VisaTypes)) return Forbid();
         if (string.IsNullOrWhiteSpace(name))
         {
             TempData["Error"] = "Visa type name is required.";
@@ -42,7 +42,7 @@ public class VisaTypesController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Update(int id, string name, string? country)
     {
-        if (!_tenant.CanEdit(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanEdit(AppModules.VisaTypes)) return Forbid();
         if (string.IsNullOrWhiteSpace(name))
         {
             TempData["Error"] = "Visa type name is required.";
@@ -56,7 +56,7 @@ public class VisaTypesController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(int id)
     {
-        if (!_tenant.CanDelete(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanDelete(AppModules.VisaTypes)) return Forbid();
         await _repo.DeleteAsync(id);
         TempData["Success"] = "Visa type deactivated.";
         return RedirectToAction(nameof(Index));

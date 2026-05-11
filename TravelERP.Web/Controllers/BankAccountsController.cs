@@ -22,7 +22,7 @@ public class BankAccountsController : Controller
 
     public async Task<IActionResult> Index()
     {
-        if (!_tenant.CanView(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanView(AppModules.BankAccounts)) return Forbid();
         ViewData["Title"] = "Bank Accounts";
         return View(await _repo.GetAllAsync());
     }
@@ -30,7 +30,7 @@ public class BankAccountsController : Controller
     [HttpGet]
     public IActionResult Create()
     {
-        if (!_tenant.CanAdd(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanAdd(AppModules.BankAccounts)) return Forbid();
         ViewData["Title"] = "Add Bank Account";
         ViewBag.AccountTypes = AccountTypes;
         return View(new BankAccount());
@@ -39,7 +39,7 @@ public class BankAccountsController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(BankAccount model)
     {
-        if (!_tenant.CanAdd(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanAdd(AppModules.BankAccounts)) return Forbid();
         Validate(model);
         if (!ModelState.IsValid)
         {
@@ -55,7 +55,7 @@ public class BankAccountsController : Controller
     [HttpGet]
     public async Task<IActionResult> Edit(int id)
     {
-        if (!_tenant.CanEdit(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanEdit(AppModules.BankAccounts)) return Forbid();
         var a = await _repo.GetByIdAsync(id);
         if (a == null) return NotFound();
         ViewData["Title"] = $"Edit — {a.BankName}";
@@ -66,7 +66,7 @@ public class BankAccountsController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(BankAccount model)
     {
-        if (!_tenant.CanEdit(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanEdit(AppModules.BankAccounts)) return Forbid();
         Validate(model);
         if (!ModelState.IsValid)
         {
@@ -82,7 +82,7 @@ public class BankAccountsController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(int id)
     {
-        if (!_tenant.CanDelete(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanDelete(AppModules.BankAccounts)) return Forbid();
         await _repo.DeleteAsync(id);
         TempData["Success"] = "Bank account deactivated.";
         return RedirectToAction(nameof(Index));

@@ -4,7 +4,7 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <p class="text-muted mb-0 small">Reusable email templates for booking confirmations, invoices, payments, etc.</p>
-    @if (Tenant.CanAdd(TravelERP.Core.Constants.AppModules.Masters))
+    @if (Tenant.CanAdd(TravelERP.Core.Constants.AppModules.MailTemplates))
     {
         <a href="/MailTemplates/Create" class="btn btn-primary">
             <i class="bi bi-plus-lg me-1"></i>Add Template
@@ -46,13 +46,13 @@
                                     }
                                 </td>
                                 <td class="text-end pe-3">
-                                    @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.Masters))
+                                    @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.MailTemplates))
                                     {
                                         <a href="/MailTemplates/Edit/@t.Id" class="btn btn-sm btn-outline-primary">
                                             <i class="bi bi-pencil"></i>
                                         </a>
                                     }
-                                    @if (Tenant.CanDelete(TravelERP.Core.Constants.AppModules.Masters))
+                                    @if (Tenant.CanDelete(TravelERP.Core.Constants.AppModules.MailTemplates))
                                     {
                                         <form asp-action="Delete" method="post" class="d-inline"
                                               onsubmit="return confirm('Deactivate this template?');">

@@ -83,35 +83,29 @@ public class TenantDbProvisioningService
         foreach (var m in AppModules.All)
             await InsertPerm(conn, adminId, m, v: true, a: true, e: true, d: true);
 
-        // ── Sales Agent permissions ────────────────────────────────────────
-        await InsertPerm(conn, agentId, AppModules.Dashboard,  v: true,  a: false, e: false, d: false);
-        await InsertPerm(conn, agentId, AppModules.Leads,      v: true,  a: true,  e: true,  d: false);
-        await InsertPerm(conn, agentId, AppModules.Customers,  v: true,  a: true,  e: true,  d: false);
-        await InsertPerm(conn, agentId, AppModules.Bookings,   v: true,  a: true,  e: true,  d: false);
-        await InsertPerm(conn, agentId, AppModules.Packages,   v: true,  a: true,  e: true,  d: false);
-        await InsertPerm(conn, agentId, AppModules.Finance,    v: true,  a: false, e: false, d: false);
-        await InsertPerm(conn, agentId, AppModules.HR,         v: false, a: false, e: false, d: false);
-        await InsertPerm(conn, agentId, AppModules.Visa,       v: true,  a: true,  e: true,  d: false);
-        await InsertPerm(conn, agentId, AppModules.Suppliers,  v: true,  a: false, e: false, d: false);
-        await InsertPerm(conn, agentId, AppModules.Reports,    v: false, a: false, e: false, d: false);
-        await InsertPerm(conn, agentId, AppModules.Masters,    v: true,  a: false, e: false, d: false);
-        await InsertPerm(conn, agentId, AppModules.Roles,      v: false, a: false, e: false, d: false);
-        await InsertPerm(conn, agentId, AppModules.Settings,   v: false, a: false, e: false, d: false);
+        // ── Sales Agent: ops + read-only masters ───────────────────────────
+        await InsertPerm(conn, agentId, AppModules.Dashboard, v: true,  a: false, e: false, d: false);
+        await InsertPerm(conn, agentId, AppModules.Leads,     v: true,  a: true,  e: true,  d: false);
+        await InsertPerm(conn, agentId, AppModules.Packages,  v: true,  a: true,  e: true,  d: false);
+        await InsertPerm(conn, agentId, AppModules.Bookings,  v: true,  a: true,  e: true,  d: false);
+        foreach (var m in new[]
+        {
+            AppModules.Destinations, AppModules.Hotels, AppModules.RoomTypes, AppModules.MealPlans,
+            AppModules.Sightseeings, AppModules.Itineraries, AppModules.LeadSources, AppModules.LeadStatuses,
+            AppModules.ActivityTemplates, AppModules.VisaTypes, AppModules.MailTemplates, AppModules.BankAccounts
+        })
+            await InsertPerm(conn, agentId, m, v: true, a: false, e: false, d: false);
+        await InsertPerm(conn, agentId, AppModules.Reports, v: false, a: false, e: false, d: false);
+        await InsertPerm(conn, agentId, AppModules.Roles,   v: false, a: false, e: false, d: false);
 
-        // ── Accountant permissions ─────────────────────────────────────────
-        await InsertPerm(conn, acctId, AppModules.Dashboard,  v: true,  a: false, e: false, d: false);
-        await InsertPerm(conn, acctId, AppModules.Leads,      v: true,  a: false, e: false, d: false);
-        await InsertPerm(conn, acctId, AppModules.Customers,  v: true,  a: false, e: false, d: false);
-        await InsertPerm(conn, acctId, AppModules.Bookings,   v: true,  a: false, e: false, d: false);
-        await InsertPerm(conn, acctId, AppModules.Packages,   v: true,  a: false, e: false, d: false);
-        await InsertPerm(conn, acctId, AppModules.Finance,    v: true,  a: true,  e: true,  d: false);
-        await InsertPerm(conn, acctId, AppModules.HR,         v: false, a: false, e: false, d: false);
-        await InsertPerm(conn, acctId, AppModules.Visa,       v: false, a: false, e: false, d: false);
-        await InsertPerm(conn, acctId, AppModules.Suppliers,  v: true,  a: false, e: false, d: false);
-        await InsertPerm(conn, acctId, AppModules.Reports,    v: true,  a: false, e: false, d: false);
-        await InsertPerm(conn, acctId, AppModules.Masters,    v: false, a: false, e: false, d: false);
-        await InsertPerm(conn, acctId, AppModules.Roles,      v: false, a: false, e: false, d: false);
-        await InsertPerm(conn, acctId, AppModules.Settings,   v: false, a: false, e: false, d: false);
+        // ── Accountant: read-only ops + reports ────────────────────────────
+        await InsertPerm(conn, acctId, AppModules.Dashboard, v: true, a: false, e: false, d: false);
+        await InsertPerm(conn, acctId, AppModules.Leads,     v: true, a: false, e: false, d: false);
+        await InsertPerm(conn, acctId, AppModules.Packages,  v: true, a: false, e: false, d: false);
+        await InsertPerm(conn, acctId, AppModules.Bookings,  v: true, a: false, e: false, d: false);
+        await InsertPerm(conn, acctId, AppModules.BankAccounts, v: true, a: true, e: true, d: false);
+        await InsertPerm(conn, acctId, AppModules.Reports,   v: true, a: false, e: false, d: false);
+        await InsertPerm(conn, acctId, AppModules.Roles,     v: false, a: false, e: false, d: false);
 
         return superAdminId;
     }

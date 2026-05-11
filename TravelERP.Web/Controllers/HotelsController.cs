@@ -28,7 +28,7 @@ public class HotelsController : Controller
 
     public async Task<IActionResult> Index()
     {
-        if (!_tenant.CanView(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanView(AppModules.Hotels)) return Forbid();
         ViewData["Title"] = "Hotels";
         return View(await _repo.GetAllAsync());
     }
@@ -36,7 +36,7 @@ public class HotelsController : Controller
     [HttpGet]
     public async Task<IActionResult> Create()
     {
-        if (!_tenant.CanAdd(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanAdd(AppModules.Hotels)) return Forbid();
         ViewData["Title"] = "Add Hotel";
         ViewBag.Destinations = await _destinations.GetAllAsync();
         return View(new Hotel());
@@ -46,7 +46,7 @@ public class HotelsController : Controller
     [RequestSizeLimit(50 * 1024 * 1024)]
     public async Task<IActionResult> Create(Hotel model, IFormFile? heroImage)
     {
-        if (!_tenant.CanAdd(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanAdd(AppModules.Hotels)) return Forbid();
         if (model.DestinationId == 0)
             ModelState.AddModelError(nameof(model.DestinationId), "Destination is required.");
         if (string.IsNullOrWhiteSpace(model.Name))
@@ -71,7 +71,7 @@ public class HotelsController : Controller
     [HttpGet]
     public async Task<IActionResult> Edit(int id)
     {
-        if (!_tenant.CanEdit(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanEdit(AppModules.Hotels)) return Forbid();
         var hotel = await _repo.GetByIdAsync(id);
         if (hotel == null) return NotFound();
         ViewData["Title"] = $"Edit — {hotel.Name}";
@@ -83,7 +83,7 @@ public class HotelsController : Controller
     [RequestSizeLimit(50 * 1024 * 1024)]
     public async Task<IActionResult> Edit(Hotel model, IFormFile? heroImage)
     {
-        if (!_tenant.CanEdit(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanEdit(AppModules.Hotels)) return Forbid();
         var existing = await _repo.GetByIdAsync(model.Id);
         if (existing == null) return NotFound();
 
@@ -113,7 +113,7 @@ public class HotelsController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(int id)
     {
-        if (!_tenant.CanDelete(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanDelete(AppModules.Hotels)) return Forbid();
         await _repo.DeleteAsync(id);
         TempData["Success"] = "Hotel deactivated.";
         return RedirectToAction(nameof(Index));

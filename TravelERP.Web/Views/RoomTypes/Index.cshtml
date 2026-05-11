@@ -4,7 +4,7 @@
 
 <div class="row g-3">
     <div class="col-lg-5">
-        @if (Tenant.CanAdd(TravelERP.Core.Constants.AppModules.Masters))
+        @if (Tenant.CanAdd(TravelERP.Core.Constants.AppModules.RoomTypes))
         {
             <div class="card shadow-sm">
                 <div class="card-header bg-transparent border-0">
@@ -55,7 +55,7 @@
                                     <tr id="row-@r.Id">
                                         <td class="fw-semibold ps-3">
                                             <span class="rt-name">@r.Name</span>
-                                            @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.Masters))
+                                            @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.RoomTypes))
                                             {
                                                 <form asp-action="Update" method="post" class="d-none rt-edit-form gap-2">
                                                     @Html.AntiForgeryToken()
@@ -67,13 +67,13 @@
                                             }
                                         </td>
                                         <td class="text-end pe-3">
-                                            @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.Masters))
+                                            @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.RoomTypes))
                                             {
                                                 <button type="button" class="btn btn-sm btn-outline-primary rt-edit">
                                                     <i class="bi bi-pencil"></i>
                                                 </button>
                                             }
-                                            @if (Tenant.CanDelete(TravelERP.Core.Constants.AppModules.Masters))
+                                            @if (Tenant.CanDelete(TravelERP.Core.Constants.AppModules.RoomTypes))
                                             {
                                                 <form asp-action="Delete" method="post" class="d-inline"
                                                       onsubmit="return confirm('Deactivate this room type?');">

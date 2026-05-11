@@ -23,7 +23,7 @@ public class LeadStatusesController : Controller
 
     public async Task<IActionResult> Index()
     {
-        if (!_tenant.CanView(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanView(AppModules.LeadStatuses)) return Forbid();
         ViewData["Title"] = "Lead Statuses";
         ViewBag.Colors = Colors;
         return View(await _repo.GetAllAsync());
@@ -33,7 +33,7 @@ public class LeadStatusesController : Controller
     public async Task<IActionResult> Create(string name, string color, int displayOrder,
         bool isDefault = false, bool isClosed = false)
     {
-        if (!_tenant.CanAdd(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanAdd(AppModules.LeadStatuses)) return Forbid();
         if (string.IsNullOrWhiteSpace(name))
         {
             TempData["Error"] = "Status name is required.";
@@ -55,7 +55,7 @@ public class LeadStatusesController : Controller
     public async Task<IActionResult> Update(int id, string name, string color, int displayOrder,
         bool isDefault = false, bool isClosed = false)
     {
-        if (!_tenant.CanEdit(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanEdit(AppModules.LeadStatuses)) return Forbid();
         if (string.IsNullOrWhiteSpace(name))
         {
             TempData["Error"] = "Status name is required.";
@@ -77,7 +77,7 @@ public class LeadStatusesController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(int id)
     {
-        if (!_tenant.CanDelete(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanDelete(AppModules.LeadStatuses)) return Forbid();
         await _repo.DeleteAsync(id);
         TempData["Success"] = "Status deactivated.";
         return RedirectToAction(nameof(Index));

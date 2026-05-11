@@ -4,7 +4,7 @@
 
 <div class="row g-3">
     <div class="col-lg-5">
-        @if (Tenant.CanAdd(TravelERP.Core.Constants.AppModules.Masters))
+        @if (Tenant.CanAdd(TravelERP.Core.Constants.AppModules.LeadSources))
         {
             <div class="card shadow-sm">
                 <div class="card-header bg-transparent border-0">
@@ -45,7 +45,7 @@
                                     <tr>
                                         <td class="fw-semibold ps-3">
                                             <span class="row-name">@r.Name</span>
-                                            @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.Masters))
+                                            @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.LeadSources))
                                             {
                                                 <form asp-action="Update" method="post" class="d-none row-edit-form gap-2">
                                                     @Html.AntiForgeryToken()
@@ -57,11 +57,11 @@
                                             }
                                         </td>
                                         <td class="text-end pe-3">
-                                            @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.Masters))
+                                            @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.LeadSources))
                                             {
                                                 <button type="button" class="btn btn-sm btn-outline-primary row-edit"><i class="bi bi-pencil"></i></button>
                                             }
-                                            @if (Tenant.CanDelete(TravelERP.Core.Constants.AppModules.Masters))
+                                            @if (Tenant.CanDelete(TravelERP.Core.Constants.AppModules.LeadSources))
                                             {
                                                 <form asp-action="Delete" method="post" class="d-inline" onsubmit="return confirm('Deactivate?');">
                                                     @Html.AntiForgeryToken()

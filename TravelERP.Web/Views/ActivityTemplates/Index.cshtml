@@ -5,7 +5,7 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <p class="text-muted mb-0 small">Predefined log snippets for fast follow-up entry. Pick one in the activity modal to auto-fill subject and notes.</p>
-    @if (Tenant.CanAdd(TravelERP.Core.Constants.AppModules.Masters))
+    @if (Tenant.CanAdd(TravelERP.Core.Constants.AppModules.ActivityTemplates))
     {
         <a href="/ActivityTemplates/Create" class="btn btn-primary">
             <i class="bi bi-plus-lg me-1"></i>Add Template
@@ -56,13 +56,13 @@
                                 </td>
                                 <td class="small text-muted">@(t.Subject ?? "—")</td>
                                 <td class="text-end pe-3">
-                                    @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.Masters))
+                                    @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.ActivityTemplates))
                                     {
                                         <a href="/ActivityTemplates/Edit/@t.Id" class="btn btn-sm btn-outline-primary">
                                             <i class="bi bi-pencil"></i>
                                         </a>
                                     }
-                                    @if (Tenant.CanDelete(TravelERP.Core.Constants.AppModules.Masters))
+                                    @if (Tenant.CanDelete(TravelERP.Core.Constants.AppModules.ActivityTemplates))
                                     {
                                         <form asp-action="Delete" method="post" class="d-inline" onsubmit="return confirm('Deactivate this template?');">
                                             @Html.AntiForgeryToken()

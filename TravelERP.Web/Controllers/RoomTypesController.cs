@@ -20,7 +20,7 @@ public class RoomTypesController : Controller
 
     public async Task<IActionResult> Index()
     {
-        if (!_tenant.CanView(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanView(AppModules.RoomTypes)) return Forbid();
         ViewData["Title"] = "Room Types";
         return View(await _repo.GetAllAsync());
     }
@@ -28,7 +28,7 @@ public class RoomTypesController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(string name)
     {
-        if (!_tenant.CanAdd(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanAdd(AppModules.RoomTypes)) return Forbid();
         if (string.IsNullOrWhiteSpace(name))
         {
             TempData["Error"] = "Room type name is required.";
@@ -43,7 +43,7 @@ public class RoomTypesController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Update(int id, string name)
     {
-        if (!_tenant.CanEdit(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanEdit(AppModules.RoomTypes)) return Forbid();
         if (string.IsNullOrWhiteSpace(name))
         {
             TempData["Error"] = "Room type name is required.";
@@ -58,7 +58,7 @@ public class RoomTypesController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(int id)
     {
-        if (!_tenant.CanDelete(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanDelete(AppModules.RoomTypes)) return Forbid();
         await _repo.DeleteAsync(id);
         TempData["Success"] = "Room type deactivated.";
         return RedirectToAction(nameof(Index));

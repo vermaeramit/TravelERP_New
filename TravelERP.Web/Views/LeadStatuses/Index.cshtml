@@ -15,7 +15,7 @@
 
 <div class="row g-3">
     <div class="col-lg-5">
-        @if (Tenant.CanAdd(TravelERP.Core.Constants.AppModules.Masters))
+        @if (Tenant.CanAdd(TravelERP.Core.Constants.AppModules.LeadStatuses))
         {
             <div class="card shadow-sm">
                 <div class="card-header bg-transparent border-0">
@@ -94,7 +94,7 @@
                                         <td class="ps-3 small text-muted">@s.DisplayOrder</td>
                                         <td>
                                             <span class="row-display badge bg-@s.Color fs-6">@s.Name</span>
-                                            @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.Masters))
+                                            @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.LeadStatuses))
                                             {
                                                 <form asp-action="Update" method="post" class="d-none row-edit-form">
                                                     @Html.AntiForgeryToken()
@@ -147,11 +147,11 @@
                                             }
                                         </td>
                                         <td class="text-end pe-3">
-                                            @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.Masters))
+                                            @if (Tenant.CanEdit(TravelERP.Core.Constants.AppModules.LeadStatuses))
                                             {
                                                 <button type="button" class="btn btn-sm btn-outline-primary row-edit"><i class="bi bi-pencil"></i></button>
                                             }
-                                            @if (Tenant.CanDelete(TravelERP.Core.Constants.AppModules.Masters))
+                                            @if (Tenant.CanDelete(TravelERP.Core.Constants.AppModules.LeadStatuses))
                                             {
                                                 <form asp-action="Delete" method="post" class="d-inline" onsubmit="return confirm('Deactivate this status?');">
                                                     @Html.AntiForgeryToken()

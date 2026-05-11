@@ -2,8 +2,6 @@
 @model TodayPanel
 @{
     ViewData["Title"] = "Today";
-    var myOnly = (bool?)ViewBag.MyOnly ?? true;
-    var myOnlyForced = (bool?)ViewBag.MyOnlyForced ?? false;
 }
 
 @section Styles {
@@ -66,17 +64,6 @@
         <span class="me-3"><i class="bi bi-bell-fill text-primary me-1"></i>Today: <strong>@Model.TodayCount</strong></span>
         <span><i class="bi bi-calendar-event text-success me-1"></i>Next 7 days: <strong>@Model.UpcomingCount</strong></span>
     </div>
-    <form method="get" class="d-flex align-items-center gap-2">
-        <div class="form-check form-switch mb-0">
-            <input class="form-check-input" type="checkbox" id="myOnly" name="myOnly" value="true"
-                   @(myOnly ? "checked" : "") @(myOnlyForced ? "disabled" : "")
-                   onchange="this.form.submit()" />
-            <label class="form-check-label small" for="myOnly">
-                My follow-ups only
-                @if (myOnlyForced) { <i class="bi bi-lock-fill text-muted ms-1" title="Locked by your role"></i> }
-            </label>
-        </div>
-    </form>
 </div>
 
 <div class="row g-3">

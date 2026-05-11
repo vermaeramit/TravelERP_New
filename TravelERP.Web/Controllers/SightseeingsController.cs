@@ -28,7 +28,7 @@ public class SightseeingsController : Controller
 
     public async Task<IActionResult> Index()
     {
-        if (!_tenant.CanView(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanView(AppModules.Sightseeings)) return Forbid();
         ViewData["Title"] = "Sightseeing";
         return View(await _repo.GetAllAsync());
     }
@@ -36,7 +36,7 @@ public class SightseeingsController : Controller
     [HttpGet]
     public async Task<IActionResult> Create()
     {
-        if (!_tenant.CanAdd(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanAdd(AppModules.Sightseeings)) return Forbid();
         ViewData["Title"] = "Add Sightseeing";
         ViewBag.Destinations = await _destinations.GetAllAsync();
         return View(new Sightseeing());
@@ -46,7 +46,7 @@ public class SightseeingsController : Controller
     [RequestSizeLimit(50 * 1024 * 1024)]
     public async Task<IActionResult> Create(Sightseeing model, IFormFile? heroImage)
     {
-        if (!_tenant.CanAdd(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanAdd(AppModules.Sightseeings)) return Forbid();
         if (model.DestinationId == 0)
             ModelState.AddModelError(nameof(model.DestinationId), "Destination is required.");
         if (string.IsNullOrWhiteSpace(model.Name))
@@ -69,7 +69,7 @@ public class SightseeingsController : Controller
     [HttpGet]
     public async Task<IActionResult> Edit(int id)
     {
-        if (!_tenant.CanEdit(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanEdit(AppModules.Sightseeings)) return Forbid();
         var s = await _repo.GetByIdAsync(id);
         if (s == null) return NotFound();
         ViewData["Title"] = $"Edit — {s.Name}";
@@ -81,7 +81,7 @@ public class SightseeingsController : Controller
     [RequestSizeLimit(50 * 1024 * 1024)]
     public async Task<IActionResult> Edit(Sightseeing model, IFormFile? heroImage)
     {
-        if (!_tenant.CanEdit(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanEdit(AppModules.Sightseeings)) return Forbid();
         var existing = await _repo.GetByIdAsync(model.Id);
         if (existing == null) return NotFound();
 
@@ -109,7 +109,7 @@ public class SightseeingsController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(int id)
     {
-        if (!_tenant.CanDelete(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanDelete(AppModules.Sightseeings)) return Forbid();
         await _repo.DeleteAsync(id);
         TempData["Success"] = "Sightseeing deactivated.";
         return RedirectToAction(nameof(Index));

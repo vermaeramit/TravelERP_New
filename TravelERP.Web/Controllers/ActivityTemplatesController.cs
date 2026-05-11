@@ -24,7 +24,7 @@ public class ActivityTemplatesController : Controller
 
     public async Task<IActionResult> Index()
     {
-        if (!_tenant.CanView(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanView(AppModules.ActivityTemplates)) return Forbid();
         ViewData["Title"] = "Activity Templates";
         return View(await _repo.GetAllAsync());
     }
@@ -32,7 +32,7 @@ public class ActivityTemplatesController : Controller
     [HttpGet]
     public IActionResult Create()
     {
-        if (!_tenant.CanAdd(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanAdd(AppModules.ActivityTemplates)) return Forbid();
         ViewData["Title"] = "Add Activity Template";
         ViewBag.Types = TypeOptions;
         return View(new ActivityTemplate());
@@ -41,7 +41,7 @@ public class ActivityTemplatesController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(ActivityTemplate model)
     {
-        if (!_tenant.CanAdd(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanAdd(AppModules.ActivityTemplates)) return Forbid();
         Validate(model);
         if (!ModelState.IsValid)
         {
@@ -57,7 +57,7 @@ public class ActivityTemplatesController : Controller
     [HttpGet]
     public async Task<IActionResult> Edit(int id)
     {
-        if (!_tenant.CanEdit(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanEdit(AppModules.ActivityTemplates)) return Forbid();
         var t = await _repo.GetByIdAsync(id);
         if (t == null) return NotFound();
         ViewData["Title"] = $"Edit — {t.Name}";
@@ -68,7 +68,7 @@ public class ActivityTemplatesController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(ActivityTemplate model)
     {
-        if (!_tenant.CanEdit(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanEdit(AppModules.ActivityTemplates)) return Forbid();
         Validate(model);
         if (!ModelState.IsValid)
         {
@@ -84,7 +84,7 @@ public class ActivityTemplatesController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(int id)
     {
-        if (!_tenant.CanDelete(AppModules.Masters)) return Forbid();
+        if (!_tenant.CanDelete(AppModules.ActivityTemplates)) return Forbid();
         await _repo.DeleteAsync(id);
         TempData["Success"] = "Template deactivated.";
         return RedirectToAction(nameof(Index));
