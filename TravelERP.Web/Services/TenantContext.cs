@@ -36,4 +36,7 @@ public class TenantContext : ITenantContext
     public bool CanAdd(string module)    => IsSuperAdmin || User.HasClaim("Perm", $"{module}.Add");
     public bool CanEdit(string module)   => IsSuperAdmin || User.HasClaim("Perm", $"{module}.Edit");
     public bool CanDelete(string module) => IsSuperAdmin || User.HasClaim("Perm", $"{module}.Delete");
+
+    public bool OnlyAssigned => !IsSuperAdmin && User.HasClaim("OnlyAssigned", "true");
+    public int? ScopeUserId  => OnlyAssigned ? UserId : null;
 }

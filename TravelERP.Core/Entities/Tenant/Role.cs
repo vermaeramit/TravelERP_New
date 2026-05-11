@@ -7,6 +7,7 @@ public class Role
     public string? Description { get; set; }
     public bool IsSystem { get; set; }   // true = SuperAdmin, non-editable
     public bool IsActive { get; set; } = true;
+    public bool OnlyAssigned { get; set; }   // true = users in this role only see leads/bookings assigned to them
     public DateTime CreatedAt { get; set; }
     public int CreatedBy { get; set; }
     public DateTime? UpdatedAt { get; set; }

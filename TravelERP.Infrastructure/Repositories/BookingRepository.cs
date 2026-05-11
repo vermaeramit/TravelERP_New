@@ -30,6 +30,7 @@ public class BookingRepository : IBookingRepository
                 DatabaseName = _tenant.DatabaseName,
                 Search   = string.IsNullOrWhiteSpace(search) ? null : search.Trim(),
                 Status   = string.IsNullOrWhiteSpace(status) ? null : status.Trim(),
+                ScopeUserId = _tenant.ScopeUserId,
                 Page     = page < 1 ? 1 : page,
                 PageSize = pageSize is < 5 or > 100 ? 20 : pageSize
             },

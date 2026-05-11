@@ -520,6 +520,11 @@ BEGIN
 END
 GO
 
+-- Roles: data-scope flag (idempotent — defaults to 0 = "All data")
+IF COL_LENGTH('Roles','OnlyAssigned') IS NULL
+    ALTER TABLE Roles ADD OnlyAssigned BIT NOT NULL DEFAULT 0;
+GO
+
 -- Voucher-specific extras (idempotent — safe to re-run)
 IF COL_LENGTH('PackageOptionHotels','Rooms')        IS NULL ALTER TABLE PackageOptionHotels ADD Rooms        INT NOT NULL DEFAULT 1;
 IF COL_LENGTH('PackageOptionHotels','ExtraBeds')    IS NULL ALTER TABLE PackageOptionHotels ADD ExtraBeds    INT NOT NULL DEFAULT 0;
@@ -529,10 +534,15 @@ GO
 -- Bookings.PackageOptionId FK: relax to ON DELETE SET NULL so editing a package
 -- (which delete-and-replaces its options) doesn't blow up on existing bookings.
 -- OptionName is denormalized on the Booking row, so historical data is preserved.
-IF EXISTS (SELECT * FROM sys.foreign_keys WHERE name = 'FK_Bookings_PackageOption')
+-- Guarded so brand-new tenant DBs (where Bookings hasn't been created yet at this
+-- point in the script) skip these ALTERs cleanly — the CREATE TABLE below already
+-- declares the FK with ON DELETE SET NULL.
+IF OBJECT_ID(N'Bookings', 'U') IS NOT NULL
+    AND EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_Bookings_PackageOption')
     ALTER TABLE Bookings DROP CONSTRAINT FK_Bookings_PackageOption;
 GO
-IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE name = 'FK_Bookings_PackageOption')
+IF OBJECT_ID(N'Bookings', 'U') IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_Bookings_PackageOption')
     ALTER TABLE Bookings ADD CONSTRAINT FK_Bookings_PackageOption
         FOREIGN KEY (PackageOptionId) REFERENCES PackageOptions(Id) ON DELETE SET NULL;
 GO
@@ -629,7 +639,7 @@ BEGIN
         UpdatedBy       INT            NULL,
         CONSTRAINT FK_Bookings_Lead          FOREIGN KEY (LeadId)          REFERENCES Leads(Id),
         CONSTRAINT FK_Bookings_Package       FOREIGN KEY (PackageId)       REFERENCES Packages(Id),
-        CONSTRAINT FK_Bookings_PackageOption FOREIGN KEY (PackageOptionId) REFERENCES PackageOptions(Id),
+        CONSTRAINT FK_Bookings_PackageOption FOREIGN KEY (PackageOptionId) REFERENCES PackageOptions(Id) ON DELETE SET NULL,
         CONSTRAINT FK_Bookings_Destination   FOREIGN KEY (DestinationId)   REFERENCES Destinations(Id),
         CONSTRAINT UQ_Bookings_BookingNumber UNIQUE (BookingNumber),
         CONSTRAINT UQ_Bookings_InvoiceNumber UNIQUE (InvoiceNumber)

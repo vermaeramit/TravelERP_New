@@ -122,10 +122,12 @@
                         <i class="bi bi-telephone me-1"></i>Call
                     </a>
                 }
-                @if (!string.IsNullOrEmpty(Model.Email))
+                @if (!string.IsNullOrEmpty(Model.Mobile))
                 {
-                    <a href="mailto:@Model.Email" class="btn btn-sm btn-outline-info">
-                        <i class="bi bi-envelope me-1"></i>Email
+                    var waNumber = (Model.Mobile ?? "").Replace(" ", "").Replace("+", "").Replace("-", "");
+                    var waText   = Uri.EscapeDataString($"Hi {Model.Name}, ");
+                    <a href="https://wa.me/@(waNumber)?text=@waText" target="_blank" class="btn btn-sm btn-outline-success">
+                        <i class="bi bi-whatsapp me-1"></i>WhatsApp
                     </a>
                 }
                 @if (Tenant.CanAdd(TravelERP.Core.Constants.AppModules.Packages))

@@ -35,13 +35,13 @@ public class RolesController : Controller
     }
 
     [HttpPost, ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(Role model, Dictionary<string, bool[]> perms)
+    public async Task<IActionResult> Create(Role model)
     {
         if (!_tenant.CanAdd(AppModules.Roles)) return Forbid();
         if (!ModelState.IsValid) { ViewBag.Modules = AppModules.All; return View(model); }
 
         var id = await _repo.InsertAsync(model);
-        await SavePermissions(id, perms);
+        await SavePermissions(id, Request.Form);
 
         TempData["Success"] = $"Role '{model.RoleName}' created successfully.";
         return RedirectToAction(nameof(Index));
@@ -64,13 +64,13 @@ public class RolesController : Controller
     }
 
     [HttpPost, ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(Role model, Dictionary<string, bool[]> perms)
+    public async Task<IActionResult> Edit(Role model)
     {
         if (!_tenant.CanEdit(AppModules.Roles)) return Forbid();
         if (!ModelState.IsValid) { ViewBag.Modules = AppModules.All; return View(model); }
 
         await _repo.UpdateAsync(model);
-        await SavePermissions(model.Id, perms);
+        await SavePermissions(model.Id, Request.Form);
 
         TempData["Success"] = "Role updated successfully.";
         return RedirectToAction(nameof(Index));
@@ -85,14 +85,24 @@ public class RolesController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    private async Task SavePermissions(int roleId, Dictionary<string, bool[]> perms)
+    /// <summary>
+    /// Reads four flags per module out of the form: <c>View[Module]</c>, <c>Add[Module]</c>,
+    /// <c>Edit[Module]</c>, <c>Delete[Module]</c>. Unchecked checkboxes don't post; we treat
+    /// "absent" as false, "true" as true.
+    /// </summary>
+    private async Task SavePermissions(int roleId, Microsoft.AspNetCore.Http.IFormCollection form)
     {
+        static bool Flag(Microsoft.AspNetCore.Http.IFormCollection f, string key) =>
+            f.TryGetValue(key, out var v) && v.Any(x => string.Equals(x, "true", StringComparison.OrdinalIgnoreCase));
+
         foreach (var module in AppModules.All)
         {
-            if (perms.TryGetValue(module, out var bits) && bits.Length >= 4)
-                await _repo.SavePermissionAsync(roleId, module, bits[0], bits[1], bits[2], bits[3]);
-            else
-                await _repo.SavePermissionAsync(roleId, module, false, false, false, false);
+            await _repo.SavePermissionAsync(
+                roleId, module,
+                canView:   Flag(form, $"View[{module}]"),
+                canAdd:    Flag(form, $"Add[{module}]"),
+                canEdit:   Flag(form, $"Edit[{module}]"),
+                canDelete: Flag(form, $"Delete[{module}]"));
         }
     }
 }

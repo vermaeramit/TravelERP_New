@@ -318,6 +318,18 @@ AS BEGIN
 END
 GO
 
+CREATE OR ALTER PROCEDURE sp_User_Delete
+    @Id        INT,
+    @UpdatedBy INT = NULL
+AS BEGIN
+    SET NOCOUNT ON;
+    UPDATE MasterUsers SET
+        IsDeleted = 1, IsActive = 0,
+        UpdatedAt = GETUTCDATE(), UpdatedBy = @UpdatedBy
+    WHERE Id = @Id;
+END
+GO
+
 -- ============================================================
 -- ROLE PROCEDURES (cross-DB, tenant data)
 -- ============================================================
@@ -348,18 +360,19 @@ CREATE OR ALTER PROCEDURE sp_Role_Insert
     @RoleName     NVARCHAR(100),
     @Description  NVARCHAR(300) = NULL,
     @IsSystem     BIT           = 0,
+    @OnlyAssigned BIT           = 0,
     @CreatedBy    INT           = 0,
     @NewId        INT OUTPUT
 AS BEGIN
     SET NOCOUNT ON;
     DECLARE @sql NVARCHAR(MAX) = N'
         INSERT INTO [' + @DatabaseName + N'].dbo.Roles
-            (RoleName, Description, IsSystem, IsActive, CreatedAt, CreatedBy)
-        VALUES (@RoleName, @Description, @IsSystem, 1, GETUTCDATE(), @CreatedBy);
+            (RoleName, Description, IsSystem, OnlyAssigned, IsActive, CreatedAt, CreatedBy)
+        VALUES (@RoleName, @Description, @IsSystem, @OnlyAssigned, 1, GETUTCDATE(), @CreatedBy);
         SELECT @NewId = SCOPE_IDENTITY();';
     EXEC sp_executesql @sql,
-        N'@RoleName NVARCHAR(100), @Description NVARCHAR(300), @IsSystem BIT, @CreatedBy INT, @NewId INT OUTPUT',
-        @RoleName, @Description, @IsSystem, @CreatedBy, @NewId OUTPUT;
+        N'@RoleName NVARCHAR(100), @Description NVARCHAR(300), @IsSystem BIT, @OnlyAssigned BIT, @CreatedBy INT, @NewId INT OUTPUT',
+        @RoleName, @Description, @IsSystem, @OnlyAssigned, @CreatedBy, @NewId OUTPUT;
 END
 GO
 
@@ -368,17 +381,18 @@ CREATE OR ALTER PROCEDURE sp_Role_Update
     @Id           INT,
     @RoleName     NVARCHAR(100),
     @Description  NVARCHAR(300) = NULL,
+    @OnlyAssigned BIT           = 0,
     @UpdatedBy    INT           = 0
 AS BEGIN
     SET NOCOUNT ON;
     DECLARE @sql NVARCHAR(MAX) = N'
         UPDATE [' + @DatabaseName + N'].dbo.Roles
-        SET RoleName = @RoleName, Description = @Description,
+        SET RoleName = @RoleName, Description = @Description, OnlyAssigned = @OnlyAssigned,
             UpdatedAt = GETUTCDATE(), UpdatedBy = @UpdatedBy
         WHERE Id = @Id AND IsSystem = 0';
     EXEC sp_executesql @sql,
-        N'@Id INT, @RoleName NVARCHAR(100), @Description NVARCHAR(300), @UpdatedBy INT',
-        @Id, @RoleName, @Description, @UpdatedBy;
+        N'@Id INT, @RoleName NVARCHAR(100), @Description NVARCHAR(300), @OnlyAssigned BIT, @UpdatedBy INT',
+        @Id, @RoleName, @Description, @OnlyAssigned, @UpdatedBy;
 END
 GO
 
@@ -2326,6 +2340,7 @@ CREATE OR ALTER PROCEDURE sp_Booking_GetAll
     @DatabaseName NVARCHAR(100),
     @Search       NVARCHAR(150) = NULL,
     @Status       NVARCHAR(20)  = NULL,
+    @ScopeUserId  INT           = NULL,    -- when set, only bookings the user owns / is assigned via lead
     @Page         INT           = 1,
     @PageSize     INT           = 20
 AS BEGIN
@@ -2334,7 +2349,7 @@ AS BEGIN
     IF @PageSize < 1 SET @PageSize = 20;
     IF @PageSize > 200 SET @PageSize = 200;
 
-    DECLARE @sql NVARCHAR(MAX) = N'
+    DECLARE @sql NVARCHAR(MAX) = CAST(N'' AS NVARCHAR(MAX)) + N'
         SELECT b.*,
                d.Name          AS DestinationName,
                l.LeadNumber    AS LeadNumber,
@@ -2348,6 +2363,9 @@ AS BEGIN
         LEFT JOIN [' + @DatabaseName + N'].dbo.Packages     p ON b.PackageId     = p.Id
         WHERE b.IsActive = 1
           AND (@Status IS NULL OR b.Status = @Status)
+          AND (@ScopeUserId IS NULL
+               OR b.CreatedBy = @ScopeUserId
+               OR l.AssignedToUserId = @ScopeUserId)
           AND (@Search IS NULL OR
                b.BookingNumber LIKE ''%'' + @Search + ''%'' OR
                b.InvoiceNumber LIKE ''%'' + @Search + ''%'' OR
@@ -2358,8 +2376,8 @@ AS BEGIN
         OFFSET ((@Page - 1) * @PageSize) ROWS
         FETCH NEXT @PageSize ROWS ONLY';
     EXEC sp_executesql @sql,
-        N'@Search NVARCHAR(150), @Status NVARCHAR(20), @Page INT, @PageSize INT',
-        @Search, @Status, @Page, @PageSize;
+        N'@Search NVARCHAR(150), @Status NVARCHAR(20), @ScopeUserId INT, @Page INT, @PageSize INT',
+        @Search, @Status, @ScopeUserId, @Page, @PageSize;
 END
 GO
 

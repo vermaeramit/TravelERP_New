@@ -17,4 +17,9 @@ public interface ITenantContext
     bool CanAdd(string module);
     bool CanEdit(string module);
     bool CanDelete(string module);
+
+    /// <summary>True when the user's role is restricted to assigned data only.</summary>
+    bool OnlyAssigned { get; }
+    /// <summary>UserId to filter by in queries (returns null when the user can see everything).</summary>
+    int? ScopeUserId { get; }
 }

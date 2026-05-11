@@ -22,6 +22,11 @@ public class LeadRepository : ILeadRepository
 
     public async Task<PagedResult<Lead>> GetPagedAsync(LeadFilter f)
     {
+        // Restricted-scope users can only see leads assigned to them — force the
+        // AssignedTo filter to their UserId regardless of what they pass in the URL.
+        if (_tenant.ScopeUserId.HasValue)
+            f.AssignedTo = _tenant.ScopeUserId.Value;
+
         using var conn = _factory.CreateMasterConnection();
         var rows = (await conn.QueryAsync<Lead>(
             "sp_Lead_GetAll",

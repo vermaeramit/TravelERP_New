@@ -187,16 +187,18 @@ public class AuthController : Controller
         else if (user.TenantRoleId.HasValue)
         {
             claims.Add(new Claim("TenantRoleId", user.TenantRoleId.Value.ToString()));
-            // Load role — check if IsSystem (tenant SuperAdmin role)
+            // Load role — check if IsSystem (tenant SuperAdmin role) and OnlyAssigned scope
             using var conn = _dbFactory.CreateTenantConnection(company.DatabaseName);
-            var isSystem = await conn.ExecuteScalarAsync<bool>(
-                "SELECT IsSystem FROM Roles WHERE Id = @Id", new { Id = user.TenantRoleId.Value });
-            if (isSystem)
+            var role = await conn.QuerySingleOrDefaultAsync<(bool IsSystem, bool OnlyAssigned)>(
+                "SELECT IsSystem, OnlyAssigned FROM Roles WHERE Id = @Id", new { Id = user.TenantRoleId.Value });
+            if (role.IsSystem)
             {
                 claims.Add(new Claim("IsSuperAdmin", "true"));
             }
             else
             {
+                if (role.OnlyAssigned) claims.Add(new Claim("OnlyAssigned", "true"));
+
                 var perms = await conn.QueryAsync<(string Module, bool CanView, bool CanAdd, bool CanEdit, bool CanDelete)>(
                     @"SELECT Module, CanView, CanAdd, CanEdit, CanDelete
                       FROM RolePermissions WHERE RoleId = @Id",

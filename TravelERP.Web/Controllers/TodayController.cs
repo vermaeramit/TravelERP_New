@@ -21,7 +21,10 @@ public class TodayController : Controller
     {
         if (!_tenant.CanView(AppModules.Leads)) return Forbid();
         ViewData["Title"] = "Today";
+        // Restricted-scope users always see only their own follow-ups — toggle is forced on.
+        if (_tenant.OnlyAssigned) myOnly = true;
         ViewBag.MyOnly = myOnly;
+        ViewBag.MyOnlyForced = _tenant.OnlyAssigned;
         var panel = await _activities.GetTodayPanelAsync(_tenant.UserId, myOnly);
         return View(panel);
     }
@@ -31,6 +34,7 @@ public class TodayController : Controller
     public async Task<IActionResult> Counts(bool myOnly = true)
     {
         if (!_tenant.CanView(AppModules.Leads)) return Forbid();
+        if (_tenant.OnlyAssigned) myOnly = true;
         var panel = await _activities.GetTodayPanelAsync(_tenant.UserId, myOnly);
         return Json(new
         {

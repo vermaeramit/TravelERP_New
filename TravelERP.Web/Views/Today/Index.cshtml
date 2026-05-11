@@ -3,6 +3,7 @@
 @{
     ViewData["Title"] = "Today";
     var myOnly = (bool?)ViewBag.MyOnly ?? true;
+    var myOnlyForced = (bool?)ViewBag.MyOnlyForced ?? false;
 }
 
 @section Styles {
@@ -67,9 +68,13 @@
     </div>
     <form method="get" class="d-flex align-items-center gap-2">
         <div class="form-check form-switch mb-0">
-            <input class="form-check-input" type="checkbox" id="myOnly" name="myOnly" value="true" @(myOnly ? "checked" : "")
+            <input class="form-check-input" type="checkbox" id="myOnly" name="myOnly" value="true"
+                   @(myOnly ? "checked" : "") @(myOnlyForced ? "disabled" : "")
                    onchange="this.form.submit()" />
-            <label class="form-check-label small" for="myOnly">My follow-ups only</label>
+            <label class="form-check-label small" for="myOnly">
+                My follow-ups only
+                @if (myOnlyForced) { <i class="bi bi-lock-fill text-muted ms-1" title="Locked by your role"></i> }
+            </label>
         </div>
     </form>
 </div>

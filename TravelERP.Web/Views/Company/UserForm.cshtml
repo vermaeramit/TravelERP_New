@@ -1,0 +1,111 @@
+@using TravelERP.Shared.Enums
+@using TravelERP.Core.Entities.Tenant
+@model TravelERP.Web.Controllers.CompanyController.UserFormVm
+@{
+    var isEdit = Model.Id > 0;
+    ViewData["Title"] ??= isEdit ? $"Edit User" : "Add User";
+    var roles = ViewBag.Roles as IEnumerable<Role> ?? [];
+    var systemRoles = Enum.GetValues<UserRole>().Where(r => r != UserRole.SuperAdmin).ToArray();
+}
+
+<form asp-action="@(isEdit ? "EditUser" : "CreateUser")" method="post" class="row g-3">
+    @Html.AntiForgeryToken()
+    @if (isEdit) { <input type="hidden" asp-for="Id" /> }
+
+    <div class="col-lg-8">
+        <!-- Identity -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-transparent border-0">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-person-vcard text-primary me-2"></i>User Details</h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label asp-for="FullName" class="form-label small fw-semibold">Full Name <span class="text-danger">*</span></label>
+                        <input asp-for="FullName" class="form-control" required autofocus />
+                        <span asp-validation-for="FullName" class="text-danger small"></span>
+                    </div>
+                    <div class="col-md-6">
+                        <label asp-for="Email" class="form-label small fw-semibold">Email <span class="text-danger">*</span></label>
+                        <input asp-for="Email" type="email" class="form-control" required />
+                        <span asp-validation-for="Email" class="text-danger small"></span>
+                    </div>
+
+                    @if (!isEdit)
+                    {
+                        <div class="col-md-6">
+                            <label asp-for="Password" class="form-label small fw-semibold">Initial Password <span class="text-danger">*</span></label>
+                            <input asp-for="Password" type="password" class="form-control" required minlength="6" autocomplete="new-password" />
+                            <small class="text-muted">Min 6 chars. The user can change it later.</small>
+                            <span asp-validation-for="Password" class="text-danger small"></span>
+                        </div>
+                    }
+
+                    <div class="col-md-6">
+                        <div class="form-check form-switch mt-4">
+                            <input asp-for="IsActive" class="form-check-input" type="checkbox" id="IsActive" />
+                            <label class="form-check-label" for="IsActive">User can sign in</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Role -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-transparent border-0">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-shield-lock text-primary me-2"></i>Access &amp; Role</h6>
+                <small class="text-muted">System role gates which top-level features the user sees; tenant role determines fine-grained CRUD permissions.</small>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label asp-for="Role" class="form-label small fw-semibold">System Role <span class="text-danger">*</span></label>
+                        <select asp-for="Role" class="form-select">
+                            @foreach (var r in systemRoles)
+                            {
+                                <option value="@r" selected="@(Model.Role == r)">@r</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label asp-for="TenantRoleId" class="form-label small fw-semibold">Tenant Role (permissions)</label>
+                        <select asp-for="TenantRoleId" class="form-select">
+                            <option value="">— Use system-role defaults —</option>
+                            @foreach (var r in roles)
+                            {
+                                <option value="@r.Id" selected="@(Model.TenantRoleId == r.Id)">@r.RoleName</option>
+                            }
+                        </select>
+                        <small class="text-muted">Manage tenant roles &amp; permissions in <a href="/Roles" target="_blank">Roles &amp; Permissions</a>.</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2 justify-content-end">
+            <a href="/Company/Users" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary px-4">
+                <i class="bi bi-check-lg me-1"></i>@(isEdit ? "Save Changes" : "Create User")
+            </button>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card shadow-sm bg-light border-0">
+            <div class="card-body small">
+                <h6 class="fw-bold mb-2"><i class="bi bi-info-circle text-primary me-2"></i>About users</h6>
+                <ul class="ps-3 mb-0">
+                    <li>Each user signs in with their email and password.</li>
+                    <li>Email must be unique across all companies.</li>
+                    <li>Disabled users cannot sign in but their data (leads, packages, bookings created) is preserved.</li>
+                    <li>You can reset passwords from the Users list at any time.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

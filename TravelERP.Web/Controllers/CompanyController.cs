@@ -48,10 +48,176 @@ public class CompanyController : Controller
     [HttpGet("Users")]
     public async Task<IActionResult> Users()
     {
-        ViewData["Title"] = "User Management";
-        ViewData["Breadcrumbs"] = new List<(string, string?)> { ("Setup", null), ("Users", null) };
+        if (!_tenant.IsSuperAdmin) return Forbid();
+        ViewData["Title"] = "Users";
         var users = await _users.GetByCompanyAsync(_tenant.CompanyId);
         return View(users);
+    }
+
+    [HttpGet("Users/Create")]
+    public async Task<IActionResult> CreateUser([FromServices] IRoleRepository roles)
+    {
+        if (!_tenant.IsSuperAdmin) return Forbid();
+        ViewData["Title"] = "Add User";
+        ViewBag.Roles = await roles.GetAllAsync();
+        return View("UserForm", new UserFormVm());
+    }
+
+    [HttpPost("Users/Create"), ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateUser(UserFormVm vm, [FromServices] IRoleRepository roles)
+    {
+        if (!_tenant.IsSuperAdmin) return Forbid();
+        if (!ModelState.IsValid)
+        {
+            ViewBag.Roles = await roles.GetAllAsync();
+            return View("UserForm", vm);
+        }
+
+        // Check for duplicate email across all companies (MasterUsers.Email is unique)
+        var existing = await _users.GetByEmailAsync(vm.Email);
+        if (existing != null)
+        {
+            ModelState.AddModelError(nameof(vm.Email), "A user with this email already exists.");
+            ViewBag.Roles = await roles.GetAllAsync();
+            return View("UserForm", vm);
+        }
+
+        if (string.IsNullOrWhiteSpace(vm.Password) || vm.Password.Length < 6)
+        {
+            ModelState.AddModelError(nameof(vm.Password), "Password must be at least 6 characters.");
+            ViewBag.Roles = await roles.GetAllAsync();
+            return View("UserForm", vm);
+        }
+
+        var user = new TravelERP.Core.Entities.Master.MasterUser
+        {
+            CompanyId    = _tenant.CompanyId,
+            FullName     = vm.FullName.Trim(),
+            Email        = vm.Email.Trim().ToLowerInvariant(),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(vm.Password),
+            Role         = vm.Role,
+            IsActive     = vm.IsActive,
+            CreatedBy    = _tenant.UserId,
+            CreatedAt    = DateTime.UtcNow
+        };
+        var newId = await _users.InsertAsync(user);
+        if (vm.TenantRoleId.HasValue && vm.TenantRoleId > 0)
+            await _users.SetTenantRoleAsync(newId, vm.TenantRoleId.Value);
+
+        TempData["Success"] = $"User {user.FullName} created.";
+        return RedirectToAction(nameof(Users));
+    }
+
+    [HttpGet("Users/Edit/{id:int}")]
+    public async Task<IActionResult> EditUser(int id, [FromServices] IRoleRepository roles)
+    {
+        if (!_tenant.IsSuperAdmin) return Forbid();
+        var user = await _users.GetByIdAsync(id);
+        if (user == null || user.CompanyId != _tenant.CompanyId) return NotFound();
+        ViewData["Title"] = $"Edit — {user.FullName}";
+        ViewBag.Roles = await roles.GetAllAsync();
+        return View("UserForm", new UserFormVm
+        {
+            Id = user.Id,
+            FullName = user.FullName,
+            Email = user.Email,
+            Role = user.Role,
+            TenantRoleId = user.TenantRoleId,
+            IsActive = user.IsActive
+        });
+    }
+
+    [HttpPost("Users/Edit/{id:int}"), ValidateAntiForgeryToken]
+    public async Task<IActionResult> EditUser(int id, UserFormVm vm, [FromServices] IRoleRepository roles)
+    {
+        if (!_tenant.IsSuperAdmin) return Forbid();
+        var user = await _users.GetByIdAsync(id);
+        if (user == null || user.CompanyId != _tenant.CompanyId) return NotFound();
+
+        if (!ModelState.IsValid)
+        {
+            ViewBag.Roles = await roles.GetAllAsync();
+            return View("UserForm", vm);
+        }
+
+        user.FullName = vm.FullName.Trim();
+        user.Email    = vm.Email.Trim().ToLowerInvariant();
+        user.Role     = vm.Role;
+        user.IsActive = vm.IsActive;
+        user.UpdatedBy = _tenant.UserId;
+        user.UpdatedAt = DateTime.UtcNow;
+        await _users.UpdateAsync(user);
+        if (vm.TenantRoleId.HasValue && vm.TenantRoleId > 0)
+            await _users.SetTenantRoleAsync(id, vm.TenantRoleId.Value);
+
+        TempData["Success"] = "User updated.";
+        return RedirectToAction(nameof(Users));
+    }
+
+    [HttpPost("Users/ResetPassword/{id:int}"), ValidateAntiForgeryToken]
+    public async Task<IActionResult> ResetUserPassword(int id, string newPassword)
+    {
+        if (!_tenant.IsSuperAdmin) return Forbid();
+        var user = await _users.GetByIdAsync(id);
+        if (user == null || user.CompanyId != _tenant.CompanyId) return NotFound();
+
+        if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 6)
+        {
+            TempData["Error"] = "New password must be at least 6 characters.";
+            return RedirectToAction(nameof(Users));
+        }
+
+        await _users.ChangePasswordAsync(id, BCrypt.Net.BCrypt.HashPassword(newPassword));
+        TempData["Success"] = $"Password reset for {user.FullName}.";
+        return RedirectToAction(nameof(Users));
+    }
+
+    [HttpPost("Users/ToggleActive/{id:int}"), ValidateAntiForgeryToken]
+    public async Task<IActionResult> ToggleUserActive(int id)
+    {
+        if (!_tenant.IsSuperAdmin) return Forbid();
+        var user = await _users.GetByIdAsync(id);
+        if (user == null || user.CompanyId != _tenant.CompanyId) return NotFound();
+        if (user.Id == _tenant.UserId)
+        {
+            TempData["Error"] = "You cannot disable your own account.";
+            return RedirectToAction(nameof(Users));
+        }
+
+        user.IsActive = !user.IsActive;
+        user.UpdatedBy = _tenant.UserId;
+        user.UpdatedAt = DateTime.UtcNow;
+        await _users.UpdateAsync(user);
+
+        TempData["Success"] = user.IsActive ? $"{user.FullName} re-activated." : $"{user.FullName} deactivated.";
+        return RedirectToAction(nameof(Users));
+    }
+
+    [HttpPost("Users/Delete/{id:int}"), ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteUser(int id)
+    {
+        if (!_tenant.IsSuperAdmin) return Forbid();
+        var user = await _users.GetByIdAsync(id);
+        if (user == null || user.CompanyId != _tenant.CompanyId) return NotFound();
+        if (user.Id == _tenant.UserId)
+        {
+            TempData["Error"] = "You cannot delete your own account.";
+            return RedirectToAction(nameof(Users));
+        }
+        await _users.DeleteAsync(id, _tenant.UserId);
+        TempData["Success"] = $"{user.FullName} removed.";
+        return RedirectToAction(nameof(Users));
+    }
+
+    public class UserFormVm
+    {
+        public int Id { get; set; }
+        public string FullName { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string? Password { get; set; }       // create-only
+        public TravelERP.Shared.Enums.UserRole Role { get; set; } = TravelERP.Shared.Enums.UserRole.Agent;
+        public int? TenantRoleId { get; set; }
+        public bool IsActive { get; set; } = true;
     }
 
     [HttpGet("Branches")]

@@ -84,4 +84,12 @@ public class UserRepository : IUserRepository
             "sp_User_SetTenantRole", new { Id = userId, TenantRoleId = tenantRoleId },
             commandType: CommandType.StoredProcedure);
     }
+
+    public async Task DeleteAsync(int id, int? deletedBy)
+    {
+        using var conn = _factory.CreateMasterConnection();
+        await conn.ExecuteAsync(
+            "sp_User_Delete", new { Id = id, UpdatedBy = deletedBy },
+            commandType: CommandType.StoredProcedure);
+    }
 }

@@ -12,4 +12,5 @@ public interface IUserRepository
     Task<bool> UpdateLastLoginAsync(int userId);
     Task<bool> ChangePasswordAsync(int userId, string passwordHash);
     Task SetTenantRoleAsync(int userId, int tenantRoleId);
+    Task DeleteAsync(int id, int? deletedBy);
 }

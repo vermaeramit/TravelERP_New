@@ -64,6 +64,7 @@ public class RoleRepository : IRoleRepository
         p.Add("RoleName",     role.RoleName);
         p.Add("Description",  role.Description);
         p.Add("IsSystem",     role.IsSystem);
+        p.Add("OnlyAssigned", role.OnlyAssigned);
         p.Add("CreatedBy",    _tenant.UserId);
         p.Add("NewId", dbType: DbType.Int32, direction: ParameterDirection.Output);
         await conn.ExecuteAsync("sp_Role_Insert", p, commandType: CommandType.StoredProcedure);
@@ -78,6 +79,7 @@ public class RoleRepository : IRoleRepository
         p.Add("Id",           role.Id);
         p.Add("RoleName",     role.RoleName);
         p.Add("Description",  role.Description);
+        p.Add("OnlyAssigned", role.OnlyAssigned);
         p.Add("UpdatedBy",    _tenant.UserId);
         await conn.ExecuteAsync("sp_Role_Update", p, commandType: CommandType.StoredProcedure);
     }
