@@ -18,4 +18,10 @@ public class MasterUser : BaseEntity
     public string? Mobile { get; set; }
     public DateTime? DateOfBirth { get; set; }
     public string? ReplyEmail { get; set; }
+
+    // OTP state. Loaded with the user so AuthController can verify without an extra round-trip.
+    public string?   OtpHash { get; set; }
+    public DateTime? OtpExpiresAt { get; set; }
+    public DateTime? OtpIssuedAt { get; set; }
+    public int       OtpAttempts { get; set; }
 }

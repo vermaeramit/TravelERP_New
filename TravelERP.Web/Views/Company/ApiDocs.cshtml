@@ -1,0 +1,135 @@
+@{
+    ViewData["Title"] = "API Documentation";
+    var baseUrl = $"{Context.Request.Scheme}://{Context.Request.Host}";
+}
+
+@section Styles {
+    <style>
+        .doc pre { background:#0f172a; color:#e2e8f0; padding:1rem 1.25rem; border-radius:.5rem; font-size:.85rem; overflow-x:auto; }
+        .doc code { background:#f1f5f9; padding:1px 5px; border-radius:.25rem; color:#0f172a; }
+        .doc h5 { font-weight:700; margin-top:1.5rem; }
+        .doc table th, .doc table td { font-size:.88rem; vertical-align: top; }
+    </style>
+}
+
+<div class="doc">
+    <p class="text-muted small">
+        Use the REST API to push leads from your website, marketing platform, chatbot, etc. directly into your CRM.
+        Manage your keys on the <a href="/Company/ApiKeys">API Keys</a> page.
+    </p>
+
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-body">
+            <h5 class="m-0"><i class="bi bi-shield-lock text-primary me-2"></i>Authentication</h5>
+            <p class="small mt-2 mb-2">Every request must include your API key in the <code>X-Api-Key</code> request header.</p>
+            <pre>X-Api-Key: tek_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</pre>
+            <ul class="small text-muted mb-0">
+                <li>Keys are scoped to one company — they grant write-access to your leads.</li>
+                <li>Treat them like passwords. If leaked, revoke immediately on the API Keys page.</li>
+                <li>You can have multiple keys (one per integration) and revoke each independently.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-body">
+            <h5 class="m-0"><i class="bi bi-plus-circle text-success me-2"></i>POST <code>/api/v1/leads</code></h5>
+            <p class="small mt-2">Creates a new lead in your CRM. Returns the assigned <code>leadNumber</code>.</p>
+
+            <h5 class="mt-3">Request</h5>
+            <pre>curl -X POST @(baseUrl)/api/v1/leads \
+  -H "X-Api-Key: tek_your_api_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "John Smith",
+    "mobile": "+91 99999 88888",
+    "email": "john@example.com",
+    "destinationName": "Dubai",
+    "sourceName": "Website",
+    "travelingDate": "2026-09-15",
+    "leavingFrom": "Delhi",
+    "adults": 2,
+    "children": 1,
+    "infants": 0,
+    "days": 5,
+    "remark": "Looking for honeymoon package, 4★ hotel preferred"
+  }'</pre>
+
+            <h5>Request Body</h5>
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead class="table-light">
+                        <tr><th>Field</th><th>Type</th><th>Required</th><th>Notes</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><code>name</code></td><td>string</td><td>Yes</td><td>Lead's name (max 150 chars)</td></tr>
+                        <tr><td><code>mobile</code></td><td>string</td><td>No</td><td>Phone number</td></tr>
+                        <tr><td><code>email</code></td><td>string</td><td>No</td><td>Email address</td></tr>
+                        <tr><td><code>destinationId</code> / <code>destinationName</code></td><td>int / string</td><td>No</td><td>Either pass the ID or the name (we look it up). Unknown names are ignored.</td></tr>
+                        <tr><td><code>sourceId</code> / <code>sourceName</code></td><td>int / string</td><td>No</td><td>Lead source — same dual lookup. e.g. "Website", "Facebook", "Walk-in".</td></tr>
+                        <tr><td><code>statusId</code></td><td>int</td><td>No</td><td>Defaults to your <em>default</em> lead status if not provided.</td></tr>
+                        <tr><td><code>assignedToUserId</code></td><td>int</td><td>No</td><td>User to assign the lead to. Defaults to unassigned.</td></tr>
+                        <tr><td><code>travelingDate</code></td><td>date (YYYY-MM-DD)</td><td>No</td><td>Planned travel start date.</td></tr>
+                        <tr><td><code>leavingFrom</code></td><td>string</td><td>No</td><td>Origin city.</td></tr>
+                        <tr><td><code>hotelRecommended</code></td><td>string</td><td>No</td><td>Hotel name if requested.</td></tr>
+                        <tr><td><code>adults</code> / <code>children</code> / <code>infants</code></td><td>int</td><td>No</td><td>Pax counts. Defaults: 1 / 0 / 0.</td></tr>
+                        <tr><td><code>days</code></td><td>int</td><td>No</td><td>Trip duration.</td></tr>
+                        <tr><td><code>remark</code></td><td>string</td><td>No</td><td>Free-form notes.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h5>Success Response — 201 Created</h5>
+            <pre>{
+  "id": 42,
+  "leadNumber": "LD-2026-0042",
+  "companyId": 1,
+  "createdAt": "2026-05-11T18:00:00Z"
+}</pre>
+
+            <h5>Error Responses</h5>
+            <ul class="small">
+                <li><code>400 Bad Request</code> — invalid payload (missing <code>name</code>, etc.)</li>
+                <li><code>401 Unauthorized</code> — missing, invalid, expired or revoked <code>X-Api-Key</code></li>
+                <li><code>403 Forbidden</code> — your tenant is suspended or expired</li>
+                <li><code>500 Internal Server Error</code> — database or server issue</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-body">
+            <h5 class="m-0"><i class="bi bi-lightbulb text-warning me-2"></i>Quick examples</h5>
+
+            <h5>JavaScript (fetch)</h5>
+            <pre>await fetch('@(baseUrl)/api/v1/leads', {
+  method: 'POST',
+  headers: {
+    'X-Api-Key': 'tek_your_api_key_here',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    name: form.name.value,
+    mobile: form.mobile.value,
+    email: form.email.value,
+    destinationName: form.dest.value,
+    sourceName: 'Website',
+    remark: form.notes.value
+  })
+});</pre>
+
+            <h5>Python (requests)</h5>
+            <pre>import requests
+requests.post(
+    '@(baseUrl)/api/v1/leads',
+    headers={'X-Api-Key': 'tek_your_api_key_here'},
+    json={
+        'name': 'John Smith',
+        'mobile': '+91 99999 88888',
+        'destinationName': 'Dubai',
+        'sourceName': 'Website',
+    }
+)</pre>
+        </div>
+    </div>
+</div>

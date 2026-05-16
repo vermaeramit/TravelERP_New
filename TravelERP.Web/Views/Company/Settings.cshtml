@@ -4,6 +4,8 @@
 <form asp-action="Settings" method="post" class="row g-3">
     @Html.AntiForgeryToken()
 
+    <div asp-validation-summary="ModelOnly" class="alert alert-danger border-0 shadow-sm small py-2 mb-3"></div>
+
     <div class="col-lg-8">
         <!-- IDENTITY -->
         <div class="card shadow-sm mb-3">
@@ -78,6 +80,27 @@
                         <input asp-for="CurrencySymbol" class="form-control" maxlength="10" />
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- SECURITY / LOGIN -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-transparent border-0">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-shield-lock text-primary me-2"></i>Login Security</h6>
+                <small class="text-muted">Controls how your team signs in to the CRM.</small>
+            </div>
+            <div class="card-body">
+                <div class="form-check form-switch">
+                    @Html.CheckBoxFor(m => m.RequireOtpLogin, new { @class = "form-check-input", role = "switch", id = "RequireOtpLogin" })
+                    <label for="RequireOtpLogin" class="form-check-label fw-semibold">
+                        Require email OTP on every login
+                    </label>
+                </div>
+                <small class="text-muted d-block mt-1">
+                    When enabled, after entering email + password every user gets a 6-digit code by email and must
+                    enter it to finish signing in. Requires
+                    <a href="/Company/EmailSettings">SMTP</a> to be configured for this company.
+                </small>
             </div>
         </div>
 

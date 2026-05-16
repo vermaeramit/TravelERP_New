@@ -51,4 +51,13 @@ public class Company : BaseEntity
     // Public quote branding
     public string? GreetingParagraph { get; set; }
     public string? WhyBookWithUs { get; set; }   // JSON: [{"icon":"bi-headset","title":"24/7 Support"}, …]
+
+    // Google Business reviews — shown at bottom of public quote page
+    public string? GooglePlaceId { get; set; }
+    public string? GoogleApiKey { get; set; }
+    public string? GoogleReviewsCacheJson { get; set; }     // cached Places API response
+    public DateTime? GoogleReviewsCachedAt { get; set; }    // UTC; service refreshes if > 12h
+
+    // When true, /login requires a 6-digit OTP (emailed via per-tenant SMTP) after password.
+    public bool RequireOtpLogin { get; set; }
 }

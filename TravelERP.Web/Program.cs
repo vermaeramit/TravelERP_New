@@ -7,7 +7,13 @@ using TravelERP.Core.Constants;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews(o =>
+{
+    // Non-nullable string properties on entities should not be implicitly [Required] —
+    // the form fields they bind to are routinely optional (Email, Phone, Address, etc.),
+    // and explicit [Required] on DTOs covers the genuinely-required cases.
+    o.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
+});
 builder.Services.AddHttpContextAccessor();
 
 var masterConnStr = builder.Configuration.GetConnectionString("MasterConnection")!;
@@ -16,6 +22,7 @@ builder.Services.AddSingleton(new DbConnectionFactory(masterConnStr));
 builder.Services.AddScoped<ITenantContext, TenantContext>();
 builder.Services.AddScoped<TenantDbProvisioningService>();
 builder.Services.AddScoped<PublicPackageService>();
+builder.Services.AddScoped<GoogleReviewsService>();
 builder.Services.AddSingleton<PdfService>();
 builder.Services.AddScoped<EmailService>();
 
@@ -23,6 +30,7 @@ builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<ICompanyRepository, CompanyRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<ISubscriptionPlanRepository, SubscriptionPlanRepository>();
+builder.Services.AddScoped<IApiKeyRepository, ApiKeyRepository>();
 builder.Services.AddScoped<PlatformSeedService>();
 
 // Tenant repositories

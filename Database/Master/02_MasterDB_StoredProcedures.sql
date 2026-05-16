@@ -157,15 +157,40 @@ CREATE OR ALTER PROCEDURE sp_Company_UpdateQuoteBranding
     @WhyBookWithUs     NVARCHAR(MAX) = NULL,
     @LogoUrl           NVARCHAR(500) = NULL,
     @UpdateLogo        BIT           = 0,    -- only overwrite LogoUrl when true
+    @GooglePlaceId     NVARCHAR(255) = NULL,
+    @GoogleApiKey      NVARCHAR(255) = NULL,
     @UpdatedBy         INT           = NULL
 AS BEGIN
     SET NOCOUNT ON;
+    -- If Place ID changed, drop the cache so the next public view fetches fresh.
+    DECLARE @clearCache BIT = CASE
+        WHEN ISNULL((SELECT GooglePlaceId FROM Companies WHERE Id = @Id), '') <> ISNULL(@GooglePlaceId, '') THEN 1
+        ELSE 0
+    END;
+
     UPDATE Companies SET
-        GreetingParagraph = @GreetingParagraph,
-        WhyBookWithUs     = @WhyBookWithUs,
-        LogoUrl           = CASE WHEN @UpdateLogo = 1 THEN @LogoUrl ELSE LogoUrl END,
-        UpdatedAt         = GETUTCDATE(),
-        UpdatedBy         = @UpdatedBy
+        GreetingParagraph      = @GreetingParagraph,
+        WhyBookWithUs          = @WhyBookWithUs,
+        LogoUrl                = CASE WHEN @UpdateLogo = 1 THEN @LogoUrl ELSE LogoUrl END,
+        GooglePlaceId          = @GooglePlaceId,
+        GoogleApiKey           = @GoogleApiKey,
+        GoogleReviewsCacheJson = CASE WHEN @clearCache = 1 THEN NULL ELSE GoogleReviewsCacheJson END,
+        GoogleReviewsCachedAt  = CASE WHEN @clearCache = 1 THEN NULL ELSE GoogleReviewsCachedAt  END,
+        UpdatedAt              = GETUTCDATE(),
+        UpdatedBy              = @UpdatedBy
+    WHERE Id = @Id;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Company_UpdateGoogleReviewsCache
+    @Id        INT,
+    @CacheJson NVARCHAR(MAX) = NULL,
+    @CachedAt  DATETIME2     = NULL
+AS BEGIN
+    SET NOCOUNT ON;
+    UPDATE Companies SET
+        GoogleReviewsCacheJson = @CacheJson,
+        GoogleReviewsCachedAt  = @CachedAt
     WHERE Id = @Id;
 END
 GO
@@ -191,35 +216,37 @@ END
 GO
 
 CREATE OR ALTER PROCEDURE sp_Company_UpdateProfile
-    @Id             INT,
-    @Name           NVARCHAR(200),
-    @Email          NVARCHAR(150) = NULL,
-    @Phone          NVARCHAR(50)  = NULL,
-    @Address        NVARCHAR(500) = NULL,
-    @City           NVARCHAR(100) = NULL,
-    @Country        NVARCHAR(100) = NULL,
-    @LicenseNumber  NVARCHAR(100) = NULL,
-    @TaxNumber      NVARCHAR(100) = NULL,
-    @TimeZone       NVARCHAR(100) = NULL,
-    @Currency       NVARCHAR(10)  = NULL,
-    @CurrencySymbol NVARCHAR(10)  = NULL,
-    @UpdatedBy      INT           = NULL
+    @Id              INT,
+    @Name            NVARCHAR(200),
+    @Email           NVARCHAR(150) = NULL,
+    @Phone           NVARCHAR(50)  = NULL,
+    @Address         NVARCHAR(500) = NULL,
+    @City            NVARCHAR(100) = NULL,
+    @Country         NVARCHAR(100) = NULL,
+    @LicenseNumber   NVARCHAR(100) = NULL,
+    @TaxNumber       NVARCHAR(100) = NULL,
+    @TimeZone        NVARCHAR(100) = NULL,
+    @Currency        NVARCHAR(10)  = NULL,
+    @CurrencySymbol  NVARCHAR(10)  = NULL,
+    @RequireOtpLogin BIT           = 0,
+    @UpdatedBy       INT           = NULL
 AS BEGIN
     SET NOCOUNT ON;
     UPDATE Companies SET
-        Name           = @Name,
-        Email          = ISNULL(@Email, ''),
-        Phone          = ISNULL(@Phone, ''),
-        Address        = ISNULL(@Address, ''),
-        City           = ISNULL(@City, ''),
-        Country        = ISNULL(@Country, ''),
-        LicenseNumber  = ISNULL(@LicenseNumber, ''),
-        TaxNumber      = ISNULL(@TaxNumber, ''),
-        TimeZone       = ISNULL(@TimeZone, 'UTC'),
-        Currency       = ISNULL(@Currency, 'INR'),
-        CurrencySymbol = ISNULL(@CurrencySymbol, N'₹'),
-        UpdatedAt      = GETUTCDATE(),
-        UpdatedBy      = @UpdatedBy
+        Name            = @Name,
+        Email           = ISNULL(@Email, ''),
+        Phone           = ISNULL(@Phone, ''),
+        Address         = ISNULL(@Address, ''),
+        City            = ISNULL(@City, ''),
+        Country         = ISNULL(@Country, ''),
+        LicenseNumber   = ISNULL(@LicenseNumber, ''),
+        TaxNumber       = ISNULL(@TaxNumber, ''),
+        TimeZone        = ISNULL(@TimeZone, 'UTC'),
+        Currency        = ISNULL(@Currency, 'INR'),
+        CurrencySymbol  = ISNULL(@CurrencySymbol, N'₹'),
+        RequireOtpLogin = @RequireOtpLogin,
+        UpdatedAt       = GETUTCDATE(),
+        UpdatedBy       = @UpdatedBy
     WHERE Id = @Id;
 END
 GO
@@ -376,6 +403,47 @@ AS BEGIN
         IsDeleted = 1, IsActive = 0,
         UpdatedAt = GETUTCDATE(), UpdatedBy = @UpdatedBy
     WHERE Id = @Id;
+END
+GO
+
+-- ============================================================
+-- OTP login — store hashed 6-digit code with TTL + attempts.
+-- The code itself never leaves C# in plaintext after SetOtp returns.
+-- ============================================================
+CREATE OR ALTER PROCEDURE sp_User_SetOtp
+    @Id        INT,
+    @OtpHash   NVARCHAR(128),
+    @ExpiresAt DATETIME2
+AS BEGIN
+    SET NOCOUNT ON;
+    UPDATE MasterUsers SET
+        OtpHash      = @OtpHash,
+        OtpExpiresAt = @ExpiresAt,
+        OtpIssuedAt  = GETUTCDATE(),
+        OtpAttempts  = 0
+    WHERE Id = @Id;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_User_ClearOtp
+    @Id INT
+AS BEGIN
+    SET NOCOUNT ON;
+    UPDATE MasterUsers SET
+        OtpHash      = NULL,
+        OtpExpiresAt = NULL,
+        OtpIssuedAt  = NULL,
+        OtpAttempts  = 0
+    WHERE Id = @Id;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_User_IncrementOtpAttempts
+    @Id INT
+AS BEGIN
+    SET NOCOUNT ON;
+    UPDATE MasterUsers SET OtpAttempts = ISNULL(OtpAttempts, 0) + 1 WHERE Id = @Id;
+    SELECT OtpAttempts FROM MasterUsers WHERE Id = @Id;
 END
 GO
 
@@ -1931,7 +1999,7 @@ AS BEGIN
 
     -- Resolve package id + creator (agent) up front so we can return the agent
     -- name/phone alongside other context. CreatedBy points at MasterUsers in the
-    -- master DB; the Mobile lives in the tenant DB Employees table linked by UserId.
+    -- master DB; profile fields (Mobile, ProfileImageUrl) live there too.
     DECLARE @id INT, @createdBy INT;
     DECLARE @findSql NVARCHAR(MAX) = N'
         SELECT @id = Id, @createdBy = CreatedBy
@@ -2027,13 +2095,9 @@ AS BEGIN
         ORDER BY IsDefault DESC, Id;';
     EXEC sp_executesql @sql, N'@id INT', @id;
 
-    -- Agent (creator) — name from MasterUsers + phone from Employees in tenant DB.
-    DECLARE @agentSql NVARCHAR(MAX) = N'
-        SELECT mu.FullName, mu.Email, e.Mobile, mu.ProfileImageUrl AS ImageUrl
-        FROM dbo.MasterUsers mu
-        LEFT JOIN [' + @DatabaseName + N'].dbo.Employees e ON e.UserId = mu.Id
-        WHERE mu.Id = @createdBy;';
-    EXEC sp_executesql @agentSql, N'@createdBy INT', @createdBy;
+    -- Agent (creator) — all fields now live on MasterUsers since Employees was merged in.
+    SELECT FullName, Email, Mobile, ProfileImageUrl AS ImageUrl
+    FROM dbo.MasterUsers WHERE Id = @createdBy;
 
     -- Company branding (greeting + why-book-with-us JSON).
     SELECT GreetingParagraph, WhyBookWithUs
@@ -2758,9 +2822,9 @@ AS BEGIN
         SELECT
             CASE
                 WHEN i.DueDate IS NULL OR i.DueDate >= @today THEN ''Current''
-                WHEN DATEDIFF(DAY, i.DueDate, @today) BETWEEN 1 AND 30  THEN ''1–30 days''
-                WHEN DATEDIFF(DAY, i.DueDate, @today) BETWEEN 31 AND 60 THEN ''31–60 days''
-                WHEN DATEDIFF(DAY, i.DueDate, @today) BETWEEN 61 AND 90 THEN ''61–90 days''
+                WHEN DATEDIFF(DAY, i.DueDate, @today) BETWEEN 1 AND 30  THEN ''1-30 days''
+                WHEN DATEDIFF(DAY, i.DueDate, @today) BETWEEN 31 AND 60 THEN ''31-60 days''
+                WHEN DATEDIFF(DAY, i.DueDate, @today) BETWEEN 61 AND 90 THEN ''61-90 days''
                 ELSE ''90+ days''
             END                                AS Bucket,
             CASE
@@ -2780,9 +2844,9 @@ AS BEGIN
         GROUP BY
             CASE
                 WHEN i.DueDate IS NULL OR i.DueDate >= @today THEN ''Current''
-                WHEN DATEDIFF(DAY, i.DueDate, @today) BETWEEN 1 AND 30  THEN ''1–30 days''
-                WHEN DATEDIFF(DAY, i.DueDate, @today) BETWEEN 31 AND 60 THEN ''31–60 days''
-                WHEN DATEDIFF(DAY, i.DueDate, @today) BETWEEN 61 AND 90 THEN ''61–90 days''
+                WHEN DATEDIFF(DAY, i.DueDate, @today) BETWEEN 1 AND 30  THEN ''1-30 days''
+                WHEN DATEDIFF(DAY, i.DueDate, @today) BETWEEN 31 AND 60 THEN ''31-60 days''
+                WHEN DATEDIFF(DAY, i.DueDate, @today) BETWEEN 61 AND 90 THEN ''61-90 days''
                 ELSE ''90+ days''
             END,
             CASE
@@ -3233,5 +3297,63 @@ AS BEGIN
     FROM Companies
     WHERE IsDeleted = 0
     ORDER BY CreatedAt DESC;
+END
+GO
+
+-- ============================================================
+-- API KEY PROCEDURES
+-- ============================================================
+CREATE OR ALTER PROCEDURE sp_ApiKey_GetByCompany
+    @CompanyId INT
+AS BEGIN
+    SET NOCOUNT ON;
+    SELECT Id, CompanyId, Name, ApiKey AS [Key], IsActive, CreatedAt, CreatedBy, LastUsedAt, ExpiresAt
+    FROM ApiKeys WHERE CompanyId = @CompanyId
+    ORDER BY IsActive DESC, CreatedAt DESC;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_ApiKey_GetByKey
+    @ApiKey NVARCHAR(80)
+AS BEGIN
+    SET NOCOUNT ON;
+    SELECT k.Id, k.CompanyId, k.Name, k.ApiKey AS [Key], k.IsActive, k.CreatedAt, k.CreatedBy,
+           k.LastUsedAt, k.ExpiresAt,
+           c.DatabaseName, c.Status AS CompanyStatus, c.LeadPrefix
+    FROM ApiKeys k
+    INNER JOIN Companies c ON c.Id = k.CompanyId
+    WHERE k.ApiKey = @ApiKey AND k.IsActive = 1 AND c.IsDeleted = 0;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_ApiKey_Insert
+    @CompanyId INT,
+    @Name      NVARCHAR(100),
+    @ApiKey    NVARCHAR(80),
+    @CreatedBy INT = NULL,
+    @ExpiresAt DATETIME = NULL,
+    @NewId     INT OUTPUT
+AS BEGIN
+    SET NOCOUNT ON;
+    INSERT INTO ApiKeys (CompanyId, Name, ApiKey, IsActive, CreatedAt, CreatedBy, ExpiresAt)
+    VALUES (@CompanyId, @Name, @ApiKey, 1, GETUTCDATE(), @CreatedBy, @ExpiresAt);
+    SET @NewId = SCOPE_IDENTITY();
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_ApiKey_Revoke
+    @Id        INT,
+    @CompanyId INT
+AS BEGIN
+    SET NOCOUNT ON;
+    UPDATE ApiKeys SET IsActive = 0 WHERE Id = @Id AND CompanyId = @CompanyId;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_ApiKey_MarkUsed
+    @Id INT
+AS BEGIN
+    SET NOCOUNT ON;
+    UPDATE ApiKeys SET LastUsedAt = GETUTCDATE() WHERE Id = @Id;
 END
 GO

@@ -1,0 +1,71 @@
+@model TravelERP.Shared.DTOs.OtpVerifyDto
+@{
+    Layout = "_LayoutAuth";
+    ViewData["Title"] = "Verify Code";
+    var masked = ViewBag.MaskedEmail as string;
+}
+
+<div class="mb-4">
+    <h2 class="fw-800 mb-1" style="font-weight:800;font-size:1.75rem;color:#0f1f4b;letter-spacing:-0.5px">Verify your identity</h2>
+    <p class="text-muted mb-0" style="font-size:0.92rem">
+        We've sent a 6-digit code to
+        <strong>@(masked ?? "your email")</strong>.
+        It expires in 5 minutes.
+    </p>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success border-0 rounded-3 small py-2 mb-3">
+        <i class="bi bi-check-circle-fill me-2"></i>@TempData["Success"]
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-warning border-0 rounded-3 small py-2 mb-3">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>@TempData["Error"]
+    </div>
+}
+
+<form asp-action="Otp" asp-controller="Auth" method="post" autocomplete="off">
+    @Html.AntiForgeryToken()
+    <div asp-validation-summary="ModelOnly" class="alert alert-danger border-0 rounded-3 small py-2 mb-3"></div>
+
+    <div class="mb-4">
+        <label asp-for="Code" class="form-label">6-digit code</label>
+        <input asp-for="Code" class="form-control form-control-lg text-center"
+               style="font-size:1.5rem;letter-spacing:.6rem;font-family:ui-monospace,SFMono-Regular,monospace"
+               maxlength="6" inputmode="numeric" pattern="[0-9]{6}"
+               autocomplete="one-time-code" autofocus placeholder="••••••" />
+        <span asp-validation-for="Code" class="text-danger" style="font-size:0.78rem"></span>
+    </div>
+
+    <button type="submit" class="btn btn-auth-primary w-100 mb-3">
+        <i class="bi bi-shield-check me-2"></i>Verify &amp; Sign In
+    </button>
+</form>
+
+<div class="text-center" style="font-size:0.87rem;color:#64748b">
+    Didn't get the code?
+    <form asp-action="OtpResend" asp-controller="Auth" method="post" class="d-inline">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="btn btn-link p-0 fw-semibold text-decoration-none align-baseline"
+                style="color:#1a3a8f;font-size:0.87rem">Resend</button>
+    </form>
+    &nbsp;·&nbsp;
+    <a href="/login" class="fw-semibold text-decoration-none" style="color:#1a3a8f">Back to sign in</a>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        // Auto-submit when 6 digits entered
+        const code = document.getElementById('Code');
+        if (code) {
+            code.addEventListener('input', () => {
+                code.value = code.value.replace(/\D/g, '').slice(0, 6);
+                if (code.value.length === 6) code.form.submit();
+            });
+        }
+    </script>
+}

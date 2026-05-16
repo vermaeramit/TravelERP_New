@@ -48,6 +48,12 @@ public class RegisterCompanyDto
     public string? LicenseNumber { get; set; }
 }
 
+public class OtpVerifyDto
+{
+    [Required, RegularExpression(@"^\d{6}$", ErrorMessage = "Enter the 6-digit code.")]
+    public string Code { get; set; } = string.Empty;
+}
+
 public class ChangePasswordDto
 {
     [Required]

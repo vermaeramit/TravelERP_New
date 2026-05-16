@@ -79,7 +79,7 @@ public class CompanyRepository : ICompanyRepository
             "sp_Company_UpdateProfile",
             new
             {
-                Id             = c.Id,
+                Id              = c.Id,
                 c.Name,
                 c.Email,
                 c.Phone,
@@ -91,7 +91,8 @@ public class CompanyRepository : ICompanyRepository
                 c.TimeZone,
                 c.Currency,
                 c.CurrencySymbol,
-                UpdatedBy      = updatedBy
+                c.RequireOtpLogin,
+                UpdatedBy       = updatedBy
             },
             commandType: CommandType.StoredProcedure) > 0;
     }
@@ -113,7 +114,7 @@ public class CompanyRepository : ICompanyRepository
             commandType: CommandType.StoredProcedure) > 0;
     }
 
-    public async Task<bool> UpdateQuoteBrandingAsync(int companyId, string? greetingParagraph, string? whyBookWithUs, string? logoUrl, bool updateLogo, int? updatedBy)
+    public async Task<bool> UpdateQuoteBrandingAsync(int companyId, string? greetingParagraph, string? whyBookWithUs, string? logoUrl, bool updateLogo, string? googlePlaceId, string? googleApiKey, int? updatedBy)
     {
         using var conn = _factory.CreateMasterConnection();
         return await conn.ExecuteAsync(
@@ -125,8 +126,19 @@ public class CompanyRepository : ICompanyRepository
                 WhyBookWithUs     = string.IsNullOrWhiteSpace(whyBookWithUs)     ? null : whyBookWithUs,
                 LogoUrl           = string.IsNullOrWhiteSpace(logoUrl) ? null : logoUrl,
                 UpdateLogo        = updateLogo,
+                GooglePlaceId     = string.IsNullOrWhiteSpace(googlePlaceId) ? null : googlePlaceId.Trim(),
+                GoogleApiKey      = string.IsNullOrWhiteSpace(googleApiKey)  ? null : googleApiKey.Trim(),
                 UpdatedBy         = updatedBy
             },
+            commandType: CommandType.StoredProcedure) > 0;
+    }
+
+    public async Task<bool> UpdateGoogleReviewsCacheAsync(int companyId, string? cacheJson, DateTime? cachedAt)
+    {
+        using var conn = _factory.CreateMasterConnection();
+        return await conn.ExecuteAsync(
+            "sp_Company_UpdateGoogleReviewsCache",
+            new { Id = companyId, CacheJson = cacheJson, CachedAt = cachedAt },
             commandType: CommandType.StoredProcedure) > 0;
     }
 

@@ -1,0 +1,110 @@
+@model IEnumerable<TravelERP.Core.Entities.Master.ApiKey>
+@{
+    ViewData["Title"] = "API Keys";
+    var newKey  = ViewBag.NewKey  as string;
+    var newName = ViewBag.NewName as string;
+}
+
+@if (!string.IsNullOrEmpty(newKey))
+{
+    <div class="alert alert-success border-0 shadow-sm" role="alert">
+        <h6 class="fw-bold mb-2"><i class="bi bi-key-fill me-2"></i>New key generated: @newName</h6>
+        <p class="small mb-2">Copy this now — for security, the full key is never shown again. Anyone with this key can submit leads to your CRM.</p>
+        <div class="input-group">
+            <input type="text" value="@newKey" id="newKeyInput" class="form-control font-monospace" readonly />
+            <button type="button" class="btn btn-success" onclick="navigator.clipboard.writeText(document.getElementById('newKeyInput').value); this.innerHTML='<i class=&quot;bi bi-check2&quot;></i> Copied'">
+                <i class="bi bi-clipboard me-1"></i>Copy
+            </button>
+        </div>
+    </div>
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <p class="text-muted mb-0 small">
+        API keys let external systems push leads into your CRM via <a href="/Company/ApiDocs">our REST API</a>.
+        Pass the key in the <code>X-Api-Key</code> header on every request.
+    </p>
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newKeyModal">
+        <i class="bi bi-plus-lg me-1"></i>New API Key
+    </button>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Name</th>
+                    <th>Key (preview)</th>
+                    <th>Status</th>
+                    <th>Last Used</th>
+                    <th>Created</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                    <tr><td colspan="6" class="text-center py-4 text-muted">No API keys yet. Create one to start integrating.</td></tr>
+                }
+                @foreach (var k in Model)
+                {
+                    var preview = k.Key.Length > 12 ? $"{k.Key[..8]}…{k.Key[^4..]}" : k.Key;
+                    <tr class="@(k.IsActive ? "" : "text-muted")">
+                        <td class="fw-semibold">@k.Name</td>
+                        <td class="font-monospace small">@preview</td>
+                        <td>
+                            @if (k.IsActive)
+                            {
+                                <span class="badge bg-success-subtle text-success">Active</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary-subtle text-secondary">Revoked</span>
+                            }
+                        </td>
+                        <td class="small">@(k.LastUsedAt?.ToString("dd MMM yyyy HH:mm") ?? "never")</td>
+                        <td class="small">@k.CreatedAt.ToString("dd MMM yyyy")</td>
+                        <td class="text-end">
+                            @if (k.IsActive)
+                            {
+                                <form asp-action="RevokeApiKey" asp-route-id="@k.Id" method="post" class="d-inline"
+                                      onsubmit="return confirm('Revoke @k.Name? Any integration using this key will stop working.');">
+                                    @Html.AntiForgeryToken()
+                                    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-x-circle me-1"></i>Revoke</button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- New Key modal -->
+<div class="modal fade" id="newKeyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form asp-action="CreateApiKey" method="post">
+                @Html.AntiForgeryToken()
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-key-fill text-primary me-2"></i>New API Key
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-muted">Give the key a recognisable name — e.g. the system it's used by.</p>
+                    <label class="form-label small fw-semibold">Name <span class="text-danger">*</span></label>
+                    <input type="text" name="name" class="form-control" required maxlength="100"
+                           placeholder="e.g. Website lead form, Zapier integration" />
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Generate Key</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

@@ -11,6 +11,7 @@
     var greetingHtml  = ViewBag.GreetingHtml  as string;
     var whyItems      = ViewBag.WhyBookWithUs as IReadOnlyList<PublicPackageService.WhyItem> ?? new List<PublicPackageService.WhyItem>();
     var bankAccounts  = ViewBag.BankAccounts  as IReadOnlyList<BankAccount> ?? new List<BankAccount>();
+    var reviews       = ViewBag.GoogleReviews as GoogleReviewsService.ReviewsBundle;
 
     string FormatStars(byte? cat)
     {
@@ -227,6 +228,48 @@
         }
         .why-tile .why-tt { font-size: .85rem; font-weight: 600; color: #1f2937; }
 
+        /* ─────────── Google reviews ─────────── */
+        .reviews-head {
+            display: flex; flex-wrap: wrap; align-items: center; gap: .75rem;
+            margin-bottom: 1rem;
+        }
+        .reviews-head .rh-score {
+            display: flex; align-items: baseline; gap: .35rem;
+            font-weight: 800; font-size: 1.5rem; color: #1f2937;
+        }
+        .reviews-head .rh-stars { color: #f59e0b; letter-spacing: 2px; font-size: 1rem; }
+        .reviews-head .rh-total { color: #6b7280; font-size: .85rem; }
+        .reviews-head .g-badge {
+            display: inline-flex; align-items: center; gap: .35rem;
+            background: #fff; border: 1px solid #e5e7eb; border-radius: 999px;
+            padding: 3px 12px; font-size: .8rem; color: #4b5563;
+        }
+        .reviews-head .g-badge i { color: #4285F4; font-size: 1rem; }
+        .reviews-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: .85rem;
+        }
+        .review-card {
+            background: #fff; border: 1px solid #e5e7eb; border-radius: .75rem;
+            padding: 1rem 1.1rem;
+        }
+        .review-card .rv-head { display: flex; align-items: center; gap: .65rem; margin-bottom: .5rem; }
+        .review-card .rv-avatar {
+            width: 38px; height: 38px; border-radius: 50%;
+            background: var(--brand-soft); color: var(--brand);
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: .85rem; overflow: hidden; flex-shrink: 0;
+        }
+        .review-card .rv-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .review-card .rv-name { font-weight: 700; color: #1f2937; font-size: .9rem; line-height: 1.1; }
+        .review-card .rv-when { color: #6b7280; font-size: .75rem; margin-top: 2px; }
+        .review-card .rv-stars { color: #f59e0b; font-size: .8rem; letter-spacing: 1px; margin-bottom: .4rem; }
+        .review-card .rv-text {
+            color: #4b5563; font-size: .85rem; line-height: 1.5;
+            display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
         /* ─────────── Pagination: keep cards/tiles intact across PDF page breaks ─────────── */
         /* These rules apply on screen too, but only have effect when paginating
            (browser print + Puppeteer PDF rendering). Living outside the print
@@ -236,6 +279,7 @@
         .day-card,
         .bank-card,
         .why-tile,
+        .review-card,
         .pub-card,
         .opt-card .hotel-row {
             break-inside: avoid;
@@ -579,6 +623,57 @@
                 <div class="why-tile">
                     <div class="why-ic"><i class="bi @IconClass(w.Icon)"></i></div>
                     <div class="why-tt">@w.Title</div>
+                </div>
+            }
+        </div>
+    }
+
+    <!-- ──────────── GOOGLE REVIEWS ──────────── -->
+    @if (reviews?.Reviews != null && reviews.Reviews.Count > 0)
+    {
+        <div class="section-title">What Our Customers Say</div>
+        <div class="reviews-head">
+            @if (reviews.AverageRating.HasValue)
+            {
+                <div class="rh-score">
+                    @reviews.AverageRating.Value.ToString("0.0")
+                    <span class="rh-stars">@FormatStars((byte)Math.Round(reviews.AverageRating.Value))</span>
+                </div>
+            }
+            @if (reviews.TotalRatings.HasValue)
+            {
+                <div class="rh-total">based on @reviews.TotalRatings.Value.ToString("N0") Google reviews</div>
+            }
+            <span class="g-badge"><i class="bi bi-google"></i>Verified Google reviews</span>
+        </div>
+        <div class="reviews-grid">
+            @foreach (var rv in reviews.Reviews.Take(5))
+            {
+                <div class="review-card">
+                    <div class="rv-head">
+                        <div class="rv-avatar">
+                            @if (!string.IsNullOrEmpty(rv.ProfilePhotoUrl))
+                            {
+                                <img src="@rv.ProfilePhotoUrl" alt="@rv.AuthorName" />
+                            }
+                            else
+                            {
+                                @(string.Concat(rv.AuthorName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(x => x[0])).ToUpperInvariant())
+                            }
+                        </div>
+                        <div>
+                            <div class="rv-name">@rv.AuthorName</div>
+                            @if (!string.IsNullOrEmpty(rv.RelativeTime))
+                            {
+                                <div class="rv-when">@rv.RelativeTime</div>
+                            }
+                        </div>
+                    </div>
+                    <div class="rv-stars">@FormatStars((byte)rv.Rating)</div>
+                    @if (!string.IsNullOrEmpty(rv.Text))
+                    {
+                        <div class="rv-text">@rv.Text</div>
+                    }
                 </div>
             }
         </div>

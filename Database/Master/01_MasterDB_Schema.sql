@@ -129,6 +129,23 @@ IF COL_LENGTH('Companies','WhyBookWithUs') IS NULL
     ALTER TABLE Companies ADD WhyBookWithUs NVARCHAR(MAX) NULL;  -- JSON: [{"icon":"bi-headset","title":"24/7 Support"},...]
 GO
 
+-- Google Business reviews (idempotent) — shown at the bottom of the public quote page
+IF COL_LENGTH('Companies','GooglePlaceId')          IS NULL ALTER TABLE Companies ADD GooglePlaceId          NVARCHAR(255) NULL;
+IF COL_LENGTH('Companies','GoogleApiKey')           IS NULL ALTER TABLE Companies ADD GoogleApiKey           NVARCHAR(255) NULL;
+IF COL_LENGTH('Companies','GoogleReviewsCacheJson') IS NULL ALTER TABLE Companies ADD GoogleReviewsCacheJson NVARCHAR(MAX) NULL;
+IF COL_LENGTH('Companies','GoogleReviewsCachedAt')  IS NULL ALTER TABLE Companies ADD GoogleReviewsCachedAt  DATETIME2     NULL;
+GO
+
+-- OTP login (idempotent) — Companies opt-in flag + per-user one-time-password state
+IF COL_LENGTH('Companies','RequireOtpLogin') IS NULL
+    ALTER TABLE Companies ADD RequireOtpLogin BIT NOT NULL DEFAULT 0;
+GO
+IF COL_LENGTH('MasterUsers','OtpHash')      IS NULL ALTER TABLE MasterUsers ADD OtpHash      NVARCHAR(128) NULL;
+IF COL_LENGTH('MasterUsers','OtpExpiresAt') IS NULL ALTER TABLE MasterUsers ADD OtpExpiresAt DATETIME2     NULL;
+IF COL_LENGTH('MasterUsers','OtpAttempts')  IS NULL ALTER TABLE MasterUsers ADD OtpAttempts  INT NOT NULL DEFAULT 0;
+IF COL_LENGTH('MasterUsers','OtpIssuedAt')  IS NULL ALTER TABLE MasterUsers ADD OtpIssuedAt  DATETIME2     NULL;
+GO
+
 -- SMTP / email-sending settings (idempotent)
 IF COL_LENGTH('Companies','SmtpHost')      IS NULL ALTER TABLE Companies ADD SmtpHost      NVARCHAR(200) NULL;
 IF COL_LENGTH('Companies','SmtpPort')      IS NULL ALTER TABLE Companies ADD SmtpPort      INT           NULL;
@@ -167,6 +184,27 @@ BEGIN
     ('Starter',    29.99,   299.99,   10,  'All modules, 10 users, email support'),
     ('Business',   79.99,   799.99,   50,  'All modules, 50 users, priority support, custom reports'),
     ('Enterprise', 199.99,  1999.99,  999, 'Unlimited users, white-label, dedicated support');
+END
+GO
+
+-- ============================================================
+-- API KEYS — per-tenant tokens used by external integrations
+-- ============================================================
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'ApiKeys') AND type = 'U')
+BEGIN
+    CREATE TABLE ApiKeys (
+        Id          INT IDENTITY(1,1) PRIMARY KEY,
+        CompanyId   INT           NOT NULL,
+        Name        NVARCHAR(100) NOT NULL,
+        ApiKey      NVARCHAR(80)  NOT NULL UNIQUE,
+        IsActive    BIT           NOT NULL DEFAULT 1,
+        CreatedAt   DATETIME      NOT NULL DEFAULT GETUTCDATE(),
+        CreatedBy   INT           NULL,
+        LastUsedAt  DATETIME      NULL,
+        ExpiresAt   DATETIME      NULL,
+        CONSTRAINT FK_ApiKeys_Company FOREIGN KEY (CompanyId) REFERENCES Companies(Id)
+    );
+    CREATE INDEX IX_ApiKeys_Company ON ApiKeys(CompanyId);
 END
 GO
 

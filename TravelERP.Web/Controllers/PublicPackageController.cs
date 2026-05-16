@@ -29,6 +29,7 @@ public class PublicPackageController : Controller
         ViewBag.GreetingHtml  = result.GreetingHtml;
         ViewBag.WhyBookWithUs = result.WhyBookWithUs;
         ViewBag.BankAccounts  = result.BankAccounts;
+        ViewBag.GoogleReviews = result.GoogleReviews;
         return View("PackageView", result.Package);
     }
 

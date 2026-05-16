@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
@@ -16,19 +18,34 @@ namespace TravelERP.Web.Controllers;
 [AllowAnonymous]
 public class AuthController : Controller
 {
+    private const string PendingOtpSessionKey = "PendingOtp";
+    // 6-digit OTP, 5-minute TTL, max 5 verify attempts, resend allowed after 30s.
+    private static readonly TimeSpan OtpLifetime    = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan OtpResendCooldown = TimeSpan.FromSeconds(30);
+    private const int MaxOtpAttempts = 5;
+
     private readonly IUserRepository _users;
     private readonly ICompanyRepository _companies;
     private readonly TenantDbProvisioningService _provisioner;
     private readonly DbConnectionFactory _dbFactory;
+    private readonly EmailService _email;
+    private readonly ILogger<AuthController> _log;
 
     public AuthController(IUserRepository users, ICompanyRepository companies,
-        TenantDbProvisioningService provisioner, DbConnectionFactory dbFactory)
+        TenantDbProvisioningService provisioner, DbConnectionFactory dbFactory,
+        EmailService email, ILogger<AuthController> log)
     {
         _users = users;
         _companies = companies;
         _provisioner = provisioner;
         _dbFactory = dbFactory;
+        _email = email;
+        _log = log;
     }
+
+    // Holds the pending login between password-verified and OTP-verified pages.
+    // Lives only in session; on logout/expiry it disappears.
+    private record PendingOtpState(int UserId, int CompanyId, bool RememberMe, string ReturnUrl);
 
     [HttpGet("/login")]
     public IActionResult Login(string? returnUrl)
@@ -81,6 +98,28 @@ public class AuthController : Controller
             return View(model);
         }
 
+        // OTP gate — platform tenant is exempt (it has no per-tenant SMTP).
+        var isPlatform = string.Equals(company.Slug, "platform", StringComparison.OrdinalIgnoreCase);
+        if (company.RequireOtpLogin && !isPlatform)
+        {
+            var landing = user.Role == TravelERP.Shared.Enums.UserRole.SuperAdmin
+                ? "/Admin/Stats"
+                : (string.IsNullOrEmpty(returnUrl) ? "/Dashboard" : returnUrl);
+
+            var state = new PendingOtpState(user.Id, company.Id, model.RememberMe, landing);
+            HttpContext.Session.SetString(PendingOtpSessionKey,
+                System.Text.Json.JsonSerializer.Serialize(state));
+
+            var sendResult = await IssueAndSendOtpAsync(user, company);
+            if (!sendResult.Success)
+            {
+                HttpContext.Session.Remove(PendingOtpSessionKey);
+                ModelState.AddModelError("", "Couldn't send OTP email — " + sendResult.ErrorMessage);
+                return View(model);
+            }
+            return RedirectToAction(nameof(Otp));
+        }
+
         await _users.UpdateLastLoginAsync(user.Id);
         await SignInAsync(user, company, model.RememberMe);
 
@@ -89,6 +128,165 @@ public class AuthController : Controller
             return LocalRedirect("/Admin/Stats");
 
         return LocalRedirect(string.IsNullOrEmpty(returnUrl) ? "/Dashboard" : returnUrl);
+    }
+
+    // ─────────────────────────────────────────────── OTP login ───────────────────────────────────────────────
+
+    [HttpGet("/otp")]
+    public IActionResult Otp()
+    {
+        var state = LoadPendingOtp();
+        if (state == null) return RedirectToAction(nameof(Login));
+        ViewBag.Email = User.Identity?.Name; // not authenticated yet, but populated below from state
+        ViewBag.MaskedEmail = MaskEmail(HttpContext.Session.GetString("PendingOtpEmail"));
+        return View(new OtpVerifyDto());
+    }
+
+    [HttpPost("/otp")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Otp(OtpVerifyDto model)
+    {
+        var state = LoadPendingOtp();
+        if (state == null) return RedirectToAction(nameof(Login));
+
+        if (!ModelState.IsValid)
+        {
+            ViewBag.MaskedEmail = MaskEmail(HttpContext.Session.GetString("PendingOtpEmail"));
+            return View(model);
+        }
+
+        var user = await _users.GetByIdAsync(state.UserId);
+        var company = user != null ? await _companies.GetByIdAsync(state.CompanyId) : null;
+        if (user == null || company == null)
+        {
+            HttpContext.Session.Remove(PendingOtpSessionKey);
+            return RedirectToAction(nameof(Login));
+        }
+
+        if (!user.OtpExpiresAt.HasValue || user.OtpExpiresAt.Value < DateTime.UtcNow || string.IsNullOrEmpty(user.OtpHash))
+        {
+            ModelState.AddModelError("", "Your code has expired. Please request a new one.");
+            ViewBag.MaskedEmail = MaskEmail(HttpContext.Session.GetString("PendingOtpEmail"));
+            return View(model);
+        }
+        if (user.OtpAttempts >= MaxOtpAttempts)
+        {
+            await _users.ClearOtpAsync(user.Id);
+            HttpContext.Session.Remove(PendingOtpSessionKey);
+            ModelState.AddModelError("", "Too many incorrect attempts. Please log in again.");
+            return RedirectToAction(nameof(Login));
+        }
+
+        var providedHash = HashOtp(model.Code.Trim());
+        if (!CryptographicOperations.FixedTimeEquals(
+                Encoding.ASCII.GetBytes(providedHash),
+                Encoding.ASCII.GetBytes(user.OtpHash)))
+        {
+            var attempts = await _users.IncrementOtpAttemptsAsync(user.Id);
+            var left = Math.Max(0, MaxOtpAttempts - attempts);
+            ModelState.AddModelError("", left > 0
+                ? $"Incorrect code. {left} attempt(s) left."
+                : "Too many incorrect attempts. Please log in again.");
+            if (left == 0)
+            {
+                await _users.ClearOtpAsync(user.Id);
+                HttpContext.Session.Remove(PendingOtpSessionKey);
+                return RedirectToAction(nameof(Login));
+            }
+            ViewBag.MaskedEmail = MaskEmail(HttpContext.Session.GetString("PendingOtpEmail"));
+            return View(model);
+        }
+
+        // Success — single-use code: clear and sign in.
+        await _users.ClearOtpAsync(user.Id);
+        await _users.UpdateLastLoginAsync(user.Id);
+        HttpContext.Session.Remove(PendingOtpSessionKey);
+        HttpContext.Session.Remove("PendingOtpEmail");
+        HttpContext.Session.Remove("PendingOtpLastSent");
+
+        await SignInAsync(user, company, state.RememberMe);
+        return LocalRedirect(state.ReturnUrl);
+    }
+
+    [HttpPost("/otp/resend")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> OtpResend()
+    {
+        var state = LoadPendingOtp();
+        if (state == null) return RedirectToAction(nameof(Login));
+
+        // Rate-limit resend so the SMTP server isn't hammered.
+        var lastSentRaw = HttpContext.Session.GetString("PendingOtpLastSent");
+        if (DateTime.TryParse(lastSentRaw, out var lastSent)
+            && DateTime.UtcNow - lastSent < OtpResendCooldown)
+        {
+            TempData["Error"] = $"Please wait {(int)(OtpResendCooldown - (DateTime.UtcNow - lastSent)).TotalSeconds}s before requesting another code.";
+            return RedirectToAction(nameof(Otp));
+        }
+
+        var user = await _users.GetByIdAsync(state.UserId);
+        var company = user != null ? await _companies.GetByIdAsync(state.CompanyId) : null;
+        if (user == null || company == null)
+        {
+            HttpContext.Session.Remove(PendingOtpSessionKey);
+            return RedirectToAction(nameof(Login));
+        }
+
+        var send = await IssueAndSendOtpAsync(user, company);
+        TempData[send.Success ? "Success" : "Error"] =
+            send.Success ? "A new code has been sent." : "Couldn't send OTP — " + send.ErrorMessage;
+        return RedirectToAction(nameof(Otp));
+    }
+
+    private PendingOtpState? LoadPendingOtp()
+    {
+        var raw = HttpContext.Session.GetString(PendingOtpSessionKey);
+        if (string.IsNullOrEmpty(raw)) return null;
+        try { return System.Text.Json.JsonSerializer.Deserialize<PendingOtpState>(raw); }
+        catch { return null; }
+    }
+
+    private async Task<EmailService.SendResult> IssueAndSendOtpAsync(MasterUser user, Company company)
+    {
+        var code = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+        await _users.SetOtpAsync(user.Id, HashOtp(code), DateTime.UtcNow.Add(OtpLifetime));
+        HttpContext.Session.SetString("PendingOtpEmail", user.Email);
+        HttpContext.Session.SetString("PendingOtpLastSent", DateTime.UtcNow.ToString("o"));
+
+        var subject = $"Your login code: {code}";
+        var safeName = System.Net.WebUtility.HtmlEncode(user.FullName ?? "");
+        var html = $@"
+            <div style='font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;margin:0 auto;color:#1f2937'>
+                <p>Hi {safeName},</p>
+                <p>Use this one-time code to sign in to <strong>{System.Net.WebUtility.HtmlEncode(company.Name)}</strong>:</p>
+                <div style='font-size:28px;font-weight:800;letter-spacing:8px;background:#f3f4f6;border-radius:8px;padding:14px 18px;text-align:center;margin:14px 0'>{code}</div>
+                <p style='color:#6b7280;font-size:13px'>
+                    This code expires in {(int)OtpLifetime.TotalMinutes} minutes.
+                    If you didn't try to sign in, you can safely ignore this email.
+                </p>
+            </div>";
+        var result = await _email.SendAsync(company, user.Email, subject, html);
+        if (!result.Success)
+            _log.LogWarning("OTP email failed for user {UserId}: {Err}", user.Id, result.ErrorMessage);
+        return result;
+    }
+
+    private static string HashOtp(string code)
+    {
+        // Short-lived secret — SHA256 over (UserId-independent) code is fine.
+        // We never store the plaintext code, only the hash.
+        Span<byte> hash = stackalloc byte[32];
+        SHA256.HashData(Encoding.UTF8.GetBytes(code), hash);
+        return Convert.ToHexString(hash);
+    }
+
+    private static string? MaskEmail(string? email)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return null;
+        var at = email.IndexOf('@');
+        if (at < 2) return email;
+        var localVisible = Math.Min(2, at);
+        return email[..localVisible] + new string('•', Math.Max(1, at - localVisible)) + email[at..];
     }
 
     [HttpGet("/register")]

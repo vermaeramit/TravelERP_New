@@ -396,6 +396,8 @@ public class CompanyController : Controller
     public async Task<IActionResult> QuoteBranding(
         string? greetingParagraph,
         string? whyBookWithUs,
+        string? googlePlaceId,
+        string? googleApiKey,
         IFormFile? logoFile,
         bool removeLogo = false)
     {
@@ -422,7 +424,8 @@ public class CompanyController : Controller
         }
 
         await _companies.UpdateQuoteBrandingAsync(
-            _tenant.CompanyId, greetingParagraph, whyBookWithUs, logoUrl, updateLogo, _tenant.UserId);
+            _tenant.CompanyId, greetingParagraph, whyBookWithUs, logoUrl, updateLogo,
+            googlePlaceId, googleApiKey, _tenant.UserId);
         TempData["Success"] = "Quote branding saved.";
         return RedirectToAction(nameof(QuoteBranding));
     }
@@ -478,5 +481,62 @@ public class CompanyController : Controller
         await _companies.UpdateNumberSeriesAsync(_tenant.CompanyId, leadPrefix, packagePrefix, bookingPrefix, invoicePrefix, _tenant.UserId);
         TempData["Success"] = "Number series updated. New records will use the new prefixes.";
         return RedirectToAction(nameof(NumberSeries));
+    }
+
+    // ──────────────────────── API KEYS ────────────────────────
+    [HttpGet("ApiKeys")]
+    public async Task<IActionResult> ApiKeys([FromServices] IApiKeyRepository repo)
+    {
+        if (!_tenant.IsSuperAdmin) return Forbid();
+        ViewData["Title"] = "API Keys";
+        var keys = (await repo.GetByCompanyAsync(_tenant.CompanyId)).ToList();
+        // If we just generated one, surface its raw value once.
+        ViewBag.NewKey  = TempData["NewKey"]  as string;
+        ViewBag.NewName = TempData["NewName"] as string;
+        return View(keys);
+    }
+
+    [HttpPost("ApiKeys/Create"), ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateApiKey([FromServices] IApiKeyRepository repo, string name)
+    {
+        if (!_tenant.IsSuperAdmin) return Forbid();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            TempData["Error"] = "Name is required.";
+            return RedirectToAction(nameof(ApiKeys));
+        }
+
+        // 40 random hex chars, prefixed with "tek_" so the type of token is obvious in logs.
+        var raw = "tek_" + Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(20)).ToLowerInvariant();
+        await repo.InsertAsync(new TravelERP.Core.Entities.Master.ApiKey
+        {
+            CompanyId = _tenant.CompanyId,
+            Name      = name.Trim(),
+            Key       = raw,
+            CreatedBy = _tenant.UserId
+        });
+
+        // Carry the full key forward for ONE render so the user can copy it. Never shown again.
+        TempData["NewKey"]  = raw;
+        TempData["NewName"] = name.Trim();
+        TempData["Success"] = "API key created. Copy it now — it won't be shown again.";
+        return RedirectToAction(nameof(ApiKeys));
+    }
+
+    [HttpPost("ApiKeys/Revoke/{id:int}"), ValidateAntiForgeryToken]
+    public async Task<IActionResult> RevokeApiKey([FromServices] IApiKeyRepository repo, int id)
+    {
+        if (!_tenant.IsSuperAdmin) return Forbid();
+        await repo.RevokeAsync(id, _tenant.CompanyId);
+        TempData["Success"] = "API key revoked.";
+        return RedirectToAction(nameof(ApiKeys));
+    }
+
+    [HttpGet("ApiDocs")]
+    public IActionResult ApiDocs()
+    {
+        if (!_tenant.IsSuperAdmin) return Forbid();
+        ViewData["Title"] = "API Documentation";
+        return View();
     }
 }

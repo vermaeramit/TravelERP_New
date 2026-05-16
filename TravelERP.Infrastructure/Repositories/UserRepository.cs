@@ -107,4 +107,29 @@ public class UserRepository : IUserRepository
             "sp_User_Delete", new { Id = id, UpdatedBy = deletedBy },
             commandType: CommandType.StoredProcedure);
     }
+
+    public async Task SetOtpAsync(int userId, string otpHash, DateTime expiresAt)
+    {
+        using var conn = _factory.CreateMasterConnection();
+        await conn.ExecuteAsync(
+            "sp_User_SetOtp",
+            new { Id = userId, OtpHash = otpHash, ExpiresAt = expiresAt },
+            commandType: CommandType.StoredProcedure);
+    }
+
+    public async Task ClearOtpAsync(int userId)
+    {
+        using var conn = _factory.CreateMasterConnection();
+        await conn.ExecuteAsync(
+            "sp_User_ClearOtp", new { Id = userId },
+            commandType: CommandType.StoredProcedure);
+    }
+
+    public async Task<int> IncrementOtpAttemptsAsync(int userId)
+    {
+        using var conn = _factory.CreateMasterConnection();
+        return await conn.ExecuteScalarAsync<int>(
+            "sp_User_IncrementOtpAttempts", new { Id = userId },
+            commandType: CommandType.StoredProcedure);
+    }
 }

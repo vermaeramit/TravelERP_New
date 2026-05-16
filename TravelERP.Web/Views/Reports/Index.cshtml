@@ -13,9 +13,9 @@
     string AgingClass(string bucket) => bucket switch
     {
         "Current"     => "bg-success-subtle text-success",
-        "1–30 days"   => "bg-warning-subtle text-warning",
-        "31–60 days"  => "bg-warning text-dark",
-        "61–90 days"  => "bg-danger-subtle text-danger",
+        "1-30 days"   => "bg-warning-subtle text-warning",
+        "31-60 days"  => "bg-warning text-dark",
+        "61-90 days"  => "bg-danger-subtle text-danger",
         "90+ days"    => "bg-danger text-white",
         _             => "bg-secondary-subtle text-secondary"
     };
@@ -234,7 +234,7 @@
 
         <div class="row g-2 mb-3">
             @{
-                var buckets = new[] { "Current", "1–30 days", "31–60 days", "61–90 days", "90+ days" };
+                var buckets = new[] { "Current", "1-30 days", "31-60 days", "61-90 days", "90+ days" };
             }
             @foreach (var name in buckets)
             {

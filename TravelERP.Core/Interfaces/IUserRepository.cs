@@ -13,4 +13,9 @@ public interface IUserRepository
     Task<bool> ChangePasswordAsync(int userId, string passwordHash);
     Task SetTenantRoleAsync(int userId, int tenantRoleId);
     Task DeleteAsync(int id, int? deletedBy);
+
+    // OTP login
+    Task SetOtpAsync(int userId, string otpHash, DateTime expiresAt);
+    Task ClearOtpAsync(int userId);
+    Task<int> IncrementOtpAttemptsAsync(int userId);
 }

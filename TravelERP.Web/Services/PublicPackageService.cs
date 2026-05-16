@@ -17,11 +17,13 @@ public class PublicPackageService
 {
     private readonly DbConnectionFactory _factory;
     private readonly ICompanyRepository _companies;
+    private readonly GoogleReviewsService _reviews;
 
-    public PublicPackageService(DbConnectionFactory factory, ICompanyRepository companies)
+    public PublicPackageService(DbConnectionFactory factory, ICompanyRepository companies, GoogleReviewsService reviews)
     {
         _factory = factory;
         _companies = companies;
+        _reviews = reviews;
     }
 
     public record AgentInfo(string? FullName, string? Email, string? Mobile, string? ImageUrl);
@@ -33,7 +35,8 @@ public class PublicPackageService
         AgentInfo? Agent,
         string? GreetingHtml,
         IReadOnlyList<WhyItem> WhyBookWithUs,
-        IReadOnlyList<BankAccount> BankAccounts);
+        IReadOnlyList<BankAccount> BankAccounts,
+        GoogleReviewsService.ReviewsBundle? GoogleReviews);
 
     public async Task<PublicResult?> GetByShareTokenAsync(string companySlug, string token)
     {
@@ -81,7 +84,11 @@ public class PublicPackageService
 
         var whyItems = ParseWhyJson(whyJson);
 
-        return new PublicResult(package, company, agentRow, greeting, whyItems, bankAccounts);
+        // Best-effort: pull cached Google reviews (or refresh if stale).
+        // Service returns null when Place ID / API key aren't configured.
+        var reviews = await _reviews.GetReviewsAsync(company);
+
+        return new PublicResult(package, company, agentRow, greeting, whyItems, bankAccounts, reviews);
     }
 
     public static IReadOnlyList<WhyItem> ParseWhyJson(string? json)
