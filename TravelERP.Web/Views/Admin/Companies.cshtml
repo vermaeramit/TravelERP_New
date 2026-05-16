@@ -1,0 +1,107 @@
+@using TravelERP.Core.Entities.Master
+@using TravelERP.Shared.Enums
+@model IEnumerable<Company>
+@{
+    ViewData["Title"] = "Companies";
+    var statusFilter = ViewBag.StatusFilter as string ?? "";
+    var q = ViewBag.Q as string ?? "";
+
+    string StatusBadge(CompanyStatus s) => s switch
+    {
+        CompanyStatus.Active    => "bg-success-subtle text-success",
+        CompanyStatus.Trial     => "bg-warning-subtle text-warning",
+        CompanyStatus.Suspended => "bg-danger-subtle text-danger",
+        CompanyStatus.Expired   => "bg-secondary-subtle text-secondary",
+        _ => "bg-light text-dark"
+    };
+}
+
+<form method="get" class="card border-0 shadow-sm p-3 mb-3">
+    <div class="row g-2 align-items-end">
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold mb-1">Search</label>
+            <input type="text" name="q" value="@q" class="form-control form-control-sm" placeholder="name, slug, email" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">Status</label>
+            <select name="status" class="form-select form-select-sm">
+                <option value="">All</option>
+                @foreach (var s in Enum.GetNames<CompanyStatus>())
+                {
+                    <option value="@s" selected="@(statusFilter == s)">@s</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-3">
+            <button class="btn btn-sm btn-primary"><i class="bi bi-funnel me-1"></i>Filter</button>
+            <a href="/Admin/Companies" class="btn btn-sm btn-outline-secondary">Reset</a>
+        </div>
+        <div class="col-md-2 text-end small text-muted">@Model.Count() companies</div>
+    </div>
+</form>
+
+<div class="card shadow-sm border-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Company</th>
+                    <th>Slug</th>
+                    <th>Plan</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Trial / Sub Ends</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var c in Model)
+                {
+                    <tr>
+                        <td>
+                            <div class="fw-semibold">@c.Name</div>
+                            <div class="small text-muted">@c.Email</div>
+                        </td>
+                        <td class="font-monospace small">@c.Slug</td>
+                        <td><span class="badge bg-info-subtle text-info">@c.PlanName</span></td>
+                        <td><span class="badge @StatusBadge(c.Status)">@c.Status</span></td>
+                        <td class="small">@c.CreatedAt.ToString("dd MMM yyyy")</td>
+                        <td class="small">
+                            <div>Trial: @c.TrialEndsAt.ToString("dd MMM yyyy")</div>
+                            <div class="text-muted">Sub: @(c.SubscriptionEndsAt?.ToString("dd MMM yyyy") ?? "—")</div>
+                        </td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm">
+                                <a href="/Admin/Companies/Edit/@c.Id" class="btn btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></a>
+                                <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                                    <i class="bi bi-toggle-on"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    @foreach (var s in Enum.GetValues<CompanyStatus>())
+                                    {
+                                        <li>
+                                            <form asp-action="SetCompanyStatus" asp-route-id="@c.Id" method="post" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="status" value="@s" />
+                                                <button class="dropdown-item @(c.Status == s ? "active" : "")">Set @s</button>
+                                            </form>
+                                        </li>
+                                    }
+                                </ul>
+                                <form asp-action="DeleteCompany" asp-route-id="@c.Id" method="post" class="d-inline"
+                                      onsubmit="return confirm('Soft-delete @c.Name? Their tenant database is left intact.');">
+                                    @Html.AntiForgeryToken()
+                                    <button class="btn btn-outline-danger" title="Remove"><i class="bi bi-trash"></i></button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                @if (!Model.Any())
+                {
+                    <tr><td colspan="7" class="text-center text-muted py-4">No companies match the filter.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

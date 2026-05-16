@@ -52,6 +52,22 @@ public class AuthController : Controller
             return View(model);
         }
 
+        // Block login for Suspended / Expired companies (Active and Trial are allowed).
+        // Platform tenant is always allowed regardless of status.
+        if (!string.Equals(company.Slug, "platform", StringComparison.OrdinalIgnoreCase))
+        {
+            if (company.Status == TravelERP.Shared.Enums.CompanyStatus.Suspended)
+            {
+                ModelState.AddModelError("", "This company account is suspended. Please contact support.");
+                return View(model);
+            }
+            if (company.Status == TravelERP.Shared.Enums.CompanyStatus.Expired)
+            {
+                ModelState.AddModelError("", "This company's subscription has expired. Please renew to continue.");
+                return View(model);
+            }
+        }
+
         var user = await _users.GetByEmailAsync(model.Email);
         if (user == null || user.CompanyId != company.Id || !BCrypt.Net.BCrypt.Verify(model.Password, user.PasswordHash))
         {
@@ -67,6 +83,10 @@ public class AuthController : Controller
 
         await _users.UpdateLastLoginAsync(user.Id);
         await SignInAsync(user, company, model.RememberMe);
+
+        // Platform Super-Admin: skip the tenant Dashboard, go straight to the admin portal.
+        if (user.Role == TravelERP.Shared.Enums.UserRole.SuperAdmin)
+            return LocalRedirect("/Admin/Stats");
 
         return LocalRedirect(string.IsNullOrEmpty(returnUrl) ? "/Dashboard" : returnUrl);
     }
@@ -149,7 +169,11 @@ public class AuthController : Controller
     }
 
     [HttpGet("/plans")]
-    public IActionResult Plans() => View();
+    public async Task<IActionResult> Plans([FromServices] ISubscriptionPlanRepository plans)
+    {
+        var visible = (await plans.GetAllAsync(includeInactive: false)).ToList();
+        return View(visible);
+    }
 
     [HttpPost("/logout")]
     [Authorize]
@@ -162,8 +186,8 @@ public class AuthController : Controller
 
     private async Task SignInAsync(MasterUser user, Company company, bool rememberMe)
     {
-        var isSuperAdmin = user.Role == TravelERP.Shared.Enums.UserRole.SuperAdmin
-                        || user.Role == TravelERP.Shared.Enums.UserRole.CompanyAdmin;
+        var isPlatformAdmin = user.Role == TravelERP.Shared.Enums.UserRole.SuperAdmin;
+        var isCompanyAdmin  = user.Role == TravelERP.Shared.Enums.UserRole.CompanyAdmin;
 
         var claims = new List<Claim>
         {
@@ -180,7 +204,12 @@ public class AuthController : Controller
             new("CurrencySymbol", company.CurrencySymbol),
         };
 
-        if (isSuperAdmin)
+        if (isPlatformAdmin)
+        {
+            // Platform admin has no tenant — no IsSuperAdmin company claim, no tenant permissions.
+            // Role claim "SuperAdmin" is what AdminController gates on.
+        }
+        else if (isCompanyAdmin)
         {
             claims.Add(new Claim("IsSuperAdmin", "true"));
         }

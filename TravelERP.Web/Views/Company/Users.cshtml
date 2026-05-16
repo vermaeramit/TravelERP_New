@@ -5,6 +5,10 @@
 @{
     ViewData["Title"] = "Users";
     var users = Model?.ToList() ?? new();
+    var activeCount = (int?)ViewBag.ActiveCount ?? 0;
+    var maxUsers    = (int?)ViewBag.MaxUsers ?? 0;
+    var planName    = ViewBag.PlanName as string ?? "";
+    var atCap       = maxUsers > 0 && activeCount >= maxUsers;
 
     string RoleBadge(UserRole r) => r switch
     {
@@ -18,9 +22,20 @@
     };
 }
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <p class="text-muted mb-0 small">Users in your company. Each user signs in with their email + password.</p>
-    <a href="/Company/Users/Create" class="btn btn-primary">
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+        <p class="text-muted mb-1 small">Users in your company. Each user signs in with their email + password.</p>
+        @if (maxUsers > 0)
+        {
+            <span class="badge @(atCap ? "bg-danger-subtle text-danger" : "bg-info-subtle text-info") px-2 py-1">
+                <i class="bi @(atCap ? "bi-exclamation-triangle-fill" : "bi-people-fill") me-1"></i>
+                @activeCount of @maxUsers active users used
+                <span class="opacity-75 ms-1">— @planName plan</span>
+            </span>
+        }
+    </div>
+    <a href="/Company/Users/Create" class="btn btn-primary @(atCap ? "disabled" : "")"
+       title="@(atCap ? $"Cap reached ({activeCount} / {maxUsers}). Deactivate someone or upgrade the plan." : "Add a new user")">
         <i class="bi bi-plus-lg me-1"></i>Add User
     </a>
 </div>

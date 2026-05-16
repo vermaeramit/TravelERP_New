@@ -3,6 +3,7 @@
 [Oo]bj/
 [Oo]ut/
 [Bb]uild/
+*.lscache
 [Dd]ebug/
 [Rr]elease/
 *.dll

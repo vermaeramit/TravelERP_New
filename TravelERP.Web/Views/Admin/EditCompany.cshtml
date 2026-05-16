@@ -1,0 +1,131 @@
+@using TravelERP.Core.Entities.Master
+@model Company
+@{
+    ViewData["Title"] = $"Edit — {Model.Name}";
+    var plans = ViewBag.Plans as IEnumerable<SubscriptionPlan> ?? [];
+}
+
+<form asp-action="EditCompany" method="post" class="row g-3">
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="Id" />
+
+    <div class="col-lg-8">
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-transparent border-0">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-building text-primary me-2"></i>Company Profile</h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-8">
+                        <label class="form-label small fw-semibold">Company Name</label>
+                        <input asp-for="Name" class="form-control" required />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Slug</label>
+                        <input value="@Model.Slug" class="form-control" disabled />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Email</label>
+                        <input asp-for="Email" type="email" class="form-control" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Phone</label>
+                        <input asp-for="Phone" class="form-control" />
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label small fw-semibold">Address</label>
+                        <textarea asp-for="Address" class="form-control" rows="2"></textarea>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">City</label>
+                        <input asp-for="City" class="form-control" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Country</label>
+                        <input asp-for="Country" class="form-control" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">License</label>
+                        <input asp-for="LicenseNumber" class="form-control" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Tax / GST</label>
+                        <input asp-for="TaxNumber" class="form-control" />
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Time Zone</label>
+                        <input asp-for="TimeZone" class="form-control" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Currency Code</label>
+                        <input asp-for="Currency" class="form-control" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Currency Symbol</label>
+                        <input asp-for="CurrencySymbol" class="form-control" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-transparent border-0">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-credit-card text-primary me-2"></i>Billing</h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Plan</label>
+                        <select asp-for="PlanName" class="form-select">
+                            @foreach (var p in plans)
+                            {
+                                <option value="@p.Name" selected="@(Model.PlanName == p.Name)">@p.Name (max @p.MaxUsers users)</option>
+                            }
+                            @if (!plans.Any(p => p.Name == Model.PlanName))
+                            {
+                                <option value="@Model.PlanName" selected>@Model.PlanName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Max Users</label>
+                        <input asp-for="MaxUsers" type="number" min="1" class="form-control" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Trial Ends</label>
+                        <input asp-for="TrialEndsAt" type="date" class="form-control"
+                               value="@Model.TrialEndsAt.ToString("yyyy-MM-dd")" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Subscription Ends</label>
+                        <input asp-for="SubscriptionEndsAt" type="date" class="form-control"
+                               value="@(Model.SubscriptionEndsAt?.ToString("yyyy-MM-dd"))" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2 justify-content-end">
+            <a href="/Admin/Companies" class="btn btn-outline-secondary">Back</a>
+            <button class="btn btn-primary px-4"><i class="bi bi-check-lg me-1"></i>Save</button>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card shadow-sm border-0 bg-light">
+            <div class="card-body small">
+                <h6 class="fw-bold mb-2"><i class="bi bi-info-circle text-primary me-2"></i>Tenant DB</h6>
+                <div><strong>Database:</strong> <code>@Model.DatabaseName</code></div>
+                <div><strong>Status:</strong> @Model.Status</div>
+                <div><strong>Created:</strong> @Model.CreatedAt.ToString("dd MMM yyyy HH:mm")</div>
+                <hr class="my-2" />
+                <p class="text-muted mb-0">Status changes happen from the Companies list (toggle menu). Soft-delete removes the row from listings but leaves the tenant DB intact for recovery.</p>
+            </div>
+        </div>
+    </div>
+</form>

@@ -169,3 +169,13 @@ BEGIN
     ('Enterprise', 199.99,  1999.99,  999, 'Unlimited users, white-label, dedicated support');
 END
 GO
+
+-- Marketing fields driving the public /plans page (idempotent).
+IF COL_LENGTH('SubscriptionPlans','Tagline')      IS NULL ALTER TABLE SubscriptionPlans ADD Tagline      NVARCHAR(300) NULL;
+IF COL_LENGTH('SubscriptionPlans','IconClass')    IS NULL ALTER TABLE SubscriptionPlans ADD IconClass    NVARCHAR(50)  NULL;
+IF COL_LENGTH('SubscriptionPlans','IconColor')    IS NULL ALTER TABLE SubscriptionPlans ADD IconColor    NVARCHAR(20)  NULL;
+IF COL_LENGTH('SubscriptionPlans','IsFeatured')   IS NULL ALTER TABLE SubscriptionPlans ADD IsFeatured   BIT NOT NULL DEFAULT 0;
+IF COL_LENGTH('SubscriptionPlans','DisplayOrder') IS NULL ALTER TABLE SubscriptionPlans ADD DisplayOrder INT NOT NULL DEFAULT 100;
+IF COL_LENGTH('SubscriptionPlans','CtaLabel')     IS NULL ALTER TABLE SubscriptionPlans ADD CtaLabel     NVARCHAR(60)  NULL;
+IF COL_LENGTH('SubscriptionPlans','CtaUrl')       IS NULL ALTER TABLE SubscriptionPlans ADD CtaUrl       NVARCHAR(300) NULL;
+GO

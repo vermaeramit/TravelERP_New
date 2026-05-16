@@ -24,6 +24,10 @@ public class DashboardController : Controller
 
     public async Task<IActionResult> Index()
     {
+        // Platform admin doesn't belong to a tenant — bounce them to the admin portal.
+        if (User.IsInRole("SuperAdmin"))
+            return RedirectToAction("Stats", "Admin");
+
         ViewData["Title"] = "Dashboard";
         var company = await _companies.GetByIdAsync(_tenant.CompanyId);
 

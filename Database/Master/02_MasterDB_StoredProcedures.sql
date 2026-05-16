@@ -3040,3 +3040,198 @@ AS BEGIN
         @DueDate, @ReceivedDate, @Remark, @CreatedBy;
 END
 GO
+
+-- ============================================================
+-- SUBSCRIPTION PLAN PROCEDURES (Platform admin)
+-- ============================================================
+CREATE OR ALTER PROCEDURE sp_Plan_GetAll
+    @IncludeInactive BIT = 0
+AS BEGIN
+    SET NOCOUNT ON;
+    SELECT * FROM SubscriptionPlans
+    WHERE @IncludeInactive = 1 OR IsActive = 1
+    ORDER BY DisplayOrder, MonthlyPrice;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Plan_GetById
+    @Id INT
+AS BEGIN
+    SET NOCOUNT ON;
+    SELECT * FROM SubscriptionPlans WHERE Id = @Id;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Plan_Insert
+    @Name         NVARCHAR(50),
+    @MonthlyPrice DECIMAL(10,2),
+    @YearlyPrice  DECIMAL(10,2),
+    @MaxUsers     INT,
+    @Features     NVARCHAR(MAX) = NULL,
+    @IsActive     BIT           = 1,
+    @Tagline      NVARCHAR(300) = NULL,
+    @IconClass    NVARCHAR(50)  = NULL,
+    @IconColor    NVARCHAR(20)  = NULL,
+    @IsFeatured   BIT           = 0,
+    @DisplayOrder INT           = 100,
+    @CtaLabel     NVARCHAR(60)  = NULL,
+    @CtaUrl       NVARCHAR(300) = NULL,
+    @NewId        INT OUTPUT
+AS BEGIN
+    SET NOCOUNT ON;
+    INSERT INTO SubscriptionPlans
+        (Name, MonthlyPrice, YearlyPrice, MaxUsers, Features, IsActive,
+         Tagline, IconClass, IconColor, IsFeatured, DisplayOrder, CtaLabel, CtaUrl, CreatedAt)
+    VALUES
+        (@Name, @MonthlyPrice, @YearlyPrice, @MaxUsers, @Features, @IsActive,
+         @Tagline, @IconClass, @IconColor, @IsFeatured, @DisplayOrder, @CtaLabel, @CtaUrl, GETUTCDATE());
+    SET @NewId = SCOPE_IDENTITY();
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Plan_Update
+    @Id           INT,
+    @Name         NVARCHAR(50),
+    @MonthlyPrice DECIMAL(10,2),
+    @YearlyPrice  DECIMAL(10,2),
+    @MaxUsers     INT,
+    @Features     NVARCHAR(MAX) = NULL,
+    @IsActive     BIT,
+    @Tagline      NVARCHAR(300) = NULL,
+    @IconClass    NVARCHAR(50)  = NULL,
+    @IconColor    NVARCHAR(20)  = NULL,
+    @IsFeatured   BIT           = 0,
+    @DisplayOrder INT           = 100,
+    @CtaLabel     NVARCHAR(60)  = NULL,
+    @CtaUrl       NVARCHAR(300) = NULL
+AS BEGIN
+    SET NOCOUNT ON;
+    UPDATE SubscriptionPlans
+    SET Name         = @Name,
+        MonthlyPrice = @MonthlyPrice,
+        YearlyPrice  = @YearlyPrice,
+        MaxUsers     = @MaxUsers,
+        Features     = @Features,
+        IsActive     = @IsActive,
+        Tagline      = @Tagline,
+        IconClass    = @IconClass,
+        IconColor    = @IconColor,
+        IsFeatured   = @IsFeatured,
+        DisplayOrder = @DisplayOrder,
+        CtaLabel     = @CtaLabel,
+        CtaUrl       = @CtaUrl
+    WHERE Id = @Id;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Plan_SetActive
+    @Id       INT,
+    @IsActive BIT
+AS BEGIN
+    SET NOCOUNT ON;
+    UPDATE SubscriptionPlans SET IsActive = @IsActive WHERE Id = @Id;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Plan_Delete
+    @Id INT
+AS BEGIN
+    SET NOCOUNT ON;
+    -- Hard delete only if no companies are using it; otherwise soft-deactivate.
+    IF EXISTS (SELECT 1 FROM Companies WHERE PlanName = (SELECT Name FROM SubscriptionPlans WHERE Id = @Id))
+        UPDATE SubscriptionPlans SET IsActive = 0 WHERE Id = @Id;
+    ELSE
+        DELETE FROM SubscriptionPlans WHERE Id = @Id;
+END
+GO
+
+-- ============================================================
+-- COMPANY ADMIN PROCEDURES (Platform admin)
+-- ============================================================
+CREATE OR ALTER PROCEDURE sp_Company_UpdateStatus
+    @Id        INT,
+    @Status    TINYINT,
+    @UpdatedBy INT = NULL
+AS BEGIN
+    SET NOCOUNT ON;
+    UPDATE Companies SET
+        Status    = @Status,
+        UpdatedAt = GETUTCDATE(),
+        UpdatedBy = @UpdatedBy
+    WHERE Id = @Id;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Company_UpdateBilling
+    @Id                 INT,
+    @PlanName           NVARCHAR(50),
+    @MaxUsers           INT,
+    @TrialEndsAt        DATETIME      = NULL,
+    @SubscriptionEndsAt DATETIME      = NULL,
+    @UpdatedBy          INT           = NULL
+AS BEGIN
+    SET NOCOUNT ON;
+    UPDATE Companies SET
+        PlanName           = @PlanName,
+        MaxUsers           = @MaxUsers,
+        TrialEndsAt        = ISNULL(@TrialEndsAt, TrialEndsAt),
+        SubscriptionEndsAt = @SubscriptionEndsAt,
+        UpdatedAt          = GETUTCDATE(),
+        UpdatedBy          = @UpdatedBy
+    WHERE Id = @Id;
+END
+GO
+
+CREATE OR ALTER PROCEDURE sp_Company_SoftDelete
+    @Id        INT,
+    @UpdatedBy INT = NULL
+AS BEGIN
+    SET NOCOUNT ON;
+    UPDATE Companies SET
+        IsDeleted = 1,
+        Status    = 1,             -- Suspended
+        UpdatedAt = GETUTCDATE(),
+        UpdatedBy = @UpdatedBy
+    WHERE Id = @Id;
+END
+GO
+
+-- ============================================================
+-- PLATFORM-WIDE STATS
+-- Returns 3 result sets: counters, plan breakdown, recent signups
+-- ============================================================
+CREATE OR ALTER PROCEDURE sp_Admin_GetStats
+AS BEGIN
+    SET NOCOUNT ON;
+
+    -- 1) Counters + MRR
+    SELECT
+        (SELECT COUNT(*) FROM Companies WHERE IsDeleted = 0)                      AS TotalCompanies,
+        (SELECT COUNT(*) FROM Companies WHERE IsDeleted = 0 AND Status = 0)       AS ActiveCount,
+        (SELECT COUNT(*) FROM Companies WHERE IsDeleted = 0 AND Status = 1)       AS SuspendedCount,
+        (SELECT COUNT(*) FROM Companies WHERE IsDeleted = 0 AND Status = 2)       AS TrialCount,
+        (SELECT COUNT(*) FROM Companies WHERE IsDeleted = 0 AND Status = 3)       AS ExpiredCount,
+        (SELECT COUNT(*) FROM Companies WHERE IsDeleted = 0
+            AND CreatedAt >= DATEADD(DAY, -30, GETUTCDATE()))                     AS Signups30d,
+        ISNULL((SELECT SUM(p.MonthlyPrice)
+                FROM Companies c
+                INNER JOIN SubscriptionPlans p ON c.PlanName = p.Name
+                WHERE c.IsDeleted = 0 AND c.Status = 0), 0)                       AS MRR;
+
+    -- 2) Breakdown by plan
+    SELECT
+        c.PlanName,
+        COUNT(*) AS CompanyCount
+    FROM Companies c
+    WHERE c.IsDeleted = 0
+    GROUP BY c.PlanName
+    ORDER BY COUNT(*) DESC;
+
+    -- 3) Recent signups (last 10)
+    SELECT TOP 10
+        Id, Name, Slug, Email, Status, PlanName, CreatedAt
+    FROM Companies
+    WHERE IsDeleted = 0
+    ORDER BY CreatedAt DESC;
+END
+GO

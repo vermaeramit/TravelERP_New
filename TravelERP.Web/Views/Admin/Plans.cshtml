@@ -1,0 +1,63 @@
+@model IEnumerable<TravelERP.Core.Entities.Master.SubscriptionPlan>
+@{ ViewData["Title"] = "Subscription Plans"; }
+
+<div class="d-flex justify-content-end mb-3">
+    <a href="/Admin/Plans/Create" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i>Add Plan
+    </a>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Name</th>
+                    <th class="text-end">Monthly</th>
+                    <th class="text-end">Yearly</th>
+                    <th class="text-center">Max Users</th>
+                    <th>Features</th>
+                    <th class="text-center">Active</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in Model)
+                {
+                    <tr>
+                        <td class="fw-semibold">@p.Name</td>
+                        <td class="text-end font-monospace">@p.MonthlyPrice.ToString("N2")</td>
+                        <td class="text-end font-monospace">@p.YearlyPrice.ToString("N2")</td>
+                        <td class="text-center">@p.MaxUsers</td>
+                        <td class="small text-muted">@p.Features</td>
+                        <td class="text-center">
+                            @if (p.IsActive) { <span class="badge bg-success-subtle text-success">Active</span> }
+                            else             { <span class="badge bg-secondary-subtle text-secondary">Disabled</span> }
+                        </td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm">
+                                <a href="/Admin/Plans/Edit/@p.Id" class="btn btn-outline-primary"><i class="bi bi-pencil"></i></a>
+                                <form asp-action="SetPlanActive" asp-route-id="@p.Id" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="isActive" value="@(!p.IsActive)" />
+                                    <button class="btn btn-outline-secondary" title="@(p.IsActive ? "Disable" : "Enable")">
+                                        <i class="bi @(p.IsActive ? "bi-pause-circle" : "bi-play-circle")"></i>
+                                    </button>
+                                </form>
+                                <form asp-action="DeletePlan" asp-route-id="@p.Id" method="post" class="d-inline"
+                                      onsubmit="return confirm('Delete plan @p.Name? If any companies use it, it will be deactivated instead.');">
+                                    @Html.AntiForgeryToken()
+                                    <button class="btn btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                @if (!Model.Any())
+                {
+                    <tr><td colspan="7" class="text-center text-muted py-4">No plans yet.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

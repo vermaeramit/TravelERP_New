@@ -183,4 +183,40 @@ public class CompanyRepository : ICompanyRepository
         await conn.ExecuteAsync("sp_Company_GenerateDbName", p, commandType: CommandType.StoredProcedure);
         return p.Get<string>("DatabaseName");
     }
+
+    public async Task<bool> UpdateStatusAsync(int companyId, TravelERP.Shared.Enums.CompanyStatus status, int? updatedBy)
+    {
+        using var conn = _factory.CreateMasterConnection();
+        return await conn.ExecuteAsync(
+            "sp_Company_UpdateStatus",
+            new { Id = companyId, Status = (byte)status, UpdatedBy = updatedBy },
+            commandType: CommandType.StoredProcedure) > 0;
+    }
+
+    public async Task<bool> UpdateBillingAsync(int companyId, string planName, int maxUsers,
+        DateTime? trialEndsAt, DateTime? subscriptionEndsAt, int? updatedBy)
+    {
+        using var conn = _factory.CreateMasterConnection();
+        return await conn.ExecuteAsync(
+            "sp_Company_UpdateBilling",
+            new
+            {
+                Id                 = companyId,
+                PlanName           = planName,
+                MaxUsers           = maxUsers,
+                TrialEndsAt        = trialEndsAt,
+                SubscriptionEndsAt = subscriptionEndsAt,
+                UpdatedBy          = updatedBy
+            },
+            commandType: CommandType.StoredProcedure) > 0;
+    }
+
+    public async Task<bool> SoftDeleteAsync(int companyId, int? updatedBy)
+    {
+        using var conn = _factory.CreateMasterConnection();
+        return await conn.ExecuteAsync(
+            "sp_Company_SoftDelete",
+            new { Id = companyId, UpdatedBy = updatedBy },
+            commandType: CommandType.StoredProcedure) > 0;
+    }
 }

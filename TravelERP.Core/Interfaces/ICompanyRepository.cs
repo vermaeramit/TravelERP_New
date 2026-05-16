@@ -16,4 +16,9 @@ public interface ICompanyRepository
     Task<bool> UpdateVoucherDefaultsAsync(int companyId, Company settings, int? updatedBy);
     Task<bool> ExistsAsync(string slug);
     Task<string> GenerateDbNameAsync();
+
+    // Platform-admin operations
+    Task<bool> UpdateStatusAsync(int companyId, TravelERP.Shared.Enums.CompanyStatus status, int? updatedBy);
+    Task<bool> UpdateBillingAsync(int companyId, string planName, int maxUsers, DateTime? trialEndsAt, DateTime? subscriptionEndsAt, int? updatedBy);
+    Task<bool> SoftDeleteAsync(int companyId, int? updatedBy);
 }

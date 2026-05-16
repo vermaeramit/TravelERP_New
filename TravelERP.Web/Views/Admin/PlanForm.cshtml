@@ -1,0 +1,124 @@
+@model TravelERP.Core.Entities.Master.SubscriptionPlan
+@{
+    var isEdit = Model.Id > 0;
+    ViewData["Title"] ??= isEdit ? $"Edit — {Model.Name}" : "New Plan";
+}
+
+<form asp-action="@(isEdit ? "EditPlan" : "CreatePlan")" method="post" class="row g-3">
+    @Html.AntiForgeryToken()
+    @if (isEdit) { <input type="hidden" asp-for="Id" /> }
+
+    <div class="col-lg-8">
+        <!-- Pricing & limits -->
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-transparent border-0">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-tag text-primary me-2"></i>Plan Details</h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Name <span class="text-danger">*</span></label>
+                        <input asp-for="Name" class="form-control" required maxlength="50" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Max Users <span class="text-danger">*</span></label>
+                        <input asp-for="MaxUsers" type="number" min="1" class="form-control" required />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Monthly Price</label>
+                        <input asp-for="MonthlyPrice" type="number" step="0.01" min="0" class="form-control" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Yearly Price</label>
+                        <input asp-for="YearlyPrice" type="number" step="0.01" min="0" class="form-control" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Public /plans presentation -->
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-transparent border-0">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-megaphone text-primary me-2"></i>Public Page (/plans)</h6>
+                <small class="text-muted">Controls how this plan appears on the public pricing page.</small>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label small fw-semibold">Tagline</label>
+                        <input asp-for="Tagline" class="form-control" maxlength="300"
+                               placeholder="Perfect for small agencies getting started" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Icon Class</label>
+                        <input asp-for="IconClass" class="form-control" maxlength="50"
+                               placeholder="bi-rocket-takeoff" />
+                        <small class="text-muted">Any <a href="https://icons.getbootstrap.com" target="_blank">Bootstrap Icon</a> class (e.g. bi-rocket-takeoff).</small>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold">Icon Color</label>
+                        <input asp-for="IconColor" type="color" class="form-control form-control-color"
+                               value="@(string.IsNullOrEmpty(Model.IconColor) ? "#3b82f6" : Model.IconColor)" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold">Display Order</label>
+                        <input asp-for="DisplayOrder" type="number" min="0" class="form-control" />
+                        <small class="text-muted">Lower = leftmost.</small>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label small fw-semibold">Features (one per line)</label>
+                        <textarea asp-for="Features" class="form-control" rows="6"
+                                  placeholder="Up to 3 staff accounts&#10;500 bookings/month&#10;Email support&#10;-Visa tracking&#10;-API access"></textarea>
+                        <small class="text-muted">Prefix a line with <code>-</code> to render it as a greyed-out / unavailable feature (e.g. <code>-Visa tracking</code>).</small>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">CTA Button Label</label>
+                        <input asp-for="CtaLabel" class="form-control" maxlength="60"
+                               placeholder="Start Free Trial" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">CTA Button URL</label>
+                        <input asp-for="CtaUrl" class="form-control" maxlength="300"
+                               placeholder="/register or mailto:sales@@example.com" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="form-check form-switch">
+                            <input asp-for="IsFeatured" class="form-check-input" type="checkbox" />
+                            <label class="form-check-label" asp-for="IsFeatured">Mark as &quot;Most Popular&quot; (highlighted card)</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check form-switch">
+                            <input asp-for="IsActive" class="form-check-input" type="checkbox" />
+                            <label class="form-check-label" asp-for="IsActive">Active (visible on /plans)</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2 justify-content-end">
+            <a href="/Admin/Plans" class="btn btn-outline-secondary">Cancel</a>
+            <button class="btn btn-primary px-4"><i class="bi bi-check-lg me-1"></i>@(isEdit ? "Save" : "Create Plan")</button>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card shadow-sm border-0 bg-light">
+            <div class="card-body small">
+                <h6 class="fw-bold mb-2"><i class="bi bi-info-circle text-primary me-2"></i>Tips</h6>
+                <ul class="ps-3 mb-0">
+                    <li>Use a memorable plan name — it shows on customer invoices too.</li>
+                    <li>Set a <em>Tagline</em> to give context (1 short sentence).</li>
+                    <li>Featured plan gets the colored gradient + "Most Popular" badge on /plans.</li>
+                    <li>Disabled feature lines (<code>-line</code>) help show what's missing vs higher tiers.</li>
+                    <li>Set <em>Active = off</em> to hide a plan from /plans without deleting it.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</form>

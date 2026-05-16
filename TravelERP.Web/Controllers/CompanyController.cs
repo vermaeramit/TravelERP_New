@@ -49,7 +49,11 @@ public class CompanyController : Controller
     {
         if (!_tenant.IsSuperAdmin) return Forbid();
         ViewData["Title"] = "Users";
-        var users = await _users.GetByCompanyAsync(_tenant.CompanyId);
+        var users = (await _users.GetByCompanyAsync(_tenant.CompanyId)).ToList();
+        var company = await _companies.GetByIdAsync(_tenant.CompanyId);
+        ViewBag.ActiveCount = users.Count(u => u.IsActive);
+        ViewBag.MaxUsers    = company?.MaxUsers ?? 0;
+        ViewBag.PlanName    = company?.PlanName ?? "";
         return View(users);
     }
 
@@ -89,6 +93,19 @@ public class CompanyController : Controller
             ModelState.AddModelError(nameof(vm.Password), "Password must be at least 6 characters.");
             ViewBag.Roles = await roles.GetAllAsync();
             return View("UserForm", vm);
+        }
+
+        // Enforce plan user-limit (only counts active users; disabled users don't consume a seat).
+        if (vm.IsActive)
+        {
+            var company = await _companies.GetByIdAsync(_tenant.CompanyId);
+            var activeCount = (await _users.GetByCompanyAsync(_tenant.CompanyId)).Count(u => u.IsActive);
+            if (company != null && activeCount >= company.MaxUsers)
+            {
+                ModelState.AddModelError("", $"User limit reached: your {company.PlanName} plan allows {company.MaxUsers} active users (currently {activeCount}). Upgrade the plan or deactivate an existing user.");
+                ViewBag.Roles = await roles.GetAllAsync();
+                return View("UserForm", vm);
+            }
         }
 
         var imageUrl = await SaveUserPhotoAsync(photo);
@@ -221,6 +238,18 @@ public class CompanyController : Controller
         {
             TempData["Error"] = "You cannot disable your own account.";
             return RedirectToAction(nameof(Users));
+        }
+
+        // Block re-activation if it would push us over the plan's seat cap.
+        if (!user.IsActive)
+        {
+            var company = await _companies.GetByIdAsync(_tenant.CompanyId);
+            var activeCount = (await _users.GetByCompanyAsync(_tenant.CompanyId)).Count(u => u.IsActive);
+            if (company != null && activeCount >= company.MaxUsers)
+            {
+                TempData["Error"] = $"User limit reached ({activeCount} / {company.MaxUsers}). Deactivate another user first or upgrade the {company.PlanName} plan.";
+                return RedirectToAction(nameof(Users));
+            }
         }
 
         user.IsActive = !user.IsActive;

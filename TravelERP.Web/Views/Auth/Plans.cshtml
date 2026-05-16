@@ -1,6 +1,23 @@
+@model IEnumerable<TravelERP.Core.Entities.Master.SubscriptionPlan>
 @{
     Layout = "_LayoutPlans";
     ViewData["Title"] = "Pricing Plans";
+
+    var plans = Model?.ToList() ?? new();
+
+    string FmtMoney(decimal d) => d.ToString("N0");
+
+    IEnumerable<(string Text, bool Disabled)> ParseFeatures(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) yield break;
+        foreach (var line in raw.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var trimmed = line.Trim();
+            if (trimmed.Length == 0) continue;
+            if (trimmed.StartsWith("-")) yield return (trimmed.TrimStart('-').Trim(), true);
+            else                          yield return (trimmed, false);
+        }
+    }
 }
 
 <div class="plans-hero text-center mb-5">
@@ -8,101 +25,77 @@
     <h1 class="plans-title">Choose the plan that fits<br>your travel business</h1>
     <p class="plans-subtitle">Start free for 30 days — no credit card required. Cancel anytime.</p>
 
-    <div class="billing-toggle mt-4">
-        <span class="toggle-label" id="lblMonthly">Monthly</span>
-        <label class="toggle-switch">
-            <input type="checkbox" id="billingToggle" onchange="switchBilling(this)">
-            <span class="slider"></span>
-        </label>
-        <span class="toggle-label" id="lblYearly">Yearly <span class="save-badge">Save 20%</span></span>
-    </div>
+    @if (plans.Any(p => p.YearlyPrice > 0 && p.MonthlyPrice > 0))
+    {
+        <div class="billing-toggle mt-4">
+            <span class="toggle-label" id="lblMonthly">Monthly</span>
+            <label class="toggle-switch">
+                <input type="checkbox" id="billingToggle" onchange="switchBilling(this)">
+                <span class="slider"></span>
+            </label>
+            <span class="toggle-label" id="lblYearly">Yearly <span class="save-badge">Save</span></span>
+        </div>
+    }
 </div>
 
-<div class="plans-grid">
-
-    <!-- Starter -->
-    <div class="plan-card">
-        <div class="plan-header">
-            <div class="plan-icon" style="background:#eff6ff;color:#3b82f6"><i class="bi bi-rocket-takeoff"></i></div>
-            <h3 class="plan-name">Starter</h3>
-            <p class="plan-tagline">Perfect for small agencies getting started</p>
-        </div>
-        <div class="plan-price">
-            <span class="currency">₹</span>
-            <span class="amount" data-monthly="2,499" data-yearly="1,999">2,499</span>
-            <span class="period">/month</span>
-        </div>
-        <div class="plan-billing-note" data-monthly="Billed monthly" data-yearly="Billed ₹23,988/year">Billed monthly</div>
-        <ul class="plan-features">
-            <li><i class="bi bi-check-circle-fill"></i> Up to <strong>3 staff accounts</strong></li>
-            <li><i class="bi bi-check-circle-fill"></i> <strong>500 bookings</strong>/month</li>
-            <li><i class="bi bi-check-circle-fill"></i> Customer & supplier management</li>
-            <li><i class="bi bi-check-circle-fill"></i> Invoice generation</li>
-            <li><i class="bi bi-check-circle-fill"></i> Basic reports</li>
-            <li><i class="bi bi-check-circle-fill"></i> Email support</li>
-            <li class="disabled"><i class="bi bi-x-circle"></i> Visa tracking</li>
-            <li class="disabled"><i class="bi bi-x-circle"></i> API access</li>
-            <li class="disabled"><i class="bi bi-x-circle"></i> White-label</li>
-        </ul>
-        <a href="/register" class="btn-plan btn-plan-outline">Start Free Trial</a>
+@if (!plans.Any())
+{
+    <div class="text-center text-muted py-5">
+        <i class="bi bi-tags fs-1 d-block mb-2 opacity-50"></i>
+        <p>No plans are configured yet.</p>
     </div>
-
-    <!-- Professional (highlighted) -->
-    <div class="plan-card plan-featured">
-        <div class="popular-badge">Most Popular</div>
-        <div class="plan-header">
-            <div class="plan-icon" style="background:rgba(255,255,255,0.15);color:#fff"><i class="bi bi-lightning-charge-fill"></i></div>
-            <h3 class="plan-name">Professional</h3>
-            <p class="plan-tagline">For growing agencies that need more power</p>
-        </div>
-        <div class="plan-price">
-            <span class="currency">₹</span>
-            <span class="amount" data-monthly="6,499" data-yearly="5,199">6,499</span>
-            <span class="period">/month</span>
-        </div>
-        <div class="plan-billing-note" data-monthly="Billed monthly" data-yearly="Billed ₹62,388/year">Billed monthly</div>
-        <ul class="plan-features">
-            <li><i class="bi bi-check-circle-fill"></i> Up to <strong>15 staff accounts</strong></li>
-            <li><i class="bi bi-check-circle-fill"></i> <strong>Unlimited bookings</strong></li>
-            <li><i class="bi bi-check-circle-fill"></i> Customer & supplier management</li>
-            <li><i class="bi bi-check-circle-fill"></i> Advanced invoicing & payments</li>
-            <li><i class="bi bi-check-circle-fill"></i> <strong>Visa & document tracking</strong></li>
-            <li><i class="bi bi-check-circle-fill"></i> Full analytics dashboard</li>
-            <li><i class="bi bi-check-circle-fill"></i> Priority email & chat support</li>
-            <li><i class="bi bi-check-circle-fill"></i> API access</li>
-            <li class="disabled"><i class="bi bi-x-circle"></i> White-label</li>
-        </ul>
-        <a href="/register" class="btn-plan btn-plan-primary">Start Free Trial</a>
+}
+else
+{
+    <div class="plans-grid">
+        @foreach (var p in plans)
+        {
+            var iconClass = string.IsNullOrWhiteSpace(p.IconClass) ? "bi-tag" : p.IconClass;
+            var iconColor = string.IsNullOrWhiteSpace(p.IconColor) ? "#3b82f6" : p.IconColor;
+            var ctaLabel  = string.IsNullOrWhiteSpace(p.CtaLabel)  ? "Start Free Trial" : p.CtaLabel;
+            var ctaUrl    = string.IsNullOrWhiteSpace(p.CtaUrl)    ? "/register"        : p.CtaUrl;
+            var yearlyMonthly = p.YearlyPrice > 0 ? Math.Round(p.YearlyPrice / 12m, 0) : p.MonthlyPrice;
+            <div class="plan-card @(p.IsFeatured ? "plan-featured" : "")">
+                @if (p.IsFeatured)
+                {
+                    <div class="popular-badge">Most Popular</div>
+                }
+                <div class="plan-header">
+                    <div class="plan-icon" style="background: @(p.IsFeatured ? "rgba(255,255,255,0.15)" : iconColor + "22"); color: @(p.IsFeatured ? "#fff" : iconColor)">
+                        <i class="bi @iconClass"></i>
+                    </div>
+                    <h3 class="plan-name">@p.Name</h3>
+                    @if (!string.IsNullOrWhiteSpace(p.Tagline))
+                    {
+                        <p class="plan-tagline">@p.Tagline</p>
+                    }
+                </div>
+                <div class="plan-price">
+                    <span class="currency">₹</span>
+                    <span class="amount"
+                          data-monthly="@FmtMoney(p.MonthlyPrice)"
+                          data-yearly="@FmtMoney(yearlyMonthly)">@FmtMoney(p.MonthlyPrice)</span>
+                    <span class="period">/month</span>
+                </div>
+                <div class="plan-billing-note"
+                     data-monthly="Billed monthly"
+                     data-yearly="@(p.YearlyPrice > 0 ? $"Billed ₹{FmtMoney(p.YearlyPrice)}/year" : "Billed monthly")">
+                    Billed monthly
+                </div>
+                <ul class="plan-features">
+                    @foreach (var (text, disabled) in ParseFeatures(p.Features))
+                    {
+                        <li class="@(disabled ? "disabled" : "")">
+                            <i class="bi @(disabled ? "bi-x-circle" : "bi-check-circle-fill")"></i>
+                            @text
+                        </li>
+                    }
+                </ul>
+                <a href="@ctaUrl" class="btn-plan @(p.IsFeatured ? "btn-plan-primary" : "btn-plan-outline")">@ctaLabel</a>
+            </div>
+        }
     </div>
-
-    <!-- Enterprise -->
-    <div class="plan-card">
-        <div class="plan-header">
-            <div class="plan-icon" style="background:#f0fdf4;color:#16a34a"><i class="bi bi-building-gear"></i></div>
-            <h3 class="plan-name">Enterprise</h3>
-            <p class="plan-tagline">For large agencies & travel groups</p>
-        </div>
-        <div class="plan-price">
-            <span class="currency">₹</span>
-            <span class="amount" data-monthly="16,499" data-yearly="13,199">16,499</span>
-            <span class="period">/month</span>
-        </div>
-        <div class="plan-billing-note" data-monthly="Billed monthly" data-yearly="Billed ₹1,58,388/year">Billed monthly</div>
-        <ul class="plan-features">
-            <li><i class="bi bi-check-circle-fill"></i> <strong>Unlimited</strong> staff accounts</li>
-            <li><i class="bi bi-check-circle-fill"></i> <strong>Unlimited bookings</strong></li>
-            <li><i class="bi bi-check-circle-fill"></i> Everything in Professional</li>
-            <li><i class="bi bi-check-circle-fill"></i> <strong>White-label</strong> branding</li>
-            <li><i class="bi bi-check-circle-fill"></i> Multi-branch management</li>
-            <li><i class="bi bi-check-circle-fill"></i> Custom integrations & API</li>
-            <li><i class="bi bi-check-circle-fill"></i> Dedicated account manager</li>
-            <li><i class="bi bi-check-circle-fill"></i> SLA-backed support</li>
-            <li><i class="bi bi-check-circle-fill"></i> On-premise option</li>
-        </ul>
-        <a href="mailto:sales@travelcrm.io" class="btn-plan btn-plan-outline">Contact Sales</a>
-    </div>
-
-</div>
+}
 
 <!-- FAQ / trust strip -->
 <div class="trust-strip mt-5">
@@ -127,8 +120,12 @@
             document.querySelectorAll('.plan-billing-note').forEach(el => {
                 el.textContent = yearly ? el.dataset.yearly : el.dataset.monthly;
             });
-            document.getElementById('lblMonthly').style.fontWeight = yearly ? '400' : '700';
-            document.getElementById('lblYearly').style.fontWeight = yearly ? '700' : '400';
+            const lblM = document.getElementById('lblMonthly');
+            const lblY = document.getElementById('lblYearly');
+            if (lblM && lblY) {
+                lblM.style.fontWeight = yearly ? '400' : '700';
+                lblY.style.fontWeight = yearly ? '700' : '400';
+            }
         }
     </script>
 }

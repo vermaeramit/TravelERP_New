@@ -22,6 +22,8 @@ builder.Services.AddScoped<EmailService>();
 // Master repositories
 builder.Services.AddScoped<ICompanyRepository, CompanyRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<ISubscriptionPlanRepository, SubscriptionPlanRepository>();
+builder.Services.AddScoped<PlatformSeedService>();
 
 // Tenant repositories
 builder.Services.AddScoped<IRoleRepository, RoleRepository>();
@@ -61,6 +63,13 @@ builder.Services.AddAuthorization();
 builder.Services.AddSession(o => { o.IdleTimeout = TimeSpan.FromMinutes(30); o.Cookie.HttpOnly = true; });
 
 var app = builder.Build();
+
+// One-shot platform seed (system Company + admin@platform). Idempotent.
+using (var scope = app.Services.CreateScope())
+{
+    var seed = scope.ServiceProvider.GetRequiredService<PlatformSeedService>();
+    await seed.EnsureAsync();
+}
 
 if (!app.Environment.IsDevelopment())
 {
